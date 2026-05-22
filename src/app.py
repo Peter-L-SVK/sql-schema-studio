@@ -49,6 +49,6 @@ class Application(Gtk.Application):
 
     def do_shutdown(self):
         """Clean up before exit"""
-        if self.db_connector._active_profile:
+        if self.db_connector.is_connected:
             self.db_connector.disconnect()
         Gtk.Application.do_shutdown(self)

@@ -110,18 +110,18 @@ class DatabaseBrowser(Gtk.Box):
 
         db = self._window.db_connector
 
-        if not db._active_profile:
+        if not db.is_connected:
             self._store.append(None, ["📁", "No Connection", "", "", True])
             self._refreshing = False
             return
 
-        root = self._store.append(None, ["🖥", db._active_profile, "server", "", True])
-        self._all_items.append((root, db._active_profile, "server", ""))
+        root = self._store.append(None, ["🖥", db.active_profile_name, "server", "", True])
+        self._all_items.append((root, db.active_profile_name, "server", ""))
 
-        active_name = db._active_profile
+        active_name = db.active_profile_name
 
         def load_all():
-            if self._window.db_connector._active_profile != active_name:
+            if self._window.db_connector.active_profile_name != active_name:
                 return None
 
             try:
