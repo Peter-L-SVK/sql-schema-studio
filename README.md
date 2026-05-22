@@ -1,8 +1,16 @@
 # SQL Schema Studio
 
+[![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0) 
+[![Top Language](https://img.shields.io/github/languages/top/Peter-L-SVK/sql-schema-studio)](https://github.com/Peter-L-SVK/sql-shcema-studio)
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/Peter-L-SVK/sql-schema-studio](https://github.com/Peter-L-SVK/sql-shcema-studio/releases/latest)
+[![GitHub last commit](https://img.shields.io/github/last-commit/Peter-L-SVK/sql-schema-studio)](https://github.com/Peter-L-SVK/sql-schema-studio/commits/main)
+<a href="https://buymeacoffee.com/leukanic.peter"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" height="20px"></a>
+
 Intelligent PostgreSQL Management Platform. A GTK4 desktop application for
 database administrators and developers who want a clean, fast, and extensible
 SQL tool.
+
+![Demo](scrshots/4.png)   
 
 ## What It Does
 

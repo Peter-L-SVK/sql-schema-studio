@@ -93,16 +93,14 @@ class ActionHandler:
         self._add_action("preferences", self._on_preferences)
 
     def _on_undo(self, action, param):
-        if self._window and hasattr(self._window, "editor"):
+        if self._window and hasattr(self._window, 'editor'):
             buffer = self._window.editor._view.get_buffer()
-            if buffer.can_undo():
-                buffer.undo()
+            buffer.undo()
 
     def _on_redo(self, action, param):
-        if self._window and hasattr(self._window, "editor"):
+        if self._window and hasattr(self._window, 'editor'):
             buffer = self._window.editor._view.get_buffer()
-            if buffer.can_redo():
-                buffer.redo()
+            buffer.redo()
 
     def _on_cut(self, action, param):
         if self._window and hasattr(self._window, "editor"):
