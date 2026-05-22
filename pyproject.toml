@@ -1,0 +1,114 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "sql-schema-studio"
+version = "0.1.0"
+description = "Intelligent PostgreSQL Management Platform with Python/Perl hooks and AI analytics"
+readme = "README.md"
+license = {text = "GPL-3.0-or-later"}
+authors = [
+    {name = "Peter Leukanič"}
+]
+keywords = ["postgresql", "gtk4", "sql", "database", "schema", "ai"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: X11 Applications :: GTK",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Perl",
+    "Topic :: Database :: Front-Ends",
+    "Topic :: Software Development :: User Interfaces",
+]
+requires-python = ">=3.12"
+dependencies = [
+    "psycopg[binary]>=3.1.0",
+    "sqlparse>=0.4.4",
+    "PyGObject>=3.46.0",
+    "numpy>=1.24.0",
+    "pandas>=2.0.0",
+    "scikit-learn>=1.3.0",
+    "matplotlib>=3.7.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "black>=23.0.0",
+    "mypy>=1.5.0",
+]
+analytics = [
+    "plotly>=5.15.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/peter-leukanic/sql-schema-studio"
+"Bug Tracker" = "https://github.com/peter-leukanic/sql-schema-studio/issues"
+Documentation = "https://github.com/peter-leukanic/sql-schema-studio#readme"
+"Source Code" = "https://github.com/peter-leukanic/sql-schema-studio"
+
+[project.scripts]
+sql-schema-studio = "src.main:main"
+
+[project.gui-scripts]
+sql-schema-studio-gtk = "src.main:main"
+
+[tool.setuptools]
+packages = [
+    "src",
+    "src.core",
+    "src.ui",
+    "src.ui.dialogs",
+    "src.models",
+    "src.utils",
+    "src.plugins",
+    "src.plugins.python",
+    "src.plugins.perl",
+    "src.analytics",
+    "src.analytics.visualizations",
+    "src.hooks",
+    "src.hooks.python_hooks",
+    "src.hooks.perl_hooks",
+]
+
+[tool.setuptools.package-data]
+src = ["resources/ui/*.css"]
+
+[tool.flake8]
+max-line-length = 100
+extend-ignore = "E402,W503"
+exclude = [
+    # No need to traverse our git directory
+    ".git",
+    # There's no value in checking cache directories
+    "__pycache__",
+    "buld_dist"
+]
+ignore = "E501,E302"
+per-file-ignores = "__init__.py:F401,F403, src/plugins/perl/executor.py:W293, src/ui/browser.py:W291"
+
+[tool.black]
+line-length = 100
+target-version = ['py312']
+
+[tool.mypy]
+python_version = "3.14"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+explicit_package_bases = true
+namespace_packages = true
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-v --tb=short"

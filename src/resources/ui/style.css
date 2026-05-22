@@ -1,0 +1,307 @@
+/* ---------------------------------------------------------------------
+ * SQL Schema Studio - GTK4 CSS Styling 
+ * Copyright (C) 2026 Peter Leukanič
+ * License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
+ * This is free software with NO WARRANTY.
+ * Feel free to distribute and modify.
+ * --------------------------------------------------------------------- */
+
+/* Base window styling */
+window {
+    background-color: @theme_bg_color;
+}
+
+/* Header bar - Cinnamon style */
+headerbar {
+    padding: 4px 8px;
+    min-height: 38px;
+    background-color: shade(@theme_bg_color, 0.95);
+    border-bottom: 1px solid @borders;
+}
+
+headerbar button {
+    padding: 4px 12px;
+    min-height: 28px;
+    border-radius: 4px;
+    font-weight: normal;
+}
+
+headerbar button:hover {
+    background-color: shade(@theme_bg_color, 0.85);
+    border-color: shade(@borders, 0.8);
+}
+
+headerbar button:active {
+    background-color: shade(@theme_bg_color, 0.75);
+}
+
+/* Panel headers - the section labels */
+.panel-header {
+    font-weight: 600;
+    font-size: 0.95em;
+    padding: 10px 14px;
+    background-color: shade(@theme_bg_color, 0.97);
+    border-bottom: 1px solid @borders;
+    color: @theme_fg_color;
+}
+
+/* Sidebar / database browser */
+.db-browser {
+    background-color: shade(@theme_bg_color, 0.98);
+    border-right: 1px solid @borders;
+}
+
+.db-browser treeview {
+    padding: 4px;
+    background-color: transparent;
+}
+
+.db-browser treeview:hover {
+    background-color: shade(@theme_bg_color, 0.95);
+}
+
+/* SQL Editor */
+.sql-editor textview {
+    font-family: 'Monospace', 'DejaVu Sans Mono', 'Courier New', monospace;
+    font-size: 13px;
+    padding: 12px;
+    background-color: shade(@theme_base_color, 0.98);
+    color: @theme_text_color;
+    border: none;
+}
+
+.sql-editor textview:focus {
+    background-color: @theme_base_color;
+}
+
+/* Results view */
+.results-view {
+    font-family: 'Monospace', 'DejaVu Sans Mono', monospace;
+    font-size: 12px;
+}
+
+.results-view textview {
+    padding: 8px 12px;
+    background-color: @theme_base_color;
+}
+
+/* Paned dividers - subtle */
+paned > separator {
+    background-color: @borders;
+    min-width: 1px;
+    min-height: 1px;
+}
+
+paned > separator:hover {
+    background-color: shade(@borders, 0.6);
+}
+
+/* Buttons */
+button {
+    padding: 6px 16px;
+    border-radius: 5px;
+    border: 1px solid @borders;
+    background-color: @theme_bg_color;
+    color: @theme_fg_color;
+    transition: all 150ms ease;
+}
+
+button.suggested-action {
+    background-color: #3584e4;  /* Cinnamon blue */
+    color: white;
+    border-color: #1c71d8;
+    font-weight: 600;
+}
+
+button.suggested-action:hover {
+    background-color: #1c71d8;
+}
+
+button.suggested-action:active {
+    background-color: #1557a8;
+}
+
+/* Destructive actions */
+button.destructive-action {
+    background-color: #c01c28;
+    color: white;
+}
+
+/* Regular buttons */
+button {
+    padding: 4px 14px;
+    border-radius: 5px;
+    border: 1px solid @borders;
+    background-color: @theme_bg_color;
+    color: @theme_fg_color;
+}
+
+button:hover {
+    background-color: shade(@theme_bg_color, 0.93);
+}
+
+/* Stop button - red */
+button.destructive-action {
+    background-color: #c01c28;
+    color: white;
+    border-color: #a01a22;
+}
+
+button.destructive-action:hover {
+    background-color: #a01a22;
+}
+
+button.destructive-action:active {
+    background-color: #80161a;
+}
+
+/* Text entries */
+entry {
+    padding: 6px 10px;
+    border-radius: 5px;
+    border: 1px solid @borders;
+    background-color: @theme_base_color;
+    min-height: 28px;
+}
+
+entry:focus {
+    border-color: @accent_bg_color;
+    box-shadow: 0 0 0 1px @accent_bg_color;
+}
+
+/* Treeviews */
+treeview {
+    padding: 2px;
+    background-color: transparent;
+}
+
+treeview:selected {
+    background-color: @accent_bg_color;
+    color: @accent_fg_color;
+}
+
+/* Status bar */
+.status-bar {
+    padding: 4px 12px;
+    font-size: 0.85em;
+    background-color: shade(@theme_bg_color, 0.95);
+    border-top: 1px solid @borders;
+    color: alpha(@theme_fg_color, 0.7);
+}
+
+/* Tabs */
+notebook > header {
+    padding: 0;
+    background-color: shade(@theme_bg_color, 0.97);
+    border-bottom: 1px solid @borders;
+}
+
+notebook > header > tab {
+    padding: 8px 16px;
+    border-bottom: 2px solid transparent;
+}
+
+notebook > header > tab:checked {
+    border-bottom-color: @accent_bg_color;
+    font-weight: 600;
+}
+
+/* Scrollbars - subtle */
+scrolledwindow scrollbar slider {
+    min-width: 8px;
+    min-height: 8px;
+    border-radius: 4px;
+    background-color: alpha(@theme_fg_color, 0.3);
+}
+
+scrolledwindow scrollbar slider:hover {
+    background-color: alpha(@theme_fg_color, 0.5);
+}
+
+/* Dialogs */
+dialog {
+    padding: 0;
+}
+
+dialog headerbar {
+    border-radius: 0;
+}
+
+/* Tooltips */
+tooltip {
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+/* Menu styling */
+menu {
+    padding: 4px;
+    border-radius: 6px;
+    border: 1px solid @borders;
+}
+
+menuitem {
+    padding: 6px 12px;
+    border-radius: 4px;
+}
+
+menuitem:hover {
+    background-color: shade(@theme_bg_color, 0.9);
+}
+
+/* Connection status indicator */
+.connected {
+    color: @success_color;
+}
+
+.disconnected {
+    color: alpha(@theme_fg_color, 0.4);
+}
+
+.error-message {
+    color: @error_color;
+    padding: 10px 14px;
+    border-left: 3px solid @error_color;
+    background-color: alpha(@error_color, 0.08);
+    margin: 6px;
+    border-radius: 0 4px 4px 0;
+}
+
+/* Analytics dashboard cards */
+.analytics-card {
+    padding: 16px;
+    margin: 8px;
+    border-radius: 8px;
+    background-color: shade(@theme_bg_color, 0.97);
+    border: 1px solid @borders;
+}
+
+.analytics-card .title {
+    font-weight: 600;
+    font-size: 1.1em;
+    margin-bottom: 8px;
+}
+
+/* About dialog — classic GTK3 style */
+aboutdialog {
+    background-color: @theme_bg_color;
+}
+
+aboutdialog > box > image {
+    padding: 20px;
+    margin-bottom: 8px;
+}
+
+aboutdialog label.title {
+    font-size: 1.4em;
+    font-weight: bold;
+}
+
+window.aboutdialog {
+    padding: 0;
+}
+
+window.aboutdialog > box {
+    padding: 20px;
+}
