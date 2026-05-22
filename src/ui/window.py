@@ -98,7 +98,7 @@ class MainWindow(Gtk.ApplicationWindow):
     # --- Action handlers ---
     def _on_close_request(self, window):
         """Handle window close — disconnect cleanly first"""
-        if self.db_connector._active_profile:
+        if self.db_connector.is_connected:
             try:
                 self.db_connector.disconnect()
                 print("Disconnected on window close")
@@ -117,9 +117,9 @@ class MainWindow(Gtk.ApplicationWindow):
 
     def _on_connected(self):
         """Called when connection succeeds"""
-        if self.db_connector._active_profile:
-            self.toolbar.set_status(True, self.db_connector._active_profile)
-            self.statusbar.set_connection(f"Connected: {self.db_connector._active_profile}")
+        if self.db_connector.is_connected:
+            self.toolbar.set_status(True, self.db_connector.active_profile_name)
+            self.statusbar.set_connection(f"Connected: {self.db_connector.active_profile_name}")
             self.browser.refresh()
 
     def _on_disconnect_clicked(self):

@@ -8,33 +8,92 @@
 
 from __future__ import annotations
 
+import logging
+import keyring
 import psycopg
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any
+
+logger = logging.getLogger(__name__)
+SERVICE_NAME = "sql-schema-studio"
 
 
 @dataclass
 class ConnectionProfile:
+    """Database connection configuration. Passwords stored in system keyring."""
+
     name: str
     host: str = "localhost"
     port: int = 5432
     database: str = "postgres"
     username: str = "postgres"
-    password: str = ""
+    password: str = field(default="", repr=False)
     ssl_mode: str = "prefer"
+
+    def __post_init__(self):
+        if self.password:
+            self.save_password(self.password)
+
+    def _get_key(self) -> str:
+        return f"{self.name}/{self.username}"
+
+    def save_password(self, password: str) -> None:
+        """Store password in system keyring."""
+        try:
+            keyring.set_password(SERVICE_NAME, self._get_key(), password)
+        except Exception as e:
+            logger.warning(f"Could not save password to keyring: {e}")
+
+    def get_password(self) -> str:
+        """Retrieve password from system keyring."""
+        try:
+            saved = keyring.get_password(SERVICE_NAME, self._get_key())
+            return saved or ""
+        except Exception as e:
+            logger.warning(f"Could not retrieve password from keyring: {e}")
+            return ""
+
+    def delete_password(self) -> None:
+        """Remove password from system keyring."""
+        try:
+            keyring.delete_password(SERVICE_NAME, self._get_key())
+        except Exception:
+            pass
+
+    def to_dict(self) -> dict:
+        """Serialize without password."""
+        return {
+            "name": self.name,
+            "host": self.host,
+            "port": self.port,
+            "database": self.database,
+            "username": self.username,
+            "ssl_mode": self.ssl_mode,
+        }
 
 
 class DatabaseConnector:
+    """Manages PostgreSQL connections with keyring-backed credentials."""
+
     def __init__(self):
         self._profiles: Dict[str, ConnectionProfile] = {}
         self._active_profile: Optional[str] = None
         self._active_profile_obj: Optional[ConnectionProfile] = None
+
+    @property
+    def is_connected(self) -> bool:
+        return self._active_profile is not None
+
+    @property
+    def active_profile_name(self) -> str | None:
+        return self._active_profile
 
     def add_profile(self, profile: ConnectionProfile):
         self._profiles[profile.name] = profile
 
     def remove_profile(self, name: str):
         if name in self._profiles:
+            self._profiles[name].delete_password()
             del self._profiles[name]
         if self._active_profile == name:
             self._active_profile = None
@@ -64,11 +123,11 @@ class DatabaseConnector:
             self._active_profile_obj = profile
             return True
         except Exception as e:
-            print(f"Connect error: {e}")
+            logger.error(f"Connect error: {e}")
             return False
 
     def disconnect(self, profile_name: str | None = None) -> None:
-        """Clear the active connection state (connections are per-query, nothing to close)."""
+        """Clear the active connection state."""
         name = profile_name or self._active_profile
         if name and self._active_profile == name:
             self._active_profile = None
@@ -78,7 +137,7 @@ class DatabaseConnector:
         return (
             f"host={profile.host} port={profile.port} "
             f"dbname={profile.database} user={profile.username} "
-            f"password={profile.password}"
+            f"password={profile.get_password()}"
         )
 
     def _get_conn_string(self) -> str:
@@ -88,7 +147,7 @@ class DatabaseConnector:
         return self._build_conn_string(self._active_profile_obj)
 
     def execute_sync(self, query: str, params: tuple | None = None) -> list[dict[str, Any]]:
-        """Execute a query from a background thread using a direct sync connection"""
+        """Execute a query from a background thread using a direct sync connection."""
         conn_string = self._get_conn_string()
 
         with psycopg.connect(conn_string) as conn:

@@ -3,6 +3,7 @@
 # Core
 psycopg[binary,pool]>=3.1.0
 sqlparse>=0.4.4
+keyring>=24.0.0
 
 # GTK4 UI
 PyGObject>=3.46.0
