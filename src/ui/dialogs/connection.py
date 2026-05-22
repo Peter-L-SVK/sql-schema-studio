@@ -57,9 +57,9 @@ class ConnectionDialog(Gtk.Dialog):
         self._entry_user.set_text("postgres")
         content.append(make_labeled_field("Username:", self._entry_user))
 
-        self._entry_pass = Gtk.Entry()
-        self._entry_pass.set_visibility(False)
-        self._entry_pass.set_input_purpose(Gtk.InputPurpose.PASSWORD)
+        # Password with visibility toggle
+        self._entry_pass = Gtk.PasswordEntry()
+        self._entry_pass.set_show_peek_icon(True)
         content.append(make_labeled_field("Password:", self._entry_pass))
 
         self._combo_ssl = Gtk.ComboBoxText()
