@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio - Database Browser (GPLv3)
+# SQL Schema Studio 0.2 - Database Browser (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -7,10 +7,16 @@
 # ----------------------------------------------------------------------
 
 from __future__ import annotations
+
+from src.utils.logging import get_logger
+
+logger = get_logger(__name__)
+
 import gi
 
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk
+from src.config import EXCLUDED_SCHEMAS, BROWSER_PANEL_WIDTH
 from src.utils.gtk_helpers import run_async
 
 
@@ -21,7 +27,7 @@ class DatabaseBrowser(Gtk.Box):
         super().__init__(orientation=Gtk.Orientation.VERTICAL)
         self._window = window
         self._refreshing = False
-        self.set_size_request(260, -1)
+        self.set_size_request(BROWSER_PANEL_WIDTH, -1)
         self.add_css_class("sidebar")
 
         # Header with refresh
@@ -125,17 +131,12 @@ class DatabaseBrowser(Gtk.Box):
                 return None
 
             try:
-                results = db.execute_sync("""
-                    SELECT schema_name 
-                    FROM information_schema.schemata 
-                    WHERE schema_name NOT IN (
-                        'pg_catalog', 'information_schema', 'pg_toast',
-                        'pg_temp_1', 'pg_toast_temp_1'
-                    )
-                    ORDER BY 
-                        CASE WHEN schema_name = 'public' THEN 0 ELSE 1 END,
-                        schema_name
-                """)
+                results = db.execute_sync(
+                    "SELECT schema_name FROM information_schema.schemata "
+                    "WHERE schema_name != ALL(%s) "
+                    "ORDER BY CASE WHEN schema_name = 'public' THEN 0 ELSE 1 END, schema_name",
+                    (list(EXCLUDED_SCHEMAS),),
+                )
                 schemas = [r["schema_name"] for r in results]
 
                 all_data = []
@@ -151,7 +152,7 @@ class DatabaseBrowser(Gtk.Box):
 
                 return all_data
             except Exception as e:
-                print(f"Browser load error: {e}")
+                logger.error(f"Browser load error: {e}")
                 return None
 
         def on_loaded(all_data):

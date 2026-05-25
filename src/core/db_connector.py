@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio - Database Connector (GPLv3)
+# SQL Schema Studio 0.2 - Database Connector (GPLv3)
 # Copyright (C) 2025-2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -14,7 +14,17 @@ import psycopg
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any
 
-logger = logging.getLogger(__name__)
+from src.utils.logging import get_logger
+from src.config import (
+    DEFAULT_HOST,
+    DEFAULT_PORT,
+    DEFAULT_DATABASE,
+    DEFAULT_USER,
+    EXCLUDED_SCHEMAS,
+    KEYRING_SERVICE_NAME,
+)
+
+logger = get_logger(__name__)
 SERVICE_NAME = "sql-schema-studio"
 
 
@@ -23,10 +33,10 @@ class ConnectionProfile:
     """Database connection configuration. Passwords stored in system keyring."""
 
     name: str
-    host: str = "localhost"
-    port: int = 5432
-    database: str = "postgres"
-    username: str = "postgres"
+    host: str = DEFAULT_HOST
+    port: int = DEFAULT_PORT
+    database: str = DEFAULT_DATABASE
+    username: str = DEFAULT_USER
     password: str = field(default="", repr=False)
     ssl_mode: str = "prefer"
 
@@ -162,8 +172,9 @@ class DatabaseConnector:
     def get_schemas(self) -> List[str]:
         results = self.execute_sync(
             "SELECT schema_name FROM information_schema.schemata "
-            "WHERE schema_name NOT IN ('pg_catalog', 'information_schema') "
-            "ORDER BY schema_name"
+            "WHERE schema_name != ALL(%s) "
+            "ORDER BY schema_name",
+            (list(EXCLUDED_SCHEMAS),),
         )
         return [r["schema_name"] for r in results]
 

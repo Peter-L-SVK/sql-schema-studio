@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio - Toolbar (GPLv3)
+# SQL Schema Studio 0.2 - Toolbar (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -14,6 +14,10 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk
+
+from src.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class Toolbar(Gtk.Box):
@@ -57,16 +61,23 @@ class Toolbar(Gtk.Box):
         # Designer button
         btn_designer = Gtk.Button(label="Designer")
         btn_designer.set_tooltip_text("Open schema designer")
+        btn_designer.connect(
+            "clicked", lambda b: logger.info("Schema designer clicked (not implemented)")
+        )
         self.append(btn_designer)
 
         # AI Tools button
         btn_ai = Gtk.Button(label="AI Tools")
         btn_ai.set_tooltip_text("AI-powered analysis tools")
+        btn_ai.connect("clicked", lambda b: logger.info("AI tools clicked (not implemented)"))
         self.append(btn_ai)
 
         # Hooks button
         btn_hooks = Gtk.Button(label="Hooks")
         btn_hooks.set_tooltip_text("Manage hooks and plugins")
+        btn_hooks.connect(
+            "clicked", lambda b: logger.info("Hook manager clicked (not implemented)")
+        )
         self.append(btn_hooks)
 
         # Spacer

@@ -1,0 +1,63 @@
+# ----------------------------------------------------------------------
+# SQL Schema Studio 0.2 - Configuration (GPLv3)
+# Copyright (C) 2026 Peter Leukanič
+# License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
+# This is free software with NO WARRANTY.
+# Feel free to distribute and modify.
+# ----------------------------------------------------------------------
+
+"""Centralized configuration constants for SQL Schema Studio."""
+
+# --- Database ---
+EXCLUDED_SCHEMAS: frozenset[str] = frozenset(
+    {
+        "pg_catalog",
+        "information_schema",
+        "pg_toast",
+        "pg_temp_1",
+        "pg_toast_temp_1",
+    }
+)
+
+DDL_COMMANDS: frozenset[str] = frozenset(
+    {
+        "CREATE",
+        "ALTER",
+        "DROP",
+        "TRUNCATE",
+        "RENAME",
+    }
+)
+
+DML_COMMANDS: frozenset[str] = frozenset(
+    {
+        "INSERT",
+        "UPDATE",
+        "DELETE",
+    }
+)
+
+# Combined — any statement that should trigger a browser refresh
+REFRESH_TRIGGER_COMMANDS: frozenset[str] = DDL_COMMANDS | DML_COMMANDS
+
+DEFAULT_PORT: int = 5432
+DEFAULT_HOST: str = "localhost"
+DEFAULT_DATABASE: str = "postgres"
+DEFAULT_USER: str = "postgres"
+
+# --- UI ---
+DEFAULT_WINDOW_WIDTH: int = 1200
+DEFAULT_WINDOW_HEIGHT: int = 800
+BROWSER_PANEL_WIDTH: int = 260
+RESULTS_ROW_LIMIT: int = 500
+
+# --- Query ---
+DEFAULT_QUERY_TIMEOUT: int = 30
+MAX_QUERY_DISPLAY_LENGTH: int = 100
+
+# --- Hooks ---
+HOOK_MEMORY_LIMIT_MB: int = 512
+HOOK_TIME_LIMIT_SECONDS: int = 30
+
+# --- Keyring ---
+KEYRING_SERVICE_NAME: str = "sql-schema-studio"

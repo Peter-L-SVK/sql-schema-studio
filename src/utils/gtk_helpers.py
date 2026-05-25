@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio - GTK4 Helpers (GPLv3)
+# SQL Schema Studio 0.2 - GTK4 Helpers (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -9,6 +9,11 @@
 """GTK4 utility helpers for consistent UI building"""
 
 from __future__ import annotations
+
+from src.utils.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 import gi
 import threading
@@ -26,7 +31,7 @@ def run_async(func, callback=None):
             if callback:
                 GLib.idle_add(callback, result)
         except Exception as e:
-            print(f"Async error: {e}")
+            logger.error(f"Async error: {e}")
             import traceback
 
             traceback.print_exc()

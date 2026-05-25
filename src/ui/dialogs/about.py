@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio - About Dialog (GPLv3)
+# SQL Schema Studio 0.2 - About Dialog (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -37,7 +37,7 @@ def show_about(parent):
         "Visual schema designer • SQL editor • AI analytics\n"
         "Plugin system with Python3 & Perl5 hooks",
         license_type=Gtk.License.GPL_3_0,
-        website="https://github.com/peter-leukanic/sql-schema-studio",
+        website="https://github.com/Peter-L-SVK/sql-schema-studio",
         website_label="GitHub Repository",
         authors=[
             "Peter Leukanič <peter@leukanic.eu>",

@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio - Column Model (GPLv3)
+# SQL Schema Studio 0.2 - Column Model (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -30,11 +30,14 @@ class Column:
     precision: Optional[int] = None
     scale: Optional[int] = None
 
-    def to_sql(self) -> str:
-        """Generate column definition SQL"""
-        parts = [self.name]
+    def _quote(self, name: str) -> str:
+        """Quote a PostgreSQL identifier safely."""
+        return f'"{name}"'
 
-        # Data type with modifiers
+    def to_sql(self) -> str:
+        """Generate column definition SQL."""
+        parts = [self._quote(self.name)]
+
         dtype = self.data_type.upper()
         if self.length:
             dtype = f"{dtype}({self.length})"

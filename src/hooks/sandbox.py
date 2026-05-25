@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio - Sandbox Executor (GPLv3)
+# SQL Schema Studio 0.2 - Sandbox Executor (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -16,14 +16,16 @@ import asyncio
 import resource
 from typing import Dict, Any
 
+from src.config import HOOK_MEMORY_LIMIT_MB, HOOK_TIME_LIMIT_SECONDS
+
 
 class SandboxedExecutor:
     """Executes hooks with resource limits and restrictions"""
 
     def __init__(
         self,
-        memory_limit_mb: int = 512,
-        time_limit_seconds: int = 30,
+        memory_limit_mb: int = HOOK_MEMORY_LIMIT_MB,
+        time_limit_seconds: int = HOOK_TIME_LIMIT_SECONDS,
         restricted_modules: list | None = None,
     ):
         self.memory_limit = memory_limit_mb * 1024 * 1024

@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio - Menu Actions (GPLv3)
+# SQL Schema Studio 0.2 - Menu Actions (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -9,6 +9,10 @@
 """All menu and toolbar action handlers"""
 
 from __future__ import annotations
+
+from src.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 import gi
 
@@ -68,16 +72,16 @@ class ActionHandler:
             self._window._on_connect_clicked()
 
     def _on_open_schema(self, action, param):
-        print("Open schema file...")
+        logger.info("Open schema file... (not implemented)")
 
     def _on_save_schema(self, action, param):
-        print("Save schema")
+        logger.info("Save schema (not implemented)")
 
     def _on_save_schema_as(self, action, param):
-        print("Save schema as...")
+        logger.info("Save schema as... (not implemented)")
 
     def _on_export(self, action, param):
-        print("Export schema")
+        logger.info("Export schema (not implemented)")
 
     def _on_quit(self, action, param):
         self._app.quit()
@@ -117,7 +121,7 @@ class ActionHandler:
             self._window.editor._view.emit("paste-clipboard")
 
     def _on_preferences(self, action, param):
-        print("Preferences...")
+        logger.info("Preferences... (not implemented)")
 
     # --- View ---
 
@@ -129,19 +133,19 @@ class ActionHandler:
         self._add_action("view_analytics", self._on_view_analytics)
 
     def _on_view_browser(self, action, param):
-        print("Toggle browser visibility")
+        logger.info("Toggle browser visibility (not implemented)")
 
     def _on_view_editor(self, action, param):
-        print("Toggle editor visibility")
+        logger.info("Toggle editor visibility (not implemented)")
 
     def _on_view_results(self, action, param):
-        print("Toggle results visibility")
+        logger.info("Toggle results visibility (not implemented)")
 
     def _on_view_hooks(self, action, param):
-        print("Open hook manager")
+        logger.info("Open hook manager (not implemented)")
 
     def _on_view_analytics(self, action, param):
-        print("Open analytics dashboard")
+        logger.info("Open analytics dashboard (not implemented)")
 
     # --- Query ---
 
@@ -183,16 +187,16 @@ class ActionHandler:
         self._add_action("tools_query_analyzer", self._on_tools_query_analyzer)
 
     def _on_tools_schema_designer(self, action, param):
-        print("Open schema designer")
+        logger.info("Open schema designer (not implemented)")
 
     def _on_tools_migration(self, action, param):
-        print("Open migration generator")
+        logger.info("Open migration generator (not implemented)")
 
     def _on_tools_index_advisor(self, action, param):
-        print("Open AI index advisor")
+        logger.info("Open AI index advisor (not implemented)")
 
     def _on_tools_query_analyzer(self, action, param):
-        print("Open query analyzer")
+        logger.info("Open query analyzer (not implemented)")
 
     # --- Help ---
 
@@ -201,7 +205,7 @@ class ActionHandler:
         self._add_action("about", self._on_about)
 
     def _on_help_docs(self, action, param):
-        print("Open documentation")
+        logger.info("Open documentation (not implemented)")
 
     def _on_about(self, action, param):
         show_about(self._window)

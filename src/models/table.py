@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio - Table Model (GPLv3)
+# SQL Schema Studio 0.2 - Table Model (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -41,7 +41,7 @@ class Table:
         return None
 
     def to_sql(self) -> str:
-        """Generate CREATE TABLE SQL"""
+        """Generate CREATE TABLE SQL."""
         parts = [f"CREATE TABLE {self.schema}.{self.name} ("]
 
         col_defs = []
@@ -56,6 +56,7 @@ class Table:
         parts.append(");")
 
         if self.comment:
-            parts.append(f"\nCOMMENT ON TABLE {self.schema}.{self.name} IS '{self.comment}';")
+            escaped = self.comment.replace("'", "''")
+            parts.append(f"\nCOMMENT ON TABLE {self.schema}.{self.name} IS '{escaped}';")
 
         return "\n".join(parts)

@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio - Model Tests (GPLv3)
+# SQL Schema Studio 0.2 - Model Tests (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -120,8 +120,8 @@ class TestRelationship:
         )
         sql = rel.to_sql()
         assert "ON DELETE CASCADE" in sql
-        assert "ALTER TABLE public.items" in sql
-        assert "ADD CONSTRAINT fk_cascade" in sql
+        assert 'ALTER TABLE "public"."items"' in sql
+        assert 'ADD CONSTRAINT "fk_cascade"' in sql
 
     def test_custom_schemas(self):
         rel = Relationship(
@@ -134,5 +134,5 @@ class TestRelationship:
             target_schema="public",
         )
         sql = rel.to_sql()
-        assert "audit.logs" in sql
-        assert "public.users" in sql
+        assert '"audit"."logs"' in sql
+        assert '"public"."users"' in sql
