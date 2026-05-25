@@ -21,6 +21,7 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("GtkSource", "5")
 from gi.repository import Gtk
 
+from src.config import DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, REFRESH_TRIGGER_COMMANDS
 from src.ui.menubar import build_menubar
 from src.ui.toolbar import Toolbar
 from src.ui.editor import SQLEditor
@@ -39,7 +40,7 @@ class MainWindow(Gtk.ApplicationWindow):
 
         self.db_connector = db_connector
         self.set_title("SQL Schema Studio")
-        self.set_default_size(1200, 800)
+        self.set_default_size(DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT)
 
         # Connect close request signal
         self.connect("close-request", self._on_close_request)
@@ -179,10 +180,7 @@ class MainWindow(Gtk.ApplicationWindow):
 
             # Refresh browser for DDL/DML
             q = query.strip().upper()
-            if any(
-                q.startswith(c)
-                for c in ["CREATE", "ALTER", "DROP", "TRUNCATE", "INSERT", "UPDATE", "DELETE"]
-            ):
+            if any(q.startswith(c) for c in REFRESH_TRIGGER_COMMANDS):
                 self.browser.refresh()
 
         run_async(run, display)

@@ -16,14 +16,16 @@ import asyncio
 import resource
 from typing import Dict, Any
 
+from src.config import HOOK_MEMORY_LIMIT_MB, HOOK_TIME_LIMIT_SECONDS
+
 
 class SandboxedExecutor:
     """Executes hooks with resource limits and restrictions"""
 
     def __init__(
         self,
-        memory_limit_mb: int = 512,
-        time_limit_seconds: int = 30,
+        memory_limit_mb: int = HOOK_MEMORY_LIMIT_MB,
+        time_limit_seconds: int = HOOK_TIME_LIMIT_SECONDS,
         restricted_modules: list | None = None,
     ):
         self.memory_limit = memory_limit_mb * 1024 * 1024

@@ -14,6 +14,7 @@ from typing import Optional, List, Any
 from dataclasses import dataclass
 from datetime import datetime
 
+from src.config import DEFAULT_QUERY_TIMEOUT
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -34,7 +35,7 @@ class QueryResult:
 class QueryExecutor:
     """Safe query execution manager."""
 
-    def __init__(self, db_connector, timeout: int = 30):
+    def __init__(self, db_connector, timeout: int = DEFAULT_QUERY_TIMEOUT):
         self.db_connector = db_connector
         self.default_timeout = timeout
         self._running_queries: dict[int, asyncio.Task] = {}

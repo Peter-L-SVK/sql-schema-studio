@@ -15,6 +15,8 @@ import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk
 
+from src.config import RESULTS_ROW_LIMIT
+
 
 class ResultsPanel(Gtk.Box):
     """Query results display panel"""
@@ -50,7 +52,7 @@ class ResultsPanel(Gtk.Box):
         buffer = self._view.get_buffer()
         buffer.set_text(f"ERROR: {message}\n\nTime: {elapsed:.3f}s")
 
-    def show_query_result(self, columns: list, rows: list, elapsed: float, row_limit: int = 500):
+    def show_query_result(self, columns, rows, elapsed, row_limit=RESULTS_ROW_LIMIT):
         """Display query results as formatted table"""
         # Calculate column widths
         col_widths = []

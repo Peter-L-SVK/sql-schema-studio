@@ -16,6 +16,7 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk
+from src.config import EXCLUDED_SCHEMAS, BROWSER_PANEL_WIDTH
 from src.utils.gtk_helpers import run_async
 
 
@@ -26,7 +27,7 @@ class DatabaseBrowser(Gtk.Box):
         super().__init__(orientation=Gtk.Orientation.VERTICAL)
         self._window = window
         self._refreshing = False
-        self.set_size_request(260, -1)
+        self.set_size_request(BROWSER_PANEL_WIDTH, -1)
         self.add_css_class("sidebar")
 
         # Header with refresh
@@ -130,17 +131,12 @@ class DatabaseBrowser(Gtk.Box):
                 return None
 
             try:
-                results = db.execute_sync("""
-                    SELECT schema_name 
-                    FROM information_schema.schemata 
-                    WHERE schema_name NOT IN (
-                        'pg_catalog', 'information_schema', 'pg_toast',
-                        'pg_temp_1', 'pg_toast_temp_1'
-                    )
-                    ORDER BY 
-                        CASE WHEN schema_name = 'public' THEN 0 ELSE 1 END,
-                        schema_name
-                """)
+                results = db.execute_sync(
+                    "SELECT schema_name FROM information_schema.schemata "
+                    "WHERE schema_name != ALL(%s) "
+                    "ORDER BY CASE WHEN schema_name = 'public' THEN 0 ELSE 1 END, schema_name",
+                    (list(EXCLUDED_SCHEMAS),),
+                )
                 schemas = [r["schema_name"] for r in results]
 
                 all_data = []
