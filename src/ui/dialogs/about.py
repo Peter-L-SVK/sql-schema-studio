@@ -37,7 +37,7 @@ def show_about(parent):
         "Visual schema designer • SQL editor • AI analytics\n"
         "Plugin system with Python3 & Perl5 hooks",
         license_type=Gtk.License.GPL_3_0,
-        website="https://github.com/peter-leukanic/sql-schema-studio",
+        website="https://github.com/Peter-L-SVK/sql-schema-studio",
         website_label="GitHub Repository",
         authors=[
             "Peter Leukanič <peter@leukanic.eu>",
