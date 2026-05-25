@@ -10,6 +10,10 @@
 
 from __future__ import annotations
 
+from src.utils.logging import get_logger
+
+logger = get_logger(__name__)
+
 import time
 import gi
 
@@ -24,6 +28,7 @@ from src.ui.results import ResultsPanel
 from src.ui.browser import DatabaseBrowser
 from src.ui.statusbar import StatusBar
 from src.utils.gtk_helpers import run_async
+from src.ui.dialogs.connection import ConnectionDialog
 
 
 class MainWindow(Gtk.ApplicationWindow):
@@ -101,15 +106,14 @@ class MainWindow(Gtk.ApplicationWindow):
         if self.db_connector.is_connected:
             try:
                 self.db_connector.disconnect()
-                print("Disconnected on window close")
+                logger.info("Disconnected on window close")
             except Exception as e:
-                print(f"Disconnect on close error: {e}")
+                logger.error(f"Disconnect on close error: {e}")
         return False
 
     def _on_connect_clicked(self):
         """Open connection dialog"""
-        from src.ui.dialogs.connection import ConnectionDialog
-
+        logger.info("Opening connection dialog")
         dialog = ConnectionDialog(
             self, db_connector=self.db_connector, on_connected=self._on_connected
         )
@@ -117,6 +121,7 @@ class MainWindow(Gtk.ApplicationWindow):
 
     def _on_connected(self):
         """Called when connection succeeds"""
+        logger.info(f"Connected to {self.db_connector.active_profile_name}")
         if self.db_connector.is_connected:
             self.toolbar.set_status(True, self.db_connector.active_profile_name)
             self.statusbar.set_connection(f"Connected: {self.db_connector.active_profile_name}")
@@ -124,19 +129,21 @@ class MainWindow(Gtk.ApplicationWindow):
 
     def _on_disconnect_clicked(self):
         """Close database connection"""
+        logger.info("Disconnecting from database")
         try:
             self.db_connector.disconnect()
         except Exception as e:
-            print(f"Disconnect error: {e}")
-        self.toolbar.set_status(False)
-        self.statusbar.set_connection("No database connected")
-        self.browser.clear()
+            logger.error(f"Disconnect error: {e}")
+            self.toolbar.set_status(False)
+            self.statusbar.set_connection("No database connected")
+            self.browser.clear()
 
     def _on_run_clicked(self):
         """Execute SQL query"""
         query = self.editor.get_selected_text()
         if not query.strip():
             return
+        logger.info(f"Executing query ({len(query)} chars)")
 
         self.toolbar.set_run_sensitive(False)
         self.statusbar.set_message("Running...")
@@ -181,4 +188,5 @@ class MainWindow(Gtk.ApplicationWindow):
         run_async(run, display)
 
     def _on_stop_clicked(self):
+        logger.info("Query cancelled by user")
         self.statusbar.set_message("Query cancelled")

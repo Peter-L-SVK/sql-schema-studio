@@ -7,6 +7,11 @@
 # ----------------------------------------------------------------------
 
 from __future__ import annotations
+
+from src.utils.logging import get_logger
+
+logger = get_logger(__name__)
+
 import gi
 
 gi.require_version("Gtk", "4.0")
@@ -151,7 +156,7 @@ class DatabaseBrowser(Gtk.Box):
 
                 return all_data
             except Exception as e:
-                print(f"Browser load error: {e}")
+                logger.error(f"Browser load error: {e}")
                 return None
 
         def on_loaded(all_data):

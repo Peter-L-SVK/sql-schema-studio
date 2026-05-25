@@ -11,10 +11,6 @@
 from __future__ import annotations
 
 import logging
-
-logging.getLogger("psycopg").setLevel(logging.WARNING)
-logging.getLogger("psycopg.pool").setLevel(logging.ERROR)
-
 import gi
 
 gi.require_version("Gtk", "4.0")

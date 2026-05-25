@@ -28,21 +28,27 @@ class Relationship:
     source_schema: str = "public"
     target_schema: str = "public"
 
+    def _quote(self, name: str) -> str:
+        """Quote a PostgreSQL identifier safely."""
+        return f'"{name}"'
+
     def to_sql(self) -> str:
-        """Generate FOREIGN KEY constraint SQL"""
-        src_cols = ", ".join(self.source_columns)
-        tgt_cols = ", ".join(self.target_columns)
+        """Generate FOREIGN KEY constraint SQL."""
+        src_table = f"{self._quote(self.source_schema)}.{self._quote(self.source_table)}"
+        tgt_table = f"{self._quote(self.target_schema)}.{self._quote(self.target_table)}"
+        src_cols = ", ".join(self._quote(c) for c in self.source_columns)
+        tgt_cols = ", ".join(self._quote(c) for c in self.target_columns)
 
         sql = (
-            f"ALTER TABLE {self.source_schema}.{self.source_table} "
-            f"ADD CONSTRAINT {self.name} "
+            f"ALTER TABLE {src_table} "
+            f"ADD CONSTRAINT {self._quote(self.name)} "
             f"FOREIGN KEY ({src_cols}) "
-            f"REFERENCES {self.target_schema}.{self.target_table} ({tgt_cols})"
+            f"REFERENCES {tgt_table} ({tgt_cols})"
         )
 
         if self.on_delete != "NO ACTION":
             sql += f" ON DELETE {self.on_delete}"
-        if self.on_update != "NO ACTION":
-            sql += f" ON UPDATE {self.on_update}"
+            if self.on_update != "NO ACTION":
+                sql += f" ON UPDATE {self.on_update}"
 
         return sql + ";"

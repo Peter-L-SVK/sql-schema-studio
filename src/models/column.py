@@ -30,11 +30,14 @@ class Column:
     precision: Optional[int] = None
     scale: Optional[int] = None
 
-    def to_sql(self) -> str:
-        """Generate column definition SQL"""
-        parts = [self.name]
+    def _quote(self, name: str) -> str:
+        """Quote a PostgreSQL identifier safely."""
+        return f'"{name}"'
 
-        # Data type with modifiers
+    def to_sql(self) -> str:
+        """Generate column definition SQL."""
+        parts = [self._quote(self.name)]
+
         dtype = self.data_type.upper()
         if self.length:
             dtype = f"{dtype}({self.length})"

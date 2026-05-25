@@ -12,14 +12,19 @@
 
 from __future__ import annotations
 
+import logging
 import sys
 import signal
 
 from src.app import Application
 from src.utils.signal_handlers import handle_sigint
+from src.utils.logging import configure_root_logger, get_logger
 
 
 def main():
+    configure_root_logger(logging.INFO)
+    logger = get_logger(__name__)
+    logger.info("Starting SQL Schema Studio...")
     signal.signal(signal.SIGINT, handle_sigint)
     app = Application()
     return app.run(sys.argv)

@@ -14,7 +14,9 @@ import psycopg
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any
 
-logger = logging.getLogger(__name__)
+from src.utils.logging import get_logger
+
+logger = get_logger(__name__)
 SERVICE_NAME = "sql-schema-studio"
 
 

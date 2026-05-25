@@ -10,6 +10,10 @@
 Plugin discovery and registration
 """
 
+from src.utils.logging import get_logger
+
+logger = get_logger(__name__)
+
 from __future__ import annotations
 
 import importlib
@@ -62,7 +66,7 @@ class PluginRegistry:
                     self.register_hook(hook_name, hook_instance, metadata)
 
         except Exception as e:
-            print(f"Failed to load hook {hook_path}: {e}")
+            logger.warning(f"Failed to load hook {hook_path}: {e}")
 
     def _discover_perl_hooks(self, perl_dir: Path):
         """Discover Perl hooks (loaded on execution)"""
@@ -82,7 +86,7 @@ class PluginRegistry:
                 trigger = HookTrigger(trigger_str)
                 self._hook_triggers[trigger].append(name)
             except ValueError:
-                print(f"Invalid trigger '{trigger_str}' for hook {name}")
+                logger.warning(f"Invalid trigger '{trigger_str}' for hook {name}")
 
     def get_hooks_for_trigger(self, trigger: HookTrigger) -> List[BaseHook]:
         """Get all hooks registered for a specific trigger"""

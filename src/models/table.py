@@ -41,7 +41,7 @@ class Table:
         return None
 
     def to_sql(self) -> str:
-        """Generate CREATE TABLE SQL"""
+        """Generate CREATE TABLE SQL."""
         parts = [f"CREATE TABLE {self.schema}.{self.name} ("]
 
         col_defs = []
@@ -56,6 +56,7 @@ class Table:
         parts.append(");")
 
         if self.comment:
-            parts.append(f"\nCOMMENT ON TABLE {self.schema}.{self.name} IS '{self.comment}';")
+            escaped = self.comment.replace("'", "''")
+            parts.append(f"\nCOMMENT ON TABLE {self.schema}.{self.name} IS '{escaped}';")
 
         return "\n".join(parts)
