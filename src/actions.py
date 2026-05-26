@@ -187,7 +187,8 @@ class ActionHandler:
         self._add_action("tools_query_analyzer", self._on_tools_query_analyzer)
 
     def _on_tools_schema_designer(self, action, param):
-        logger.info("Open schema designer (not implemented)")
+        if self._window:
+            self._window._on_designer_clicked()
 
     def _on_tools_migration(self, action, param):
         logger.info("Open migration generator (not implemented)")

@@ -61,9 +61,7 @@ class Toolbar(Gtk.Box):
         # Designer button
         btn_designer = Gtk.Button(label="Designer")
         btn_designer.set_tooltip_text("Open schema designer")
-        btn_designer.connect(
-            "clicked", lambda b: logger.info("Schema designer clicked (not implemented)")
-        )
+        btn_designer.connect("clicked", lambda b: window._on_designer_clicked())
         self.append(btn_designer)
 
         # AI Tools button

@@ -30,6 +30,7 @@ from src.ui.browser import DatabaseBrowser
 from src.ui.statusbar import StatusBar
 from src.utils.gtk_helpers import run_async
 from src.ui.dialogs.connection import ConnectionDialog
+from src.ui.schema_designer import SchemaDesigner
 
 
 class MainWindow(Gtk.ApplicationWindow):
@@ -188,3 +189,14 @@ class MainWindow(Gtk.ApplicationWindow):
     def _on_stop_clicked(self):
         logger.info("Query cancelled by user")
         self.statusbar.set_message("Query cancelled")
+
+    def _on_designer_clicked(self):
+        """Open schema designer in the main content area."""
+        logger.info("Opening schema designer")
+        # For now, show in results panel — later make it a tab
+        self._designer = SchemaDesigner(self)
+        # Replace results panel temporarily, or make a dialog
+        dialog = Gtk.Window(transient_for=self, modal=False, title="Schema Designer")
+        dialog.set_default_size(800, 600)
+        dialog.set_child(self._designer)
+        dialog.present()
