@@ -12,13 +12,14 @@ import math
 import gi
 
 gi.require_version("Gtk", "4.0")
-from gi.repository import Gtk, Gdk, Graphene, Gsk, Pango, PangoCairo
+from gi.repository import Gtk, Gdk, GObject, Graphene, Gsk, Pango, PangoCairo
 import cairo
 
-from src.utils.gtk_helpers import set_margin
+from src.utils.gtk_helpers import set_margin, run_async
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
+GType = GObject.GType
 
 
 class ForeignKey:
@@ -67,6 +68,16 @@ class SchemaDesigner(Gtk.Box):
         self._canvas.set_draw_func(self._on_draw)
         self._canvas.set_hexpand(True)
         self._canvas.set_vexpand(True)
+
+        # Drop target — accept tables from browser
+        drop_target = Gtk.DropTarget.new(GObject.TYPE_STRING, Gdk.DragAction.COPY)
+        drop_target.connect("drop", self._on_drop)
+        self._canvas.add_controller(drop_target)
+
+        # Drop target for .sql files from file manager
+        file_drop_target = Gtk.DropTarget.new(Gdk.FileList, Gdk.DragAction.COPY)
+        file_drop_target.connect("drop", self._on_file_drop)
+        self._canvas.add_controller(file_drop_target)
 
         # Enable mouse events
         drag_gesture = Gtk.GestureDrag()
@@ -133,6 +144,7 @@ class SchemaDesigner(Gtk.Box):
         self._canvas.queue_draw()
 
     def _on_generate_sql(self, button):
+        """Generate SQL and show in editor."""
         if not self._tables:
             return
 
@@ -142,23 +154,25 @@ class SchemaDesigner(Gtk.Box):
             sql_lines.append("")
 
         for fk in self._relationships:
-            # Find source and target tables to get their schemas
             source_table = next((t for t in self._tables if t.name == fk.from_table), None)
             target_table = next((t for t in self._tables if t.name == fk.to_table), None)
-            
+
             src_schema = source_table.schema if source_table else "public"
             tgt_schema = target_table.schema if target_table else "public"
-            
+
             sql_lines.append(
-                f"ALTER TABLE {src_schema}.{fk.from_table} "
-                f"ADD CONSTRAINT {fk.name} "
-                f"FOREIGN KEY ({fk.from_column}) "
-                f"REFERENCES {tgt_schema}.{fk.to_table} ({fk.to_column});"
+                f'ALTER TABLE {src_schema}."{fk.from_table}" '
+                f'ADD CONSTRAINT "{fk.name}" '
+                f'FOREIGN KEY ("{fk.from_column}") '
+                f'REFERENCES {tgt_schema}."{fk.to_table}" ("{fk.to_column}");'
             )
             sql_lines.append("")
 
         sql = "\n".join(sql_lines)
         self._window.editor.set_text(sql)
+        logger.info(
+            f"Generated SQL for {len(self._tables)} tables, {len(self._relationships)} relationships"
+        )
 
     def _find_column_at(self, table, x, y):
         """Find which column of a table is at the given position."""
@@ -262,10 +276,10 @@ class SchemaDesigner(Gtk.Box):
             fk_name = f"fk_{table.name}_{source_table.name}"
             fk = ForeignKey(
                 name=fk_name,
-                from_table=table.name,             
-                from_column=clicked_column.name,   
-                to_table=source_table.name,         # the referenced table
-                to_column=source_col.name,          # the referenced column
+                from_table=table.name,
+                from_column=clicked_column.name,
+                to_table=source_table.name,  # the referenced table
+                to_column=source_col.name,  # the referenced column
             )
             self._relationships.append(fk)
             logger.info(
@@ -442,6 +456,171 @@ class SchemaDesigner(Gtk.Box):
             cr.rectangle(table.x - 2, table.y - 2, total_width + 4, total_height + 4)
             cr.stroke()
 
+    def _on_drop(self, target, value, x, y):
+        """Handle drops from browser."""
+        if isinstance(value, str):
+            return self._drop_table_from_browser(value, x, y)
+        return False
+
+    def _drop_table_from_browser(self, table_name, x, y):
+        """Import a table from the database browser."""
+        if not table_name:
+            return False
+
+        parts = table_name.split(".", 1)
+        schema = parts[0] if len(parts) > 1 else "public"
+        name = parts[1] if len(parts) > 1 else parts[0]
+
+        logger.info(f"Dropped table from browser: {schema}.{name}")
+
+        # Load columns directly
+        try:
+            columns = self._window.db_connector.execute_sync(
+                """SELECT column_name, data_type, is_nullable,
+                character_maximum_length
+                FROM information_schema.columns
+                WHERE table_schema = %s AND table_name = %s
+                ORDER BY ordinal_position""",
+                (schema, name),
+            )
+        except Exception as e:
+            logger.error(f"Failed to load columns: {e}")
+            return False
+
+        table = SchemaTable(name=name, x=x, y=y)
+        for col in columns:
+            dtype = col["data_type"]
+            length = col.get("character_maximum_length")
+            nullable = col["is_nullable"] == "YES"
+            is_pk = col["column_name"] == "id"
+            table.columns.append(
+                TableColumn(
+                    name=col["column_name"],
+                    data_type=dtype,
+                    is_primary=is_pk,
+                    nullable=nullable,
+                    length=length,
+                )
+            )
+
+        self._tables.append(table)
+        self._canvas.queue_draw()
+        logger.info(f"Imported table: {name} with {len(table.columns)} columns")
+        return True
+
+    def _on_file_drop(self, target, value, x, y):
+        """Handle .sql files dropped from file manager."""
+        files = value.get_files()
+        for file in files:
+            path = file.get_path()
+            if path.endswith(".sql"):
+                self._import_sql_file(path, x, y)
+        return True
+
+    def _import_sql_file(self, path, x, y):
+        """Parse CREATE TABLE statements and FK constraints from a .sql file."""
+        import re
+
+        logger.info(f"Importing SQL file: {path}")
+
+        try:
+            with open(path, "r") as f:
+                content = f.read()
+        except Exception as e:
+            logger.error(f"Failed to read SQL file: {e}")
+            return
+
+        # Pattern for CREATE TABLE statements
+        table_pattern = re.compile(
+            r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?" r"(?:(\w+)\.)?(\w+)\s*\((.*?)\);",
+            re.IGNORECASE | re.DOTALL,
+        )
+
+        # Pattern for ALTER TABLE ... ADD CONSTRAINT ... FOREIGN KEY
+        fk_pattern = re.compile(
+            r"ALTER\s+TABLE\s+(?:(\w+)\.)?(\w+)\s+"
+            r"ADD\s+CONSTRAINT\s+(\w+)\s+"
+            r"FOREIGN\s+KEY\s*\((\w+)\)\s+"
+            r"REFERENCES\s+(?:(\w+)\.)?(\w+)\s*\((\w+)\);",
+            re.IGNORECASE,
+        )
+
+        offset_x = x
+        offset_y = y
+
+        # First pass — import tables
+        for match in table_pattern.finditer(content):
+            schema = match.group(1) or "public"
+            name = match.group(2)
+            body = match.group(3)
+
+            table = SchemaTable(name=name, x=offset_x, y=offset_y)
+
+            for line in body.split(","):
+                line = line.strip()
+                # Skip constraint lines — they are not columns
+                if not line or line.upper().startswith(
+                    ("PRIMARY KEY", "FOREIGN KEY", "CONSTRAINT", "UNIQUE", "CHECK")
+                ):
+                    continue
+
+                parts = line.split()
+                if len(parts) < 2:
+                    continue
+
+                col_name = parts[0].strip('"')
+                col_type = parts[1].strip('"')
+
+                length = None
+                type_match = re.match(r"(\w+)\s*\((\d+)\)", col_type)
+                if type_match:
+                    col_type = type_match.group(1)
+                    length = int(type_match.group(2))
+
+                # Simple heuristic — column named "id" is likely a primary key
+                is_pk = col_name.lower() == "id"
+                nullable = "NOT NULL" not in line.upper()
+
+                table.columns.append(
+                    TableColumn(
+                        name=col_name,
+                        data_type=col_type,
+                        is_primary=is_pk,
+                        nullable=nullable,
+                        length=length,
+                    )
+                )
+
+            self._tables.append(table)
+            # Spread tables across the canvas
+            offset_x += 200
+            if offset_x > 600:
+                offset_x = x
+                offset_y += 200
+            logger.info(f"Imported table: {name} with {len(table.columns)} columns")
+
+        # Second pass — import foreign key relationships
+        for match in fk_pattern.finditer(content):
+            from_schema = match.group(1) or "public"
+            from_table = match.group(2)
+            constraint_name = match.group(3)
+            from_column = match.group(4)
+            to_schema = match.group(5) or "public"
+            to_table = match.group(6)
+            to_column = match.group(7)
+
+            fk = ForeignKey(
+                name=constraint_name,
+                from_table=from_table,
+                from_column=from_column,
+                to_table=to_table,
+                to_column=to_column,
+            )
+            self._relationships.append(fk)
+            logger.info(f"Imported FK: {from_table}.{from_column} -> {to_table}.{to_column}")
+
+        self._canvas.queue_draw()
+
 
 class SchemaTable:
     """Represents a table on the designer canvas."""
@@ -468,13 +647,17 @@ class SchemaTable:
 
     def to_sql(self) -> str:
         """Generate CREATE TABLE SQL."""
-        lines = [f"CREATE TABLE {self.schema}.{self.name} ("]
+
+        def quote(name):
+            return f'"{name}"'
+
+        lines = [f"CREATE TABLE {self.schema}.{quote(self.name)} ("]
         col_defs = []
         for col in self.columns:
             col_defs.append(f"    {col.to_sql()}")
         pks = [c.name for c in self.columns if c.is_primary]
         if pks:
-            col_defs.append(f"    PRIMARY KEY ({', '.join(pks)})")
+            col_defs.append(f"    PRIMARY KEY ({', '.join(quote(c) for c in pks)})")
         lines.append(",\n".join(col_defs))
         lines.append(");")
         return "\n".join(lines)

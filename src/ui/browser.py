@@ -15,7 +15,7 @@ logger = get_logger(__name__)
 import gi
 
 gi.require_version("Gtk", "4.0")
-from gi.repository import Gtk
+from gi.repository import Gtk, Gdk
 from src.config import EXCLUDED_SCHEMAS, BROWSER_PANEL_WIDTH
 from src.utils.gtk_helpers import run_async
 
@@ -59,6 +59,12 @@ class DatabaseBrowser(Gtk.Box):
         self._tree.set_headers_visible(False)
         self._tree.set_enable_search(True)
         self._tree.set_search_column(1)
+
+        # Drag source — allow dragging table names to schema designer
+        drag_source = Gtk.DragSource()
+        drag_source.set_actions(Gdk.DragAction.COPY)
+        drag_source.connect("prepare", self._on_drag_prepare)
+        self._tree.add_controller(drag_source)
 
         # Icon column
         icon_renderer = Gtk.CellRendererText()
@@ -303,20 +309,20 @@ class DatabaseBrowser(Gtk.Box):
         result = self._tree.get_path_at_pos(int(x), int(y))
         if not result:
             return
-    
+
         path, col, cx, cy = result
         tree_iter = self._store.get_iter(path)
-    
+
         item_type = self._store.get_value(tree_iter, 2)
         item_name = self._store.get_value(tree_iter, 1)
         schema = self._store.get_value(tree_iter, 3)
-    
-        if n_press == 2 and item_type in ('BASE TABLE', 'VIEW'):
+
+        if n_press == 2 and item_type in ("BASE TABLE", "VIEW"):
             # Double click — execute SELECT directly
             query = f"SELECT * FROM {schema}.{item_name} LIMIT 100;"
             self._window.editor.set_text(query)
             self._window._on_run_clicked()
-        elif item_type in ('BASE TABLE', 'VIEW'):
+        elif item_type in ("BASE TABLE", "VIEW"):
             # Single click — show structure
             self._show_structure(schema, item_name)
 
@@ -356,3 +362,17 @@ class DatabaseBrowser(Gtk.Box):
             self._window.results.show_text(text)
 
         run_async(get_cols, display)
+
+    def _on_drag_prepare(self, source, x, y):
+        model, tree_iter = self._tree.get_selection().get_selected()
+        if not tree_iter:
+            return None
+
+        item_type = self._store.get_value(tree_iter, 2)
+        if item_type not in ("BASE TABLE", "VIEW"):
+            return None
+
+        schema = self._store.get_value(tree_iter, 3)
+        table_name = self._store.get_value(tree_iter, 1)
+
+        return Gdk.ContentProvider.new_for_value(f"{schema}.{table_name}")
