@@ -133,7 +133,6 @@ class SchemaDesigner(Gtk.Box):
         self._canvas.queue_draw()
 
     def _on_generate_sql(self, button):
-        """Generate SQL and show in editor."""
         if not self._tables:
             return
 
@@ -142,37 +141,40 @@ class SchemaDesigner(Gtk.Box):
             sql_lines.append(table.to_sql())
             sql_lines.append("")
 
-        # Add FK constraints
         for fk in self._relationships:
+            # Find source and target tables to get their schemas
+            source_table = next((t for t in self._tables if t.name == fk.from_table), None)
+            target_table = next((t for t in self._tables if t.name == fk.to_table), None)
+            
+            src_schema = source_table.schema if source_table else "public"
+            tgt_schema = target_table.schema if target_table else "public"
+            
             sql_lines.append(
-                f"ALTER TABLE {fk.from_table} "
+                f"ALTER TABLE {src_schema}.{fk.from_table} "
                 f"ADD CONSTRAINT {fk.name} "
                 f"FOREIGN KEY ({fk.from_column}) "
-                f"REFERENCES {fk.to_table} ({fk.to_column});"
+                f"REFERENCES {tgt_schema}.{fk.to_table} ({fk.to_column});"
             )
             sql_lines.append("")
 
         sql = "\n".join(sql_lines)
         self._window.editor.set_text(sql)
-        logger.info(
-            f"Generated SQL for {len(self._tables)} tables, {len(self._relationships)} relationships"
-        )
 
     def _find_column_at(self, table, x, y):
         """Find which column of a table is at the given position."""
         if not table or not table.columns:
             return None
-    
+
         line_height = 20
         header_height = line_height + 6  # Same as in _draw_table
-    
+
         # The body starts right after the header
         body_start_y = table.y + header_height
-    
+
         # First column text is at body_start_y + line_height - 4 (from _draw_table)
         # So column 0 occupies body_start_y to body_start_y + line_height
         col_index = int((y - body_start_y) / line_height)
-        
+
         if 0 <= col_index < len(table.columns):
             return table.columns[col_index]
         return None
@@ -257,13 +259,13 @@ class SchemaDesigner(Gtk.Box):
                 logger.warning("No target column clicked")
                 return
 
-            fk_name = f"fk_{source_table.name}_{table.name}"
+            fk_name = f"fk_{table.name}_{source_table.name}"
             fk = ForeignKey(
                 name=fk_name,
-                from_table=source_table.name,
-                from_column=source_col.name,
-                to_table=table.name,
-                to_column=clicked_column.name,
+                from_table=table.name,             
+                from_column=clicked_column.name,   
+                to_table=source_table.name,         # the referenced table
+                to_column=source_col.name,          # the referenced column
             )
             self._relationships.append(fk)
             logger.info(
