@@ -303,17 +303,21 @@ class DatabaseBrowser(Gtk.Box):
         result = self._tree.get_path_at_pos(int(x), int(y))
         if not result:
             return
-
+    
         path, col, cx, cy = result
         tree_iter = self._store.get_iter(path)
-
+    
         item_type = self._store.get_value(tree_iter, 2)
         item_name = self._store.get_value(tree_iter, 1)
         schema = self._store.get_value(tree_iter, 3)
-
-        if n_press == 2 and item_type in ("BASE TABLE", "VIEW"):
-            self._window.editor.set_text(f"SELECT * FROM {schema}.{item_name} LIMIT 100;")
-        elif item_type in ("BASE TABLE", "VIEW"):
+    
+        if n_press == 2 and item_type in ('BASE TABLE', 'VIEW'):
+            # Double click — execute SELECT directly
+            query = f"SELECT * FROM {schema}.{item_name} LIMIT 100;"
+            self._window.editor.set_text(query)
+            self._window._on_run_clicked()
+        elif item_type in ('BASE TABLE', 'VIEW'):
+            # Single click — show structure
             self._show_structure(schema, item_name)
 
     def _on_selection_changed(self, selection):
