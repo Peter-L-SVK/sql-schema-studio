@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------
- * SQL Schema Studio - GTK4 CSS Styling 
+ * SQL Schema Studio 0.3 - GTK4 CSS Styling (GPLv3)
  * Copyright (C) 2026 Peter Leukanič
  * License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
  * This is free software with NO WARRANTY.
@@ -11,7 +11,7 @@ window {
     background-color: @theme_bg_color;
 }
 
-/* Header bar - Cinnamon style */
+/* Header bar */
 headerbar {
     padding: 4px 8px;
     min-height: 38px;
@@ -23,19 +23,17 @@ headerbar button {
     padding: 4px 12px;
     min-height: 28px;
     border-radius: 4px;
-    font-weight: normal;
 }
 
 headerbar button:hover {
     background-color: shade(@theme_bg_color, 0.85);
-    border-color: shade(@borders, 0.8);
 }
 
 headerbar button:active {
     background-color: shade(@theme_bg_color, 0.75);
 }
 
-/* Panel headers - the section labels */
+/* Panel headers */
 .panel-header {
     font-weight: 600;
     font-size: 0.95em;
@@ -48,16 +46,21 @@ headerbar button:active {
 /* Sidebar / database browser */
 .db-browser {
     background-color: shade(@theme_bg_color, 0.98);
-    border-right: 1px solid @borders;
 }
 
 .db-browser treeview {
     padding: 4px;
     background-color: transparent;
+    color: @theme_fg_color;
 }
 
 .db-browser treeview:hover {
     background-color: shade(@theme_bg_color, 0.95);
+}
+
+.db-browser treeview:selected {
+    background-color: @accent_bg_color;
+    color: @accent_fg_color;
 }
 
 /* SQL Editor */
@@ -67,7 +70,6 @@ headerbar button:active {
     padding: 12px;
     background-color: shade(@theme_base_color, 0.98);
     color: @theme_text_color;
-    border: none;
 }
 
 .sql-editor textview:focus {
@@ -83,9 +85,10 @@ headerbar button:active {
 .results-view textview {
     padding: 8px 12px;
     background-color: @theme_base_color;
+    color: @theme_text_color;
 }
 
-/* Paned dividers - subtle */
+/* Paned dividers */
 paned > separator {
     background-color: @borders;
     min-width: 1px;
@@ -96,7 +99,7 @@ paned > separator:hover {
     background-color: shade(@borders, 0.6);
 }
 
-/* Buttons */
+/* Buttons — system colors */
 button {
     padding: 6px 16px;
     border-radius: 5px;
@@ -106,53 +109,47 @@ button {
     transition: all 150ms ease;
 }
 
-button.suggested-action {
-    background-color: #3584e4;  /* Cinnamon blue */
-    color: white;
-    border-color: #1c71d8;
-    font-weight: 600;
-}
-
-button.suggested-action:hover {
-    background-color: #1c71d8;
-}
-
-button.suggested-action:active {
-    background-color: #1557a8;
-}
-
-/* Destructive actions */
-button.destructive-action {
-    background-color: #c01c28;
-    color: white;
-}
-
-/* Regular buttons */
-button {
-    padding: 4px 14px;
-    border-radius: 5px;
-    border: 1px solid @borders;
-    background-color: @theme_bg_color;
-    color: @theme_fg_color;
-}
-
 button:hover {
     background-color: shade(@theme_bg_color, 0.93);
 }
 
-/* Stop button - red */
+/* Suggested action (Run, Connect, Save) — uses accent color */
+/* Suggested action — with fallback */
+button.suggested-action {
+    background-color: @accent_bg_color;
+    color: @accent_fg_color;
+    border-color: shade(@accent_bg_color, 0.9);
+    font-weight: 600;
+}
+
+/* Fallback if theme doesn't set accent colors */
+@define-color accent_bg_color #3584e4;
+@define-color accent_fg_color white;
+@define-color destructive_bg_color #c01c28;
+@define-color destructive_fg_color white;
+
+
+button.suggested-action:hover {
+    background-color: shade(@accent_bg_color, 0.85);
+}
+
+button.suggested-action:active {
+    background-color: shade(@accent_bg_color, 0.7);
+}
+
+/* Destructive action (Stop, Delete) — uses destructive color */
 button.destructive-action {
-    background-color: #c01c28;
-    color: white;
-    border-color: #a01a22;
+    background-color: @destructive_bg_color;
+    color: @destructive_fg_color;
+    border-color: shade(@destructive_bg_color, 0.9);
 }
 
 button.destructive-action:hover {
-    background-color: #a01a22;
+    background-color: shade(@destructive_bg_color, 0.85);
 }
 
 button.destructive-action:active {
-    background-color: #80161a;
+    background-color: shade(@destructive_bg_color, 0.7);
 }
 
 /* Text entries */
@@ -161,6 +158,7 @@ entry {
     border-radius: 5px;
     border: 1px solid @borders;
     background-color: @theme_base_color;
+    color: @theme_text_color;
     min-height: 28px;
 }
 
@@ -173,6 +171,7 @@ entry:focus {
 treeview {
     padding: 2px;
     background-color: transparent;
+    color: @theme_fg_color;
 }
 
 treeview:selected {
@@ -189,24 +188,25 @@ treeview:selected {
     color: alpha(@theme_fg_color, 0.7);
 }
 
-/* Tabs */
-notebook > header {
-    padding: 0;
-    background-color: shade(@theme_bg_color, 0.97);
-    border-bottom: 1px solid @borders;
+/* Connection status */
+.connected {
+    color: @success_color;
 }
 
-notebook > header > tab {
-    padding: 8px 16px;
-    border-bottom: 2px solid transparent;
+.disconnected {
+    color: alpha(@theme_fg_color, 0.4);
 }
 
-notebook > header > tab:checked {
-    border-bottom-color: @accent_bg_color;
-    font-weight: 600;
+.error-message {
+    color: @error_color;
+    padding: 10px 14px;
+    border-left: 3px solid @error_color;
+    background-color: alpha(@error_color, 0.08);
+    margin: 6px;
+    border-radius: 0 4px 4px 0;
 }
 
-/* Scrollbars - subtle */
+/* Scrollbars */
 scrolledwindow scrollbar slider {
     min-width: 8px;
     min-height: 8px;
@@ -239,69 +239,33 @@ menu {
     padding: 4px;
     border-radius: 6px;
     border: 1px solid @borders;
+    background-color: @theme_bg_color;
 }
 
 menuitem {
     padding: 6px 12px;
     border-radius: 4px;
+    color: @theme_fg_color;
 }
 
 menuitem:hover {
     background-color: shade(@theme_bg_color, 0.9);
 }
 
-/* Connection status indicator */
-.connected {
-    color: @success_color;
-}
-
-.disconnected {
-    color: alpha(@theme_fg_color, 0.4);
-}
-
-.error-message {
-    color: @error_color;
-    padding: 10px 14px;
-    border-left: 3px solid @error_color;
-    background-color: alpha(@error_color, 0.08);
-    margin: 6px;
-    border-radius: 0 4px 4px 0;
-}
-
-/* Analytics dashboard cards */
-.analytics-card {
-    padding: 16px;
-    margin: 8px;
-    border-radius: 8px;
+/* Toolbar */
+.toolbar {
+    padding: 4px 8px;
     background-color: shade(@theme_bg_color, 0.97);
-    border: 1px solid @borders;
+    border-bottom: 1px solid @borders;
 }
 
-.analytics-card .title {
-    font-weight: 600;
-    font-size: 1.1em;
-    margin-bottom: 8px;
+.toolbar button {
+    padding: 4px 12px;
 }
 
-/* About dialog — classic GTK3 style */
-aboutdialog {
-    background-color: @theme_bg_color;
-}
-
-aboutdialog > box > image {
-    padding: 20px;
-    margin-bottom: 8px;
-}
-
-aboutdialog label.title {
-    font-size: 1.4em;
-    font-weight: bold;
-}
-
-window.aboutdialog {
-    padding: 0;
-}
-
-window.aboutdialog > box {
-    padding: 20px;
+/* Schema designer toolbar */
+.schema-toolbar {
+    padding: 6px 10px;
+    background-color: shade(@theme_bg_color, 0.96);
+    border-bottom: 1px solid @borders;
 }

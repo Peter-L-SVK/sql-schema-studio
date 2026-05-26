@@ -22,7 +22,7 @@ from src.utils.logging import configure_root_logger, get_logger
 
 
 def main():
-    configure_root_logger(logging.INFO)
+    configure_root_logger(logging.DEBUG)
     logger = get_logger(__name__)
     logger.info("Starting SQL Schema Studio...")
     signal.signal(signal.SIGINT, handle_sigint)
