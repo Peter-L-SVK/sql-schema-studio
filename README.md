@@ -8,41 +8,42 @@
 
 Intelligent PostgreSQL Management Platform. A GTK4 desktop application for
 database administrators and developers who want a clean, fast, and extensible
-SQL tool. If you wish to support me for future updates with some spare change buy me a coffe.
+SQL tool.
 
-Still in alpha!
-
-_**Initial development release — not yet ready for production use!!!**_
-
-![Demo](scrshots/4.png)   
+**Alpha software — under active development.**
 
 ## What It Does
 
 Connect to PostgreSQL, browse schemas and tables, write and execute queries
-with syntax highlighting, and get formatted results. The plugin system lets
-you extend it with Python and Perl hooks for custom automation, and the
-built-in analytics engine can suggest indexes and detect query patterns.
+with syntax highlighting, design schemas visually, and get AI-powered index
+recommendations. Extend with Python and Perl hooks for custom automation.
 
 ## Current Features
 
-- Connection manager with saved profiles and test-on-demand
+- Connection manager with saved profiles, test-on-demand, and system keyring password storage
 - Database browser with schema/table tree and live filtering
 - SQL editor with syntax highlighting, line numbers, and F5 execution
 - Results viewer with formatted table output and timing
+- **Visual schema designer** with drag-and-drop tables, column editor, and FK relationships
+- **SQL file import** — drag .sql files onto the designer to reverse-engineer schemas
+- **Preferences dialog** with persistent editor settings (font, color scheme, tab width)
+- **Window state persistence** — remembers size, pane positions across sessions
 - Full menu bar with undo/redo, clipboard, SQL formatting, and EXPLAIN
 - Modular architecture separating core, UI, models, hooks, and analytics
 - Clean shutdown with automatic disconnection on window close
+- Cross-desktop theming (Cinnamon, GNOME, MATE, XFCE)
 
 ## Planned
 
-- Visual schema designer with drag-and-drop table editing
 - Migration generator with up/down SQL diffs
 - AI index advisor using scikit-learn query pattern analysis
 - Hook manager for enabling and configuring Python and Perl plugins
 - Multiple result tabs and query history
+- Multi-CPU analytics worker pool for large datasets
 
 ## Requirements
 
+- Linux or FreeBSD
 - Python 3.12 or later
 - GTK 4 and GtkSourceView 5
 - PostgreSQL 12 or later
@@ -75,16 +76,14 @@ python3 -m src.main
 ## Contributing
 
 Contributions are welcome!  
-See [CONTRIBUTING](https://github.com/Peter-L-SVK/sql-schema-studio/blob/main/CONTRIBUTING.md) file for details.  
+See [CONTRIBUTING](https://github.com/Peter-L-SVK/sql-schema-studio/blob/main/CONTRIBUTING.md) file for details.  
 
-For contact please see my email in profile info or use GitHub’s built-in communication tools.
+For contact please see my email in profile info or use GitHub's built-in communication tools.
 
 Please open an issue or pull request for any:  
 
 - Bug fixes
-    
 - Feature suggestions
-    
 - Documentation improvements
 
 ## Development
@@ -117,12 +116,15 @@ src/
 │   ├── browser.py        Database object tree with filtering
 │   ├── editor.py         SQL editor with GtkSourceView syntax highlighting
 │   ├── results.py        Query results panel with formatted table output
+│   ├── schema_designer.py Visual schema designer with drag-drop and FK lines
 │   ├── toolbar.py        Main toolbar — connect, run, stop, tools
 │   ├── menubar.py        Traditional menu bar (File, Edit, View, Query, Tools, Help)
 │   ├── statusbar.py      Bottom status bar — connection info, row counts, timing
 │   └── dialogs/
 │       ├── connection.py Connection dialog with test and password visibility toggle
-│       └── about.py      About dialog with system information
+│       ├── about.py      About dialog with system information
+│       ├── preferences.py Editor settings with persistent JSON storage
+│       └── column_editor.py Table column editor with type selection and PK toggles
 ├── models/
 │   ├── table.py          Table model with SQL generation
 │   ├── column.py         Column model with constraints and type handling
@@ -144,6 +146,7 @@ src/
 ├── utils/
 │   ├── gtk_helpers.py    GTK4 margin, layout, and run_async utilities
 │   ├── logging.py        Centralized logger factory and configuration
+│   ├── settings.py       Persistent JSON settings manager
 │   └── signal_handlers.py SIGINT handler for graceful Ctrl-C exit
 └── resources/
     └── ui/
@@ -153,5 +156,5 @@ src/
 ## License
 
 GNU General Public License v3 or later. See [LICENSE](LICENSE).  
-    
+
 ---
