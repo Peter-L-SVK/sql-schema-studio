@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.2 - SQL Editor (GPLv3)
+# SQL Schema Studio 0.4 - SQL Editor (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -13,7 +13,7 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("GtkSource", "5")
-from gi.repository import Gtk, GtkSource, Gdk
+from gi.repository import Gtk, GtkSource, Gdk, Pango
 
 
 class SQLEditor(Gtk.Box):
@@ -57,6 +57,9 @@ class SQLEditor(Gtk.Box):
 
         scroll.set_child(self._view)
         self.append(scroll)
+
+        # Load saved settings
+        self._load_settings()
 
     def _setup_sql_language(self):
         """Configure SQL syntax highlighting"""
@@ -114,3 +117,37 @@ class SQLEditor(Gtk.Box):
             self._window._on_run_clicked()
             return True
         return False
+
+    def _load_settings(self):
+        """Apply saved editor settings."""
+        from src.utils.settings import Settings
+
+        settings = Settings()
+        editor = settings.get_section("editor")
+
+        self._view.set_tab_width(editor.get("tab_width", 4))
+        self._view.set_insert_spaces_instead_of_tabs(editor.get("spaces_instead_of_tabs", True))
+        self._view.set_show_line_numbers(editor.get("show_line_numbers", True))
+        self._view.set_highlight_current_line(editor.get("highlight_current_line", True))
+
+        # Color scheme
+        scheme_id = editor.get("color_scheme", "classic")
+        manager = GtkSource.StyleSchemeManager.get_default()
+        scheme = manager.get_scheme(scheme_id)
+        if scheme:
+            self._view.get_buffer().set_style_scheme(scheme)
+
+        # Font via CSS
+        font_str = editor.get("font", "Monospace 12")
+        font_desc = Pango.FontDescription.from_string(font_str)
+        css = f"""
+        textview {{
+            font-family: {font_desc.get_family()};
+            font-size: {font_desc.get_size() // Pango.SCALE}pt;
+        }}
+        """
+        provider = Gtk.CssProvider()
+        provider.load_from_data(css.encode())
+        self._view.get_style_context().add_provider(
+            provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
