@@ -10,7 +10,6 @@
 
 from __future__ import annotations
 
-import logging
 import gi
 
 gi.require_version("Gtk", "4.0")

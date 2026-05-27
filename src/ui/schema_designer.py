@@ -8,11 +8,10 @@
 
 """Visual schema designer with drag-and-drop table editing."""
 
-import math
 import gi
 
 gi.require_version("Gtk", "4.0")
-from gi.repository import Gtk, Gdk, GObject, Graphene, Gsk, Pango, PangoCairo
+from gi.repository import Gtk, Gdk, GObject
 import cairo
 
 from src.config import (
@@ -21,8 +20,8 @@ from src.config import (
     SCHEMA_TABLE_ROW_HEIGHT,
     SCHEMA_TABLE_BODY_PADDING,
 )
-from src.utils.gtk_helpers import set_margin, run_async
 from src.utils.logging import get_logger
+from src.utils.gtk_helpers import set_margin
 
 logger = get_logger(__name__)
 GType = GObject.GType
@@ -372,8 +371,6 @@ class SchemaDesigner(Gtk.Box):
         cr.set_font_size(10)
 
         # Source: "1"
-        mid_x = (x1 + x2) / 2
-        mid_y = (y1 + y2) / 2
         cr.move_to(x1 + 5, y1 - 5)
         cr.show_text("1")
 
@@ -394,7 +391,7 @@ class SchemaDesigner(Gtk.Box):
             col_lines.append(f" {col.name}: {dtype} {pk} ")
 
         if col_lines:
-            max_line = max(len(title), max(len(l) for l in col_lines))
+            max_line = max(len(title), max(len(c) for c in col_lines))
         else:
             max_line = len(title)
 
@@ -557,7 +554,6 @@ class SchemaDesigner(Gtk.Box):
 
         # First pass — import tables
         for match in table_pattern.finditer(content):
-            schema = match.group(1) or "public"
             name = match.group(2)
             body = match.group(3)
 
@@ -608,11 +604,9 @@ class SchemaDesigner(Gtk.Box):
 
         # Second pass — import foreign key relationships
         for match in fk_pattern.finditer(content):
-            from_schema = match.group(1) or "public"
             from_table = match.group(2)
             constraint_name = match.group(3)
             from_column = match.group(4)
-            to_schema = match.group(5) or "public"
             to_table = match.group(6)
             to_column = match.group(7)
 

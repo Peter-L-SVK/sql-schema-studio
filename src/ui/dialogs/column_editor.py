@@ -11,9 +11,9 @@
 import gi
 
 gi.require_version("Gtk", "4.0")
-from gi.repository import Gtk, GLib
+from gi.repository import Gtk
 
-from src.utils.gtk_helpers import set_margin, make_labeled_field, make_button_box, run_async
+from src.utils.gtk_helpers import set_margin
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -144,8 +144,7 @@ class ColumnEditorDialog(Gtk.Window):
         btn_remove = Gtk.Button(label="Remove Selected")
         btn_remove.connect("clicked", self._on_remove_column)
         btn_save = Gtk.Button(label="Save")
-        btn_save.add_css_class("suggested-action")
-        btn_save.connect("clicked", lambda b: print("SAVE LAMBDA FIRED") or self._on_save(b))
+        btn_save.connect("clicked", self._on_save)
         btn_close = Gtk.Button(label="Cancel")
         btn_close.connect("clicked", lambda b: self.close())
 
@@ -234,15 +233,17 @@ class ColumnEditorDialog(Gtk.Window):
             from src.ui.schema_designer import TableColumn
 
             logger.info("Save clicked")
-            print(f"Table before save: {self._table.name}, columns: {len(self._table.columns)}")
+            logger.debug(
+                f"Table before save: {self._table.name}, columns: {len(self._table.columns)}"
+            )
 
             new_name = self._name_entry.get_text().strip()
             if new_name:
                 self._table.name = new_name
-                print(f"Name changed to: {new_name}")
+                logger.debug(f"Name changed to: {new_name}")
 
             self._table.columns.clear()
-            print(f"Columns cleared, list_store rows: {len(self._list_store)}")
+            logger.debug(f"Columns cleared, list_store rows: {len(self._list_store)}")
 
             for row in self._list_store:
                 name = row[0]
@@ -250,7 +251,7 @@ class ColumnEditorDialog(Gtk.Window):
                 is_pk = row[2]
                 nullable = row[3]
                 length = row[5] if row[5] > 0 else None
-                print(f"  Saving column: {name} {dtype} PK={is_pk}")
+                logger.debug(f"  Saving column: {name} {dtype} PK={is_pk}")
                 self._table.columns.append(
                     TableColumn(
                         name=name,
@@ -261,14 +262,14 @@ class ColumnEditorDialog(Gtk.Window):
                     )
                 )
 
-            print(f"Calling on_save callback: {self._on_save}")
+            logger.debug(f"Calling on_save callback: {self._on_save_callback}")
             if self._on_save_callback:
                 self._on_save_callback(self._table)
 
-            print("Closing dialog")
+            logger.debug("Closing dialog")
             self.close()
         except Exception as e:
-            print(f"SAVE ERROR: {e}")
+            logger.error(f"SAVE ERROR: {e}")
             import traceback
 
             traceback.print_exc()

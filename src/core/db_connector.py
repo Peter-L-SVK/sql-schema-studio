@@ -8,7 +8,6 @@
 
 from __future__ import annotations
 
-import logging
 import keyring
 import psycopg
 from dataclasses import dataclass, field
@@ -21,7 +20,6 @@ from src.config import (
     DEFAULT_DATABASE,
     DEFAULT_USER,
     EXCLUDED_SCHEMAS,
-    KEYRING_SERVICE_NAME,
 )
 
 logger = get_logger(__name__)

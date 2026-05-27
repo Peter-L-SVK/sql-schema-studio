@@ -10,10 +10,6 @@
 Plugin discovery and registration
 """
 
-from src.utils.logging import get_logger
-
-logger = get_logger(__name__)
-
 from __future__ import annotations
 
 import importlib
@@ -21,6 +17,9 @@ import inspect
 from pathlib import Path
 from typing import Any, Dict, List
 from .base_plugin import BaseHook, BasePlugin, HookTrigger
+from src.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class PluginRegistry:
