@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.2 - Plugin Registry (GPLv3)
+# SQL Schema Studio 0.4 - Plugin Registry (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -10,10 +10,6 @@
 Plugin discovery and registration
 """
 
-from src.utils.logging import get_logger
-
-logger = get_logger(__name__)
-
 from __future__ import annotations
 
 import importlib
@@ -21,6 +17,9 @@ import inspect
 from pathlib import Path
 from typing import Any, Dict, List
 from .base_plugin import BaseHook, BasePlugin, HookTrigger
+from src.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class PluginRegistry:

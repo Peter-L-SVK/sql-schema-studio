@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.2 - Database Connector (GPLv3)
+# SQL Schema Studio 0.4 - Database Connector (GPLv3)
 # Copyright (C) 2025-2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -8,7 +8,6 @@
 
 from __future__ import annotations
 
-import logging
 import keyring
 import psycopg
 from dataclasses import dataclass, field
@@ -21,7 +20,6 @@ from src.config import (
     DEFAULT_DATABASE,
     DEFAULT_USER,
     EXCLUDED_SCHEMAS,
-    KEYRING_SERVICE_NAME,
 )
 
 logger = get_logger(__name__)

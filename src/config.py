@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.2 - Configuration (GPLv3)
+# SQL Schema Studio 0.4 - Configuration (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -61,3 +61,9 @@ HOOK_TIME_LIMIT_SECONDS: int = 30
 
 # --- Keyring ---
 KEYRING_SERVICE_NAME: str = "sql-schema-studio"
+
+# Schema designer
+SCHEMA_TABLE_WIDTH: int = 160
+SCHEMA_TABLE_HEADER_HEIGHT: int = 28
+SCHEMA_TABLE_ROW_HEIGHT: int = 22
+SCHEMA_TABLE_BODY_PADDING: int = 4

@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.2 - Main Application Window (GPLv3)
+# SQL Schema Studio 0.4 - Main Application Window (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -19,7 +19,7 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("GtkSource", "5")
-from gi.repository import Gtk
+from gi.repository import GLib, Gtk
 
 from src.config import DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, REFRESH_TRIGGER_COMMANDS
 from src.ui.menubar import build_menubar
@@ -43,10 +43,8 @@ class MainWindow(Gtk.ApplicationWindow):
         self.set_title("SQL Schema Studio")
         self.set_default_size(DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT)
 
-        # Connect close request signal
         self.connect("close-request", self._on_close_request)
 
-        # Create components
         self.menubar = build_menubar()
         self.toolbar = Toolbar(self)
         self.browser = DatabaseBrowser(self)
@@ -56,6 +54,7 @@ class MainWindow(Gtk.ApplicationWindow):
 
         self._build_layout()
         self._load_css()
+        self._restore_window_state()
 
     def _build_layout(self):
         """Assemble the window layout"""
@@ -68,18 +67,17 @@ class MainWindow(Gtk.ApplicationWindow):
         main_vbox.append(self.toolbar)
 
         # Main content: browser | editor+results
-        hpaned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
-        hpaned.set_wide_handle(True)
-
-        hpaned.set_start_child(self.browser)
+        self._hpaned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
+        self._hpaned.set_wide_handle(True)
+        self._hpaned.set_start_child(self.browser)
 
         right_vpaned = Gtk.Paned(orientation=Gtk.Orientation.VERTICAL)
         right_vpaned.set_wide_handle(True)
         right_vpaned.set_start_child(self.editor)
         right_vpaned.set_end_child(self.results)
 
-        hpaned.set_end_child(right_vpaned)
-        main_vbox.append(hpaned)
+        self._hpaned.set_end_child(right_vpaned)
+        main_vbox.append(self._hpaned)
 
         # Status bar
         main_vbox.append(self.statusbar)
@@ -102,9 +100,55 @@ class MainWindow(Gtk.ApplicationWindow):
             self.get_display(), css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
         )
 
+    def _on_map(self, widget):
+        """Called when window is first shown."""
+        self._restore_window_state()
+        # Only run once
+        self.disconnect_by_func(self._on_map)
+
+    def _restore_window_state(self):
+        """Restore window size and pane positions from settings."""
+        from src.utils.settings import Settings
+
+        settings = Settings()
+        window = settings.get_section("window")
+
+        width = window.get("width", 1200)
+        height = window.get("height", 800)
+        browser_width = window.get("browser_width", 220)
+
+        def do_restore():
+            self.set_default_size(width, height)
+            if hasattr(self, "_hpaned"):
+                self._hpaned.set_position(browser_width)
+            return False
+
+        GLib.idle_add(do_restore)
+
+    def _save_window_state(self):
+        """Save window size and pane positions to settings."""
+        from src.utils.settings import Settings
+
+        settings = Settings()
+
+        width = self.get_allocated_width()
+        height = self.get_allocated_height()
+        if width > 0 and height > 0:
+            settings.set("window", "width", width)
+            settings.set("window", "height", height)
+
+        if hasattr(self, "_hpaned"):
+            browser_width = self._hpaned.get_position()
+            if browser_width > 50:
+                settings.set("window", "browser_width", browser_width)
+
+        settings.save()
+
     # --- Action handlers ---
     def _on_close_request(self, window):
         """Handle window close — disconnect cleanly first"""
+        self._save_window_state()
+
         if self.db_connector.is_connected:
             try:
                 self.db_connector.disconnect()

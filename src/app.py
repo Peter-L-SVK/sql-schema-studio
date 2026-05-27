@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.2 - Application (GPLv3)
+# SQL Schema Studio 0.4 - Application (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -10,7 +10,6 @@
 
 from __future__ import annotations
 
-import logging
 import gi
 
 gi.require_version("Gtk", "4.0")
