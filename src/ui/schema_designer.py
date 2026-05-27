@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.3 - Schema Designer (GPLv3)
+# SQL Schema Studio 0.4 - Schema Designer (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -15,6 +15,12 @@ gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk, Gdk, GObject, Graphene, Gsk, Pango, PangoCairo
 import cairo
 
+from src.config import (
+    SCHEMA_TABLE_WIDTH,
+    SCHEMA_TABLE_HEADER_HEIGHT,
+    SCHEMA_TABLE_ROW_HEIGHT,
+    SCHEMA_TABLE_BODY_PADDING,
+)
 from src.utils.gtk_helpers import set_margin, run_async
 from src.utils.logging import get_logger
 
@@ -460,6 +466,7 @@ class SchemaDesigner(Gtk.Box):
         """Handle drops from browser."""
         if isinstance(value, str):
             return self._drop_table_from_browser(value, x, y)
+
         return False
 
     def _drop_table_from_browser(self, table_name, x, y):
@@ -631,19 +638,23 @@ class SchemaTable:
         self.y = y
         self.columns: list[TableColumn] = []
         self.schema = "public"
-        self._width = 160
-        self._header_height = 28
-        self._row_height = 22
+        self._width = SCHEMA_TABLE_WIDTH
+        self._header_height = SCHEMA_TABLE_HEADER_HEIGHT
+        self._row_height = SCHEMA_TABLE_ROW_HEIGHT
+        self._body_padding = SCHEMA_TABLE_BODY_PADDING
 
     def contains(self, px: float, py: float) -> bool:
         """Check if a point is inside this table."""
         w, h = self.get_size()
         return self.x <= px <= self.x + w and self.y <= py <= self.y + h
 
-    def get_size(self):
+    def get_size(self) -> tuple[float, float]:
         """Calculate table dimensions."""
         rows = max(len(self.columns), 1)
-        return (self._width, self._header_height + rows * self._row_height + 4)
+        return (
+            self._width,
+            self._header_height + rows * self._row_height + self._body_padding,
+        )
 
     def to_sql(self) -> str:
         """Generate CREATE TABLE SQL."""
