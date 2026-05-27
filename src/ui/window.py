@@ -19,7 +19,7 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("GtkSource", "5")
-from gi.repository import Gtk
+from gi.repository import GLib, Gtk
 
 from src.config import DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, REFRESH_TRIGGER_COMMANDS
 from src.ui.menubar import build_menubar
@@ -43,10 +43,8 @@ class MainWindow(Gtk.ApplicationWindow):
         self.set_title("SQL Schema Studio")
         self.set_default_size(DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT)
 
-        # Connect close request signal
         self.connect("close-request", self._on_close_request)
 
-        # Create components
         self.menubar = build_menubar()
         self.toolbar = Toolbar(self)
         self.browser = DatabaseBrowser(self)
@@ -56,9 +54,7 @@ class MainWindow(Gtk.ApplicationWindow):
 
         self._build_layout()
         self._load_css()
-
-        # Delay restore until window is mapped
-        self.connect("map", self._on_map)
+        self._restore_window_state()
 
     def _build_layout(self):
         """Assemble the window layout"""
@@ -119,23 +115,21 @@ class MainWindow(Gtk.ApplicationWindow):
 
         width = window.get("width", 1200)
         height = window.get("height", 800)
-
-        # Use set_size_request when already mapped
-        self.set_size_request(width, height)
-
-        # Browser panel width
         browser_width = window.get("browser_width", 220)
-        if hasattr(self, "_hpaned"):
-            self._hpaned.set_position(browser_width)
+
+        def do_restore():
+            self.set_default_size(width, height)
+            if hasattr(self, "_hpaned"):
+                self._hpaned.set_position(browser_width)
+            return False
+
+        GLib.idle_add(do_restore)
 
     def _save_window_state(self):
         """Save window size and pane positions to settings."""
         from src.utils.settings import Settings
 
         settings = Settings()
-
-        # Remove size request to get real allocated size
-        self.set_size_request(-1, -1)
 
         width = self.get_allocated_width()
         height = self.get_allocated_height()

@@ -281,10 +281,10 @@ class SchemaDesigner(Gtk.Box):
             fk_name = f"fk_{table.name}_{source_table.name}"
             fk = ForeignKey(
                 name=fk_name,
-                from_table=table.name,
-                from_column=clicked_column.name,
-                to_table=source_table.name,  # the referenced table
-                to_column=source_col.name,  # the referenced column
+                from_table=source_table.name,
+                from_column=source_col.name,
+                to_table=table.name,
+                to_column=clicked_column.name,
             )
             self._relationships.append(fk)
             logger.info(
@@ -534,6 +534,7 @@ class SchemaDesigner(Gtk.Box):
             logger.error(f"Failed to read SQL file: {e}")
             return
 
+        content = content.replace('"', "")
         # Pattern for CREATE TABLE statements
         table_pattern = re.compile(
             r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?" r"(?:(\w+)\.)?(\w+)\s*\((.*?)\);",

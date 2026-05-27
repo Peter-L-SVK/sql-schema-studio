@@ -24,7 +24,9 @@ recommendations. Extend with Python and Perl hooks for custom automation.
 - Database browser with schema/table tree and live filtering
 - SQL editor with syntax highlighting, line numbers, and F5 execution
 - Results viewer with formatted table output and timing
-- **Visual schema designer** with drag-and-drop tables, column editor, and FK relationships
+- **Visual schema designer** with drag-and-drop tables, column editor, and
+  FK relationships (FK direction partially implemented — use child table
+  as first right-click, parent table as second)
 - **SQL file import** — drag .sql files onto the designer to reverse-engineer schemas
 - **Preferences dialog** with persistent editor settings (font, color scheme, tab width)
 - **Window state persistence** — remembers size, pane positions across sessions
