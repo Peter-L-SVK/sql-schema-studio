@@ -57,6 +57,7 @@ def build_menubar():
     query_menu.append_section(None, Gio.Menu())
     query_menu.append("Format SQL", "app.query_format")
     query_menu.append("Explain Analyze", "app.query_explain")
+    query_menu.append("Query History", "app.query_history")
 
     # Tools
     tools_menu = Gio.Menu()

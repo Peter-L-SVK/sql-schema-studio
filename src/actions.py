@@ -138,6 +138,7 @@ class ActionHandler:
         self._add_action("view_results", self._on_view_results)
         self._add_action("view_hooks", self._on_view_hooks)
         self._add_action("view_analytics", self._on_view_analytics)
+        self._add_action("query_history", self._on_query_history)
 
     def _on_view_browser(self, action, param):
         logger.info("Toggle browser visibility (not implemented)")
@@ -188,6 +189,10 @@ class ActionHandler:
             if query.strip():
                 self._window.editor.set_text(f"EXPLAIN ANALYZE {query}")
                 self._window._on_run_clicked()
+
+    def _on_query_history(self, action, param):
+        if self._window:
+            self._window._on_query_history_clicked()
 
     # --- Tools ---
 
