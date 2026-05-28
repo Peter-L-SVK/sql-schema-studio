@@ -10,7 +10,6 @@
 
 import sqlite3
 from pathlib import Path
-from datetime import datetime
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
