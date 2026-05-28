@@ -269,3 +269,18 @@ menuitem:hover {
     background-color: shade(@theme_bg_color, 0.96);
     border-bottom: 1px solid @borders;
 }
+
+/* KDE Plasma compatibility */
+window.csd {
+    border-radius: 0;
+    box-shadow: none;
+}
+
+windowcontrols button image:not(:hover) {
+    background-color: transparent;
+}
+
+.window-frame {
+    box-shadow: 0 0 0 black;
+    border-style: none;
+}

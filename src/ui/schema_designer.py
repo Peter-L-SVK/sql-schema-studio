@@ -522,8 +522,8 @@ class SchemaDesigner(Gtk.Box):
         return True
 
     def _import_sql_file(self, path, x, y):
-        """Parse CREATE TABLE statements and FK constraints from a .sql file."""
-        import re
+        """Parse SQL file using sqlparse."""
+        from src.core.schema_parser import SchemaParser
 
         logger.info(f"Importing SQL file: {path}")
 
@@ -534,92 +534,46 @@ class SchemaDesigner(Gtk.Box):
             logger.error(f"Failed to read SQL file: {e}")
             return
 
-        content = content.replace('"', "")
-        # Pattern for CREATE TABLE statements
-        table_pattern = re.compile(
-            r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?" r"(?:(\w+)\.)?(\w+)\s*\((.*?)\);",
-            re.IGNORECASE | re.DOTALL,
-        )
-
-        # Pattern for ALTER TABLE ... ADD CONSTRAINT ... FOREIGN KEY
-        fk_pattern = re.compile(
-            r"ALTER\s+TABLE\s+(?:(\w+)\.)?(\w+)\s+"
-            r"ADD\s+CONSTRAINT\s+(\w+)\s+"
-            r"FOREIGN\s+KEY\s*\((\w+)\)\s+"
-            r"REFERENCES\s+(?:(\w+)\.)?(\w+)\s*\((\w+)\);",
-            re.IGNORECASE,
-        )
+        parser = SchemaParser()
+        tables, foreign_keys = parser.parse_sql(content)
 
         offset_x = x
         offset_y = y
 
-        # First pass — import tables
-        for match in table_pattern.finditer(content):
-            name = match.group(2)
-            body = match.group(3)
+        for table_data in tables:
+            table = SchemaTable(name=table_data["name"], x=offset_x, y=offset_y)
+            table.schema = table_data["schema"]
 
-            table = SchemaTable(name=name, x=offset_x, y=offset_y)
-
-            for line in body.split(","):
-                line = line.strip()
-                # Skip constraint lines — they are not columns
-                if not line or line.upper().startswith(
-                    ("PRIMARY KEY", "FOREIGN KEY", "CONSTRAINT", "UNIQUE", "CHECK")
-                ):
-                    continue
-
-                parts = line.split()
-                if len(parts) < 2:
-                    continue
-
-                col_name = parts[0].strip('"')
-                col_type = parts[1].strip('"')
-
-                length = None
-                type_match = re.match(r"(\w+)\s*\((\d+)\)", col_type)
-                if type_match:
-                    col_type = type_match.group(1)
-                    length = int(type_match.group(2))
-
-                # Simple heuristic — column named "id" is likely a primary key
-                is_pk = col_name.lower() == "id"
-                nullable = "NOT NULL" not in line.upper()
-
+            for col_data in table_data["columns"]:
                 table.columns.append(
                     TableColumn(
-                        name=col_name,
-                        data_type=col_type,
-                        is_primary=is_pk,
-                        nullable=nullable,
-                        length=length,
+                        name=col_data["name"],
+                        data_type=col_data["type"],
+                        is_primary=col_data["is_pk"],
+                        nullable=col_data["nullable"],
+                        length=col_data["length"],
                     )
                 )
 
             self._tables.append(table)
-            # Spread tables across the canvas
             offset_x += 200
             if offset_x > 600:
                 offset_x = x
                 offset_y += 200
-            logger.info(f"Imported table: {name} with {len(table.columns)} columns")
+            logger.info(f"Imported table: {table.name} with {len(table.columns)} columns")
 
-        # Second pass — import foreign key relationships
-        for match in fk_pattern.finditer(content):
-            from_table = match.group(2)
-            constraint_name = match.group(3)
-            from_column = match.group(4)
-            to_table = match.group(6)
-            to_column = match.group(7)
-
+        for fk_data in foreign_keys:
             fk = ForeignKey(
-                name=constraint_name,
-                from_table=from_table,
-                from_column=from_column,
-                to_table=to_table,
-                to_column=to_column,
+                name=fk_data["name"],
+                from_table=fk_data["from_table"],
+                from_column=fk_data["from_column"],
+                to_table=fk_data["to_table"],
+                to_column=fk_data["to_column"],
             )
             self._relationships.append(fk)
-            logger.info(f"Imported FK: {from_table}.{from_column} -> {to_table}.{to_column}")
+            logger.info(
+                f"Imported FK: {fk.from_table}.{fk.from_column} -> {fk.to_table}.{fk.to_column}"
+            )
 
         self._canvas.queue_draw()
 
