@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.4 - Main Application Window (GPLv3)
+# SQL Schema Studio 0.5 - Main Application Window (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -22,6 +22,7 @@ gi.require_version("GtkSource", "5")
 from gi.repository import GLib, Gtk
 
 from src.config import DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, REFRESH_TRIGGER_COMMANDS
+from src.core.query_history import QueryHistory
 from src.ui.menubar import build_menubar
 from src.ui.toolbar import Toolbar
 from src.ui.editor import SQLEditor
@@ -30,6 +31,7 @@ from src.ui.browser import DatabaseBrowser
 from src.ui.statusbar import StatusBar
 from src.utils.gtk_helpers import run_async
 from src.ui.dialogs.connection import ConnectionDialog
+from src.ui.dialogs.hook_manager import HookManagerDialog
 from src.ui.schema_designer import SchemaDesigner
 
 
@@ -51,6 +53,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self.editor = SQLEditor(self)
         self.results = ResultsPanel()
         self.statusbar = StatusBar()
+        self._query_history = QueryHistory()
 
         self._build_layout()
         self._load_css()
@@ -185,7 +188,6 @@ class MainWindow(Gtk.ApplicationWindow):
             self.browser.clear()
 
     def _on_run_clicked(self):
-        """Execute SQL query"""
         query = self.editor.get_selected_text()
         if not query.strip():
             return
@@ -206,24 +208,33 @@ class MainWindow(Gtk.ApplicationWindow):
                 return [], elapsed, str(e)
 
         def display(data):
+            logger.debug("display called")
             result, elapsed, error = data
             self.toolbar.set_run_sensitive(True)
 
             if error:
                 self.results.show_error(error, elapsed)
                 self.statusbar.set_message(f"Error ({elapsed:.3f}s)")
+                self._query_history.add(
+                    query=query, execution_time=elapsed, row_count=0, success=False
+                )
                 return
 
             if not result:
                 self.results.show_text(f"Query executed.\nTime: {elapsed:.3f}s")
                 self.statusbar.set_query_stats(0, elapsed)
+                self._query_history.add(
+                    query=query, execution_time=elapsed, row_count=0, success=True
+                )
             else:
                 columns = list(result[0].keys())
                 rows = [list(r.values()) for r in result]
                 self.results.show_query_result(columns, rows, elapsed)
                 self.statusbar.set_query_stats(len(rows), elapsed)
+                self._query_history.add(
+                    query=query, execution_time=elapsed, row_count=len(rows), success=True
+                )
 
-            # Refresh browser for DDL/DML
             q = query.strip().upper()
             if any(q.startswith(c) for c in REFRESH_TRIGGER_COMMANDS):
                 self.browser.refresh()
@@ -243,4 +254,17 @@ class MainWindow(Gtk.ApplicationWindow):
         dialog = Gtk.Window(transient_for=self, modal=False, title="Schema Designer")
         dialog.set_default_size(800, 600)
         dialog.set_child(self._designer)
+        dialog.present()
+
+    def _on_hooks_clicked(self):
+        dialog = HookManagerDialog(self)
+        dialog.present()
+
+    def _on_query_history_clicked(self):
+        from src.ui.dialogs.query_history_dialog import QueryHistoryDialog
+
+        def on_select(query):
+            self.editor.set_text(query)
+
+        dialog = QueryHistoryDialog(self, self._query_history, on_select=on_select)
         dialog.present()

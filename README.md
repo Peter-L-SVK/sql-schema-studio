@@ -12,6 +12,8 @@ SQL tool.
 
 **Alpha software — under active development.**
 
+![Demo](scrshots/4.png)
+
 ## What It Does
 
 Connect to PostgreSQL, browse schemas and tables, write and execute queries
@@ -45,11 +47,12 @@ recommendations. Extend with Python and Perl hooks for custom automation.
 
 ## Requirements
 
-- Linux or FreeBSD
+- Linux or FreeBSD 
 - Python 3.12 or later
 - GTK 4 and GtkSourceView 5
 - PostgreSQL 12 or later
 - Perl 5.30 or later (optional, for Perl hooks)
+- Developed on Fedora 43 Cinnamon and tested on Fedora 43 KDE Plasma 6
 
 ## System Requirements
 

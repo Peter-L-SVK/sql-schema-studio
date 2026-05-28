@@ -17,3 +17,7 @@
 ![inspect table](8.png)
 
 ![list table](9.png)
+
+![hook manager](11.png)
+
+![query history](12.png)

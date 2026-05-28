@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.4 - Menu Bar (GPLv3)
+# SQL Schema Studio 0.5 - Menu Bar (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -57,6 +57,7 @@ def build_menubar():
     query_menu.append_section(None, Gio.Menu())
     query_menu.append("Format SQL", "app.query_format")
     query_menu.append("Explain Analyze", "app.query_explain")
+    query_menu.append("Query History", "app.query_history")
 
     # Tools
     tools_menu = Gio.Menu()
