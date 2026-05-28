@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.4 - Preferences Dialog (GPLv3)
+# SQL Schema Studio 0.5 - Preferences Dialog (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -182,20 +182,18 @@ class PreferencesDialog(Gtk.Window):
             view.set_insert_spaces_instead_of_tabs(self._spaces_check.get_active())
             view.set_show_line_numbers(self._line_numbers_check.get_active())
             view.set_highlight_current_line(self._highlight_line_check.get_active())
-
             if font_desc:
-                if font_desc:
-                    css = f"""
-                    textview {{
-                        font-family: {font_desc.get_family()};
-                        font-size: {font_desc.get_size() / Pango.SCALE}pt;
-                    }}
-                    """
-                    provider = Gtk.CssProvider()
-                    provider.load_from_data(css.encode())
-                    view.get_style_context().add_provider(
-                        provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-                    )
+                css = f"""
+                textview {{
+                font-family: {font_desc.get_family()};
+                font-size: {font_desc.get_size() / Pango.SCALE}pt;
+                }}
+                """
+                provider = Gtk.CssProvider()
+                provider.load_from_data(css.encode())
+                view.get_style_context().add_provider(
+                    provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+                )
 
             if scheme_id:
                 manager = GtkSource.StyleSchemeManager.get_default()
@@ -206,17 +204,3 @@ class PreferencesDialog(Gtk.Window):
             logger.info("Preferences applied to editor")
 
         self.close()
-
-    def _on_choose_font(self, button):
-        dialog = Gtk.FontDialog()
-        dialog.set_title("Select Editor Font")
-        dialog.choose_font(self, None, self._on_font_selected)
-
-    def _on_font_selected(self, dialog, result):
-        try:
-            font_desc = dialog.choose_font_finish(result)
-            if font_desc:
-                self._font_label.set_label(font_desc.to_string())
-                self._selected_font = font_desc
-        except Exception as e:
-            logger.error(f"Font selection failed: {e}")

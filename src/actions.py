@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.4 - Menu Actions (GPLv3)
+# SQL Schema Studio 0.5 - Menu Actions (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -138,6 +138,7 @@ class ActionHandler:
         self._add_action("view_results", self._on_view_results)
         self._add_action("view_hooks", self._on_view_hooks)
         self._add_action("view_analytics", self._on_view_analytics)
+        self._add_action("query_history", self._on_query_history)
 
     def _on_view_browser(self, action, param):
         logger.info("Toggle browser visibility (not implemented)")
@@ -149,7 +150,11 @@ class ActionHandler:
         logger.info("Toggle results visibility (not implemented)")
 
     def _on_view_hooks(self, action, param):
-        logger.info("Open hook manager (not implemented)")
+        if self._window:
+            from src.ui.dialogs.hook_manager import HookManagerDialog
+
+            dialog = HookManagerDialog(self._window)
+            dialog.present()
 
     def _on_view_analytics(self, action, param):
         logger.info("Open analytics dashboard (not implemented)")
@@ -184,6 +189,10 @@ class ActionHandler:
             if query.strip():
                 self._window.editor.set_text(f"EXPLAIN ANALYZE {query}")
                 self._window._on_run_clicked()
+
+    def _on_query_history(self, action, param):
+        if self._window:
+            self._window._on_query_history_clicked()
 
     # --- Tools ---
 

@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.4 - Toolbar (GPLv3)
+# SQL Schema Studio 0.5 - Toolbar (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -73,9 +73,7 @@ class Toolbar(Gtk.Box):
         # Hooks button
         btn_hooks = Gtk.Button(label="Hooks")
         btn_hooks.set_tooltip_text("Manage hooks and plugins")
-        btn_hooks.connect(
-            "clicked", lambda b: logger.info("Hook manager clicked (not implemented)")
-        )
+        btn_hooks.connect("clicked", lambda b: window._on_hooks_clicked())
         self.append(btn_hooks)
 
         # Spacer
