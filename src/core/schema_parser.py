@@ -10,8 +10,7 @@
 
 import re
 import sqlparse
-from sqlparse.sql import Identifier, IdentifierList, Where, Function
-from sqlparse.tokens import Keyword, DML, Name, Punctuation
+from sqlparse.tokens import Keyword
 
 from src.utils.logging import get_logger
 
