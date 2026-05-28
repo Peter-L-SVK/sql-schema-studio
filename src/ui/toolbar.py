@@ -73,9 +73,7 @@ class Toolbar(Gtk.Box):
         # Hooks button
         btn_hooks = Gtk.Button(label="Hooks")
         btn_hooks.set_tooltip_text("Manage hooks and plugins")
-        btn_hooks.connect(
-            "clicked", lambda b: logger.info("Hook manager clicked (not implemented)")
-        )
+        btn_hooks.connect("clicked", lambda b: window._on_hooks_clicked())
         self.append(btn_hooks)
 
         # Spacer

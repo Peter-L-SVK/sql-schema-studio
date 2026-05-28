@@ -149,7 +149,11 @@ class ActionHandler:
         logger.info("Toggle results visibility (not implemented)")
 
     def _on_view_hooks(self, action, param):
-        logger.info("Open hook manager (not implemented)")
+        if self._window:
+            from src.ui.dialogs.hook_manager import HookManagerDialog
+
+            dialog = HookManagerDialog(self._window)
+            dialog.present()
 
     def _on_view_analytics(self, action, param):
         logger.info("Open analytics dashboard (not implemented)")
