@@ -12,6 +12,8 @@ SQL tool.
 
 **Alpha software — under active development.**
 
+![Demo](scrshots/4.png)
+
 ## What It Does
 
 Connect to PostgreSQL, browse schemas and tables, write and execute queries
