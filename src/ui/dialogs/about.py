@@ -87,11 +87,11 @@ def show_about(parent):
         [
             "GTK 4 Toolkit",
             "GtkSourceView 5",
-            "NumPy, pandas & scikit-learn",
+            "NumPy, pandas and scikit-learn",
             "Perl 5 (Hook System)",
             "psycopg 3 (PostgreSQL Driver)",
             "Python 3",
-            "SQLite 3 (Query History & Settings)",
+            "SQLite 3 (Query History and Settings)",
         ],
     )
 
