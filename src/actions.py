@@ -210,7 +210,29 @@ class ActionHandler:
         logger.info("Open migration generator (not implemented)")
 
     def _on_tools_index_advisor(self, action, param):
-        logger.info("Open AI index advisor (not implemented)")
+        if self._window and self._window.db_connector.is_connected:
+            from src.analytics.index_advisor import IndexAdvisor
+        
+            advisor = IndexAdvisor()
+            recommendations = advisor.analyze_all_tables(self._window.db_connector)
+        
+            # Show results in editor
+            sql_lines = ["-- AI Index Advisor Recommendations\n"]
+            for table, recs in recommendations.items():
+                sql_lines.append(f"-- Table: {table}")
+                for r in recs:
+                    sql_lines.append(f"-- {r['reason']} [{r['priority']}]")
+                    sql_lines.append(r['sql'])
+                    sql_lines.append("")
+
+            self._window.editor.set_text("\n".join(sql_lines))
+            self._window.results.show_text(
+                f"Found {sum(len(r) for r in recommendations.values())} index recommendations "
+                f"across {len(recommendations)} tables.\n\n"
+                f"Recommendations loaded in SQL editor — review and execute manually."
+            )
+        else:
+            logger.warning("Not connected to database")
 
     def _on_tools_query_analyzer(self, action, param):
         logger.info("Open query analyzer (not implemented)")
