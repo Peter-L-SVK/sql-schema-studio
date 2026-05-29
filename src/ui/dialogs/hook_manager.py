@@ -80,6 +80,11 @@ class HookManagerDialog(Gtk.Window):
         btn_refresh.connect("clicked", lambda b: self._load_hooks())
         button_box.append(btn_refresh)
 
+        btn_run = Gtk.Button(label="Run Selected")
+        btn_run.add_css_class("suggested-action")
+        btn_run.connect("clicked", self._on_run_hook)
+        button_box.append(btn_run)
+
         btn_close = Gtk.Button(label="Close")
         btn_close.connect("clicked", lambda b: self.close())
         button_box.append(btn_close)
@@ -88,9 +93,7 @@ class HookManagerDialog(Gtk.Window):
         self.set_child(main_box)
 
     def _load_hooks(self):
-        """Load hooks from the registry."""
         self._list_store.clear()
-
         try:
             from src.hooks.registry import PluginRegistry
 
@@ -98,15 +101,15 @@ class HookManagerDialog(Gtk.Window):
             registry.discover_plugins()
             hooks = registry.list_hooks()
 
-            for name, info in hooks.items():
-                if isinstance(info, dict):
-                    lang = info.get("type", "python")
-                    status = info.get("status", "available")
-                else:
-                    # It's a BaseHook instance
-                    _ = info.get_metadata() if hasattr(info, "get_metadata") else {}
+            for name, hook in hooks.items():
+                if hasattr(hook, "get_metadata"):
+                    meta = hook.get_metadata()
                     lang = "python"
                     status = "ready"
+                else:
+                    meta = hook
+                    lang = meta.get("type", "perl")
+                    status = meta.get("status", "available")
 
                 self._list_store.append([name, lang, False, status])
 
@@ -120,3 +123,88 @@ class HookManagerDialog(Gtk.Window):
         hook_name = self._list_store[path][0]
         enabled = self._list_store[path][2]
         logger.info(f"Hook '{hook_name}' {'enabled' if enabled else 'disabled'}")
+
+    def _on_run_hook(self, button):
+        selection = self._tree.get_selection()
+        model, tree_iter = selection.get_selected()
+        if not tree_iter:
+            return
+
+        hook_name = model.get_value(tree_iter, 0)
+        logger.info(f"Running hook: {hook_name}")
+
+        try:
+            from src.hooks.registry import PluginRegistry
+            from src.hooks.base_plugin import HookContext, HookTrigger
+
+            registry = PluginRegistry()
+            registry.discover_plugins()
+
+            all_hooks = registry.list_hooks()
+            logger.debug(f"Available hooks: {list(all_hooks.keys())}")
+
+            # Find the hook
+            hook = all_hooks.get(hook_name)
+
+            if hook and hasattr(hook, "execute"):
+                context = HookContext(
+                    trigger=HookTrigger.SCHEDULED_INTERVAL,
+                    database="",
+                    connection_pool=None,
+                    data={},
+                )
+
+                import asyncio
+
+                async def run():
+                    return await hook.execute(context)
+
+                with asyncio.Runner() as runner:
+                    result = runner.run(run())
+
+                self._show_result(hook_name, str(result))
+            elif hook and isinstance(hook, dict) and hook.get("type") == "perl":
+                # Perl hook
+                from src.hooks.perl.executor import PerlHookExecutor
+
+                executor = PerlHookExecutor()
+                import asyncio
+
+                async def run_perl():
+                    return await executor.execute(hook["path"], {"data": {}})
+
+                with asyncio.Runner() as runner:
+                    result = runner.run(run_perl())
+                    self._show_result(hook_name, str(result))
+            else:
+                logger.warning(f"Hook not executable: {hook_name}")
+                self._show_error(hook_name, "Hook not executable")
+        except Exception as e:
+            logger.error(f"Error: {e}")
+            self._show_error(hook_name, str(e))
+
+    def _show_result(self, hook_name, result):
+        """Show hook execution result."""
+        dialog = Gtk.MessageDialog(
+            transient_for=self,
+            modal=True,
+            message_type=Gtk.MessageType.INFO,
+            buttons=Gtk.ButtonsType.OK,
+            text=hook_name,
+            secondary_text=str(result),
+        )
+        dialog.connect("response", lambda d, r: d.close())
+        dialog.present()
+
+    def _show_error(self, hook_name, error):
+        """Show hook execution error."""
+        dialog = Gtk.MessageDialog(
+            transient_for=self,
+            modal=True,
+            message_type=Gtk.MessageType.ERROR,
+            buttons=Gtk.ButtonsType.OK,
+            text=f"Hook failed: {hook_name}",
+            secondary_text=error,
+        )
+        dialog.connect("response", lambda d, r: d.close())
+        dialog.present()

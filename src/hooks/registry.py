@@ -97,12 +97,9 @@ class PluginRegistry:
                 result.append(hook)
         return result
 
-    def list_hooks(self) -> Dict[str, Dict]:
-        """List all registered hooks with metadata"""
+    def list_hooks(self) -> Dict[str, Any]:
+        """List all registered hooks."""
         result = {}
         for name, hook in self._hooks.items():
-            if isinstance(hook, BaseHook):
-                result[name] = hook.get_metadata()
-            else:
-                result[name] = {"name": name, "type": "perl", "status": "available"}
+            result[name] = hook
         return result
