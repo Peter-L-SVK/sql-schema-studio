@@ -8,11 +8,15 @@
 
 from __future__ import annotations
 
+from src.utils.logging import get_logger
+
+logger = get_logger(__name__)
+
 import platform
 import gi
 
 gi.require_version("Gtk", "4.0")
-from gi.repository import Gtk
+from gi.repository import Gtk, Gdk
 
 
 def show_about(parent):
@@ -62,31 +66,51 @@ def show_about(parent):
     )
 
     # Set icon — works on all DEs
-    try:
-        dialog.set_logo_icon_name("application-x-sqlite3")
-    except Exception:
-        pass
+    import os
+
+    icon_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        "resources",
+        "ui",
+        "icons",
+        "logo.svg",
+    )
+    if os.path.exists(icon_path):
+        texture = Gdk.Texture.new_from_filename(icon_path)
+        dialog.set_logo(texture)
+    else:
+        dialog.set_logo_icon_name("database")
 
     # Add credits section
     dialog.add_credit_section(
         "Powered by",
         [
-            "GTK4 Toolkit",
-            "Python 3",
-            "psycopg3 PostgreSQL Driver",
+            "GTK 4 Toolkit",
             "GtkSourceView 5",
-            "NumPy / pandas / scikit-learn",
+            "NumPy, pandas & scikit-learn",
             "Perl 5 (Hook System)",
+            "psycopg 3 (PostgreSQL Driver)",
+            "Python 3",
+            "SQLite 3 (Query History & Settings)",
         ],
     )
 
     dialog.add_credit_section(
         "Special Thanks",
         [
-            "PostgreSQL Global Development Group",
             "GNOME Foundation",
+            "KDE Plasma Team",
             "Linux Mint / Cinnamon Team",
+            "PostgreSQL Global Development Group",
             "Python Software Foundation",
+            "SQLite Consortium",
+        ],
+    )
+
+    dialog.add_credit_section(
+        "Icon",
+        [
+            "DB Browser for SQLite contributors (sqlitebrowser.org) - GPLv3",
         ],
     )
 

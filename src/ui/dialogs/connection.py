@@ -60,6 +60,7 @@ class ConnectionDialog(Gtk.Dialog):
         # Password with visibility toggle
         self._entry_pass = Gtk.PasswordEntry()
         self._entry_pass.set_show_peek_icon(True)
+        self._entry_pass.connect("activate", lambda e: self._on_connect_clicked(self._btn_connect))
         content.append(make_labeled_field("Password:", self._entry_pass))
 
         self._combo_ssl = Gtk.ComboBoxText()

@@ -13,12 +13,15 @@
 from __future__ import annotations
 
 import logging
+import os
 import sys
 import signal
 
 from src.app import Application
 from src.utils.signal_handlers import handle_sigint
 from src.utils.logging import configure_root_logger, get_logger
+
+import os
 
 
 def main():
