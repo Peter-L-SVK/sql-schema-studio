@@ -74,52 +74,65 @@ class IndexAdvisor:
             for idx in indexes:
                 # Extract column names from index definition
                 import re
-                cols = re.findall(r'\(([^)]+)\)', idx['indexdef'])
+
+                cols = re.findall(r"\(([^)]+)\)", idx["indexdef"])
                 for col in cols:
-                    existing_columns.update(c.strip() for c in col.split(','))
+                    existing_columns.update(c.strip() for c in col.split(","))
 
             # Recommend indexes for foreign keys
             for fk in fks:
-                col = fk['column_name']
+                col = fk["column_name"]
                 if col not in existing_columns:
-                    recommendations.append({
-                        "column": col,
-                        "reason": f"Foreign key referencing {fk['referenced_table']}.{fk['referenced_column']}",
-                        "sql": f"CREATE INDEX idx_{table}_{col} ON {schema}.{table} ({col});",
-                        "priority": "HIGH",
-                    })
+                    recommendations.append(
+                        {
+                            "column": col,
+                            "reason": f"Foreign key referencing {fk['referenced_table']}.{fk['referenced_column']}",
+                            "sql": f"CREATE INDEX idx_{table}_{col} ON {schema}.{table} ({col});",
+                            "priority": "HIGH",
+                        }
+                    )
 
             # Recommend indexes for columns named like *_id, *_date, *_status
             for col in columns:
-                col_name = col['column_name']
+                col_name = col["column_name"]
                 if col_name in existing_columns:
                     continue
 
-                if col_name.endswith('_id') and col_name not in [r['column'] for r in recommendations]:
-                    recommendations.append({
-                        "column": col_name,
-                        "reason": "Potential foreign key (ends with _id)",
-                        "sql": f"CREATE INDEX idx_{table}_{col_name} ON {schema}.{table} ({col_name});",
-                        "priority": "MEDIUM",
-                    })
+                if col_name.endswith("_id") and col_name not in [
+                    r["column"] for r in recommendations
+                ]:
+                    recommendations.append(
+                        {
+                            "column": col_name,
+                            "reason": "Potential foreign key (ends with _id)",
+                            "sql": f"CREATE INDEX idx_{table}_{col_name} ON {schema}.{table} ({col_name});",
+                            "priority": "MEDIUM",
+                        }
+                    )
 
-                if col_name.endswith('_date') or col_name.endswith('_at'):
-                    recommendations.append({
-                        "column": col_name,
-                        "reason": "Date column — often used in range queries",
-                        "sql": f"CREATE INDEX idx_{table}_{col_name} ON {schema}.{table} ({col_name});",
-                        "priority": "MEDIUM",
-                    })
+                if col_name.endswith("_date") or col_name.endswith("_at"):
+                    recommendations.append(
+                        {
+                            "column": col_name,
+                            "reason": "Date column — often used in range queries",
+                            "sql": f"CREATE INDEX idx_{table}_{col_name} ON {schema}.{table} ({col_name});",
+                            "priority": "MEDIUM",
+                        }
+                    )
 
-                if col_name in ('status', 'type', 'category'):
-                    recommendations.append({
-                        "column": col_name,
-                        "reason": "Categorical column — often used in WHERE clauses",
-                        "sql": f"CREATE INDEX idx_{table}_{col_name} ON {schema}.{table} ({col_name});",
-                        "priority": "LOW",
-                    })
+                if col_name in ("status", "type", "category"):
+                    recommendations.append(
+                        {
+                            "column": col_name,
+                            "reason": "Categorical column — often used in WHERE clauses",
+                            "sql": f"CREATE INDEX idx_{table}_{col_name} ON {schema}.{table} ({col_name});",
+                            "priority": "LOW",
+                        }
+                    )
 
-            logger.info(f"Index advisor: {len(recommendations)} recommendations for {schema}.{table}")
+            logger.info(
+                f"Index advisor: {len(recommendations)} recommendations for {schema}.{table}"
+            )
 
         except Exception as e:
             logger.error(f"Index advisor failed: {e}")
@@ -137,7 +150,7 @@ class IndexAdvisor:
         for schema in schemas:
             tables = db_connector.get_tables(schema)
             for table in tables:
-                table_name = table['table_name']
+                table_name = table["table_name"]
                 recs = self.analyze_table(db_connector, schema, table_name)
                 if recs:
                     all_recommendations[f"{schema}.{table_name}"] = recs

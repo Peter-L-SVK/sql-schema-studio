@@ -53,7 +53,7 @@ class QueryHistoryDialog(Gtk.Window):
         main_box.append(search_box)
 
         # History list
-        self._list_store = Gtk.ListStore(str, str, str, str)
+        self._list_store = Gtk.ListStore(str, str, str, str, str)
         self._tree = Gtk.TreeView(model=self._list_store)
         self._tree.set_headers_visible(True)
 
@@ -62,6 +62,12 @@ class QueryHistoryDialog(Gtk.Window):
         date_col = Gtk.TreeViewColumn("Date", date_renderer, text=0)
         date_col.set_min_width(160)
         self._tree.append_column(date_col)
+
+        # Column Col
+        cat_renderer = Gtk.CellRendererText()
+        cat_col = Gtk.TreeViewColumn("Type", cat_renderer, text=4)
+        cat_col.set_min_width(60)
+        self._tree.append_column(cat_col)
 
         # Time column
         time_renderer = Gtk.CellRendererText()
@@ -103,13 +109,8 @@ class QueryHistoryDialog(Gtk.Window):
         self.set_child(main_box)
 
     def _load_history(self, search: str = ""):
-        """Load queries from history."""
         self._list_store.clear()
-
-        if search:
-            rows = self._history.search(search)
-        else:
-            rows = self._history.get_recent()
+        rows = self._history.search(search) if search else self._history.get_recent()
 
         for r in rows:
             date_str = r["executed_at"][:10] if r["executed_at"] else ""
@@ -118,7 +119,8 @@ class QueryHistoryDialog(Gtk.Window):
             )
             query = r["query"][:100] + "..." if len(r["query"]) > 100 else r["query"]
             row_count = str(r["row_count"])
-            self._list_store.append([date_str, time_str, query, row_count])
+            category = r.get("category", "OTHER")
+            self._list_store.append([date_str, time_str, query, row_count, category])
 
     def _on_search_changed(self, entry):
         """Filter by search term."""

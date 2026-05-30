@@ -212,17 +212,17 @@ class ActionHandler:
     def _on_tools_index_advisor(self, action, param):
         if self._window and self._window.db_connector.is_connected:
             from src.analytics.index_advisor import IndexAdvisor
-        
+
             advisor = IndexAdvisor()
             recommendations = advisor.analyze_all_tables(self._window.db_connector)
-        
+
             # Show results in editor
             sql_lines = ["-- AI Index Advisor Recommendations\n"]
             for table, recs in recommendations.items():
                 sql_lines.append(f"-- Table: {table}")
                 for r in recs:
                     sql_lines.append(f"-- {r['reason']} [{r['priority']}]")
-                    sql_lines.append(r['sql'])
+                    sql_lines.append(r["sql"])
                     sql_lines.append("")
 
             self._window.editor.set_text("\n".join(sql_lines))
