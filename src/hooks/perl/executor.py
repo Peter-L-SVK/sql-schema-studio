@@ -61,13 +61,13 @@ class PerlHookExecutor:
         use warnings;
         use JSON;
         use lib '{Path(hook_path).parent}';
-        
+
         my $json_input = do {{ local $/; <STDIN> }};
         my $context = decode_json($json_input);
-    
+
         require '{Path(hook_path).name}';
         my $hook = {Path(hook_path).stem}->new();
         my $result = $hook->execute($context);
-        
+
         print encode_json($result);
         """

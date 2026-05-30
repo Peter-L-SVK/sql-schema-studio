@@ -59,7 +59,7 @@ class QueryHistory:
         # Add category column if upgrading from older schema
         try:
             self._conn.execute("ALTER TABLE history ADD COLUMN category TEXT DEFAULT 'OTHER'")
-        except:
+        except Exception:
             pass
         self._conn.commit()
 
