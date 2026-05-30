@@ -110,7 +110,8 @@ def show_about(parent):
     dialog.add_credit_section(
         "Icon",
         [
-            "DB Browser for SQLite contributors (sqlitebrowser.org) - GPLv3",
+            "DB Browser for SQLite contributors",
+            "      (sqlitebrowser.org) - GPLv3",
         ],
     )
 
