@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.5 - Perl Hook Executor (GPLv3)
+# SQL Schema Studio 0.6 - Perl Hook Executor (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -65,7 +65,7 @@ class PerlHookExecutor:
         my $json_input = do {{ local $/; <STDIN> }};
         my $context = decode_json($json_input);
 
-        require '{Path(hook_path).stem}';
+        require '{Path(hook_path).name}';
         my $hook = {Path(hook_path).stem}->new();
         my $result = $hook->execute($context);
 
