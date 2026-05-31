@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.5 - Connection Dialog (GPLv3)
+# SQL Schema Studio 0.6 - Connection Dialog (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -60,6 +60,7 @@ class ConnectionDialog(Gtk.Dialog):
         # Password with visibility toggle
         self._entry_pass = Gtk.PasswordEntry()
         self._entry_pass.set_show_peek_icon(True)
+        self._entry_pass.connect("activate", lambda e: self._on_connect_clicked(self._btn_connect))
         content.append(make_labeled_field("Password:", self._entry_pass))
 
         self._combo_ssl = Gtk.ComboBoxText()

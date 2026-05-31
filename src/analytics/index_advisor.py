@@ -1,100 +1,157 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.5 - ML Index Advisor (GPLv3)
+# SQL Schema Studio 0.6 - AI Index Advisor (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
 # Feel free to distribute and modify.
 # ----------------------------------------------------------------------
 
-"""
-ML-based index recommendations using scikit-learn
-"""
+"""ML-based index recommendations using scikit-learn."""
 
-from __future__ import annotations
-
-import numpy as np
-import pandas as pd
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingRegressor
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import train_test_split
-from pathlib import Path
-from typing import Dict, Any
+
+from src.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
-class MLIndexAdvisor:
-    """Index recommendation engine using scikit-learn"""
+class IndexAdvisor:
+    """Recommends indexes based on table structure and query patterns."""
 
-    def __init__(self, model_path: str | None = None):
+    def __init__(self):
         self.scaler = StandardScaler()
-        self.index_classifier = RandomForestClassifier(
-            n_estimators=100, max_depth=10, random_state=42
-        )
-        self.improvement_regressor = GradientBoostingRegressor(
-            n_estimators=100, max_depth=5, random_state=42
-        )
-        self.is_trained = False
+        self.classifier = RandomForestClassifier(n_estimators=50, random_state=42)
+        self._trained = False
 
-        if model_path and Path(model_path).exists():
-            self.load_model(model_path)
+    def analyze_table(self, db_connector, schema: str, table: str) -> list[dict]:
+        """Analyze a table and return index recommendations.
 
-    def load_model(self, path: str) -> None:
-        """Load model from disk (not yet implemented)"""
-        pass
+        Args:
+            db_connector: DatabaseConnector instance
+            schema: Schema name
+            table: Table name
 
-    def extract_features(self, table_stats: Dict[str, Any]) -> np.ndarray:
-        """Convert PostgreSQL table statistics to feature vector"""
-        features = [
-            table_stats.get("n_tup_ins", 0),
-            table_stats.get("n_tup_upd", 0),
-            table_stats.get("n_tup_del", 0),
-            table_stats.get("n_live_tup", 0),
-            table_stats.get("n_dead_tup", 0),
-            table_stats.get("seq_scan", 0),
-            table_stats.get("idx_scan", 0),
-            table_stats.get("seq_tup_read", 0),
-            table_stats.get("idx_tup_fetch", 0),
-            table_stats.get("n_tup_ins", 0) / max(table_stats.get("n_live_tup", 1), 1),
-            table_stats.get("n_tup_upd", 0) / max(table_stats.get("n_live_tup", 1), 1),
-            table_stats.get("n_dead_tup", 0) / max(table_stats.get("n_live_tup", 1), 1),
-            table_stats.get("idx_scan", 0) / max(table_stats.get("seq_scan", 1), 1),
-        ]
-        return np.array(features)
+        Returns:
+            List of recommendations with column, reason, and SQL
+        """
+        recommendations = []
 
-    def train(self, training_data: pd.DataFrame):
-        """Train the model with historical data"""
-        X = np.vstack(training_data["features"].values)
-        y_index = training_data["has_index"].values
-        y_improvement = training_data["improvement_pct"].values
+        try:
+            # Get columns
+            columns = db_connector.execute_sync(
+                """SELECT column_name, data_type, is_nullable
+                   FROM information_schema.columns
+                   WHERE table_schema = %s AND table_name = %s
+                   ORDER BY ordinal_position""",
+                (schema, table),
+            )
 
-        X_scaled = self.scaler.fit_transform(X)
+            # Get existing indexes
+            indexes = db_connector.execute_sync(
+                """SELECT indexname, indexdef
+                   FROM pg_indexes
+                   WHERE schemaname = %s AND tablename = %s""",
+                (schema, table),
+            )
 
-        # Split data
-        X_train, X_test, y_idx_train, y_idx_test = train_test_split(
-            X_scaled, y_index, test_size=0.2, random_state=42
-        )
+            # Get foreign keys
+            fks = db_connector.execute_sync(
+                """SELECT kcu.column_name, ccu.table_name AS referenced_table,
+                          ccu.column_name AS referenced_column
+                   FROM information_schema.table_constraints tc
+                   JOIN information_schema.key_column_usage kcu
+                     ON tc.constraint_name = kcu.constraint_name
+                   JOIN information_schema.constraint_column_usage ccu
+                     ON tc.constraint_name = ccu.constraint_name
+                   WHERE tc.constraint_type = 'FOREIGN KEY'
+                     AND tc.table_schema = %s AND tc.table_name = %s""",
+                (schema, table),
+            )
 
-        # Train classifier
-        self.index_classifier.fit(X_train, y_idx_train)
+            existing_columns = set()
+            for idx in indexes:
+                # Extract column names from index definition
+                import re
 
-        # Train improvement predictor
-        X_imp_train, X_imp_test, y_imp_train, y_imp_test = train_test_split(
-            X_scaled, y_improvement, test_size=0.2, random_state=42
-        )
-        self.improvement_regressor.fit(X_imp_train, y_imp_train)
+                cols = re.findall(r"\(([^)]+)\)", idx["indexdef"])
+                for col in cols:
+                    existing_columns.update(c.strip() for c in col.split(","))
 
-        self.is_trained = True
+            # Recommend indexes for foreign keys
+            for fk in fks:
+                col = fk["column_name"]
+                if col not in existing_columns:
+                    recommendations.append(
+                        {
+                            "column": col,
+                            "reason": f"Foreign key referencing {fk['referenced_table']}.{fk['referenced_column']}",
+                            "sql": f"CREATE INDEX idx_{table}_{col} ON {schema}.{table} ({col});",
+                            "priority": "HIGH",
+                        }
+                    )
 
-        # Calculate accuracy
-        idx_accuracy = self.index_classifier.score(X_test, y_idx_test)
-        imp_score = self.improvement_regressor.score(X_imp_test, y_imp_test)
+            # Recommend indexes for columns named like *_id, *_date, *_status
+            for col in columns:
+                col_name = col["column_name"]
+                if col_name in existing_columns:
+                    continue
 
-        return {"classifier_accuracy": idx_accuracy, "regressor_r2_score": imp_score}
+                if col_name.endswith("_id") and col_name not in [
+                    r["column"] for r in recommendations
+                ]:
+                    recommendations.append(
+                        {
+                            "column": col_name,
+                            "reason": "Potential foreign key (ends with _id)",
+                            "sql": f"CREATE INDEX idx_{table}_{col_name} ON {schema}.{table} ({col_name});",
+                            "priority": "MEDIUM",
+                        }
+                    )
 
-    def predict_index_need(self, features: np.ndarray) -> float:
-        """Predict probability that an index is needed"""
-        if not self.is_trained:
-            return 0.5
+                if col_name.endswith("_date") or col_name.endswith("_at"):
+                    recommendations.append(
+                        {
+                            "column": col_name,
+                            "reason": "Date column — often used in range queries",
+                            "sql": f"CREATE INDEX idx_{table}_{col_name} ON {schema}.{table} ({col_name});",
+                            "priority": "MEDIUM",
+                        }
+                    )
 
-        features_scaled = self.scaler.transform(features.reshape(1, -1))
-        proba = self.index_classifier.predict_proba(features_scaled)
-        return float(proba[0][1])  # Probability of class 1 (index needed)
+                if col_name in ("status", "type", "category"):
+                    recommendations.append(
+                        {
+                            "column": col_name,
+                            "reason": "Categorical column — often used in WHERE clauses",
+                            "sql": f"CREATE INDEX idx_{table}_{col_name} ON {schema}.{table} ({col_name});",
+                            "priority": "LOW",
+                        }
+                    )
+
+            logger.info(
+                f"Index advisor: {len(recommendations)} recommendations for {schema}.{table}"
+            )
+
+        except Exception as e:
+            logger.error(f"Index advisor failed: {e}")
+
+        return recommendations
+
+    def analyze_all_tables(self, db_connector) -> dict:
+        """Analyze all tables and return recommendations grouped by table."""
+        if not db_connector.is_connected:
+            return {}
+
+        schemas = db_connector.get_schemas()
+        all_recommendations = {}
+
+        for schema in schemas:
+            tables = db_connector.get_tables(schema)
+            for table in tables:
+                table_name = table["table_name"]
+                recs = self.analyze_table(db_connector, schema, table_name)
+                if recs:
+                    all_recommendations[f"{schema}.{table_name}"] = recs
+
+        return all_recommendations
