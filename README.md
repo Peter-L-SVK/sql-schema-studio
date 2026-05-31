@@ -61,15 +61,16 @@ recommendations. Extend with Python and Perl hooks for custom automation.
 
 ## System Requirements
 
-**Debian / Ubuntu:**
+**Debian / Ubuntu / Mint:**
 ```bash
 sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-4.0 \
-  gir1.2-gtksource-5.0 gir1.2-adw-1.0 libgtk-4-1 libgtksourceview-5-0
+  gir1.2-gtksource-5.0 libgtk-4-1 libgtksourceview-5-0 \
+  libcairo2-dev python3-cairo
 ```
 
-**Fedora:**
+**Fedora / CentOS / RedHat:**
 ```bash
-sudo dnf install python3-gobject gtk4 gtksourceview5 libadwaita
+sudo dnf install python3-gobject gtk4 gtksourceview5 libadwaita cairo python3-cairo
 ```
 
 ## Quick Start
