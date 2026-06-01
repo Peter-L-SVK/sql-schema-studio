@@ -22,32 +22,38 @@ recommendations. Extend with Python and Perl hooks for custom automation.
 
 ## Current Features
 
-- Connection manager with saved profiles, test-on-demand, and system keyring password storage
-- Database browser with schema/table tree and live filtering
-- SQL editor with syntax highlighting, line numbers, and F5 execution
-- Results viewer with formatted table output and timing
-- **Visual schema designer** with drag-and-drop tables, column editor, and
-  FK relationships (FK direction partially implemented — use child table
-  as first right-click, parent table as second)
+- **Connection manager** with saved profiles and system keyring password storage
+- **Database browser** with schema/table tree, live filtering, and double-click to query
+- **SQL editor** with GtkSourceView syntax highlighting, line numbers, and F5 execution
+- **Query execution** with formatted results, timing, and EXPLAIN ANALYZE support
+- **Visual schema designer** with drag-and-drop tables, column editor, and FK relationships
 - **SQL file import** — drag .sql files onto the designer to reverse-engineer schemas
+- **Query history** with SQLite storage, search, and type categorization
+- **AI index advisor** — rule-based index recommendations for foreign keys and columns
+- **Hook system** with Python and Perl plugin support and execution
 - **Preferences dialog** with persistent editor settings (font, color scheme, tab width)
-- **Window state persistence** — remembers size, pane positions across sessions
-- Full menu bar with undo/redo, clipboard, SQL formatting, and EXPLAIN
-- Modular architecture separating core, UI, models, hooks, and analytics
-- Clean shutdown with automatic disconnection on window close
-- Cross-desktop theming (Cinnamon, GNOME, MATE, XFCE)
+- **Window state persistence** — remembers size and pane positions across sessions
+- Full menu bar with undo/redo, clipboard, SQL formatting
+- Cross-desktop theming (Cinnamon, GNOME, MATE, XFCE, KDE Plasma)
+- Clean shutdown with automatic disconnection
 
 ## Planned
 
+- File operations UI/UX — open, save, and export SQL files
+- Browse data with inline editing
 - Migration generator with up/down SQL diffs
-- AI index advisor using scikit-learn query pattern analysis
-- Hook manager for enabling and configuring Python and Perl plugins
-- Multiple result tabs and query history
-- Multi-CPU analytics worker pool for large datasets
+- Export to CSV, JSON, and SQL dump
+- Multi-CPU analytics for large datasets
+- Visual query builder with drag-and-drop JOINs
+- Bidirectional FK support with cascade rules
+- Star/Snowflake schema detection and visualization
+- Data normalization hook (Kebola)
+- Cython optimization for heavy analytics
 
 ## Requirements
 
-- Linux or FreeBSD 
+- Linux or FreeBSD
+- Windows 10/11 via WSL2
 - Python 3.12 or later
 - GTK 4 and GtkSourceView 5
 - PostgreSQL 12 or later
@@ -56,20 +62,21 @@ recommendations. Extend with Python and Perl hooks for custom automation.
 
 ## System Requirements
 
-The Python packages above require these system libraries:
-
-**Debian / Ubuntu:**
+**Debian / Ubuntu / Mint:**
 ```bash
 sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-4.0 \
-  gir1.2-gtksource-5.0 gir1.2-adw-1.0 libgtk-4-1 libgtksourceview-5-0
+  gir1.2-gtksource-5.0 libgtk-4-1 libgtksourceview-5-0 \
+  libcairo2-dev python3-cairo
 ```
 
-**Fedora:**
+**Fedora / CentOS / RedHat:**
 ```bash
-sudo dnf install python3-gobject gtk4 gtksourceview5 libadwaita
+sudo dnf install python3-gobject gtk4 gtksourceview5 libadwaita cairo python3-cairo
 ```
 
 ## Quick Start
+
+### Linux/FreeBSD
 
 ```bash
 git clone https://github.com/peter-leukanic/sql-schema-studio.git
@@ -78,18 +85,27 @@ pip install -r requirements.txt
 python3 -m src.main
 ```
 
-## Contributing
+### Windows (WSL2)
 
-Contributions are welcome!  
-See [CONTRIBUTING](https://github.com/Peter-L-SVK/sql-schema-studio/blob/main/CONTRIBUTING.md) file for details.  
+```bash
+# Install WSL2 and WSLg
+wsl --install
+wsl --update
 
-For contact please see my email in profile info or use GitHub's built-in communication tools.
+# Inside WSL2 terminal (Debian / Ubuntu):
+sudo apt update && sudo apt upgrade -y
+sudo apt install python3-pip python3-gi python3-gi-cairo \
+  gir1.2-gtk-4.0 gir1.2-gtksource-5.0 \
+  libgtk-4-1 libgtksourceview-5-0 \
+  libcairo2-dev python3-cairo postgresql postgresql-client -y
 
-Please open an issue or pull request for any:  
+sudo service postgresql start
 
-- Bug fixes
-- Feature suggestions
-- Documentation improvements
+git clone https://github.com/peter-leukanic/sql-schema-studio.git
+cd sql-schema-studio
+pip install -r requirements.txt
+python3 -m src.main
+```
 
 ## Development
 
@@ -107,59 +123,34 @@ python3 -m mypy src/
 
 ```
 src/
-├── main.py              Entry point — signal handlers, app launch
-├── app.py               Gtk.Application subclass — lifecycle management
-├── actions.py            All menu and toolbar action handlers
-├── config.py             Centralized constants (defaults, limits, schemas)
-├── core/
-│   ├── db_connector.py   Connection profiles, keyring passwords, query execution
-│   ├── query_executor.py Async query runner with timeout and cancellation
-│   ├── schema_manager.py Schema parsing and generation (planned)
-│   └── migration.py      Diff and migration generator (planned)
-├── ui/
-│   ├── window.py         Main application window — layout assembly
-│   ├── browser.py        Database object tree with filtering
-│   ├── editor.py         SQL editor with GtkSourceView syntax highlighting
-│   ├── results.py        Query results panel with formatted table output
-│   ├── schema_designer.py Visual schema designer with drag-drop and FK lines
-│   ├── toolbar.py        Main toolbar — connect, run, stop, tools
-│   ├── menubar.py        Traditional menu bar (File, Edit, View, Query, Tools, Help)
-│   ├── statusbar.py      Bottom status bar — connection info, row counts, timing
-│   └── dialogs/
-│       ├── connection.py Connection dialog with test and password visibility toggle
-│       ├── about.py      About dialog with system information
-│       ├── preferences.py Editor settings with persistent JSON storage
-│       └── column_editor.py Table column editor with type selection and PK toggles
-├── models/
-│   ├── table.py          Table model with SQL generation
-│   ├── column.py         Column model with constraints and type handling
-│   └── relationship.py   Foreign key relationship model
-├── hooks/
-│   ├── base_plugin.py    Abstract base classes for hooks and plugins
-│   ├── registry.py       Plugin discovery and registration
-│   ├── sandbox.py        Secure execution environment with resource limits
-│   ├── bridge.py         Python ↔ Perl data marshaling
-│   ├── python/
-│   │   └── executor.py   Python hook runtime
-│   └── perl/
-│       └── executor.py   Perl5 hook runtime via subprocess
-├── analytics/
-│   ├── index_advisor.py  ML-based index recommendations (scikit-learn)
-│   ├── query_analyzer.py Query pattern analysis (planned)
-│   ├── pipeline.py       Data preprocessing pipelines (planned)
-│   └── visualizations/   Matplotlib and Plotly backends (planned)
-├── utils/
-│   ├── gtk_helpers.py    GTK4 margin, layout, and run_async utilities
-│   ├── logging.py        Centralized logger factory and configuration
-│   ├── settings.py       Persistent JSON settings manager
-│   └── signal_handlers.py SIGINT handler for graceful Ctrl-C exit
+├── main.py Entry point
+├── app.py Gtk.Application lifecycle
+├── actions.py Menu and toolbar handlers
+├── config.py Centralized constants
+├── core/ Database connectivity, query execution, SQL parsing
+├── ui/ GTK4 interface (window, browser, editor, designer)
+│ └── dialogs/ Connection, about, preferences, column editor, hooks
+├── models/ Table, column, and relationship data models
+├── hooks/ Plugin system with Python and Perl executors
+│ ├── python/ Python hook runtime
+│ ├── perl/ Perl hook runtime
+│ ├── python_hooks/ Python hook implementations
+│ └── perl_hooks/ Perl hook implementations
+├── analytics/ Index advisor and query analysis
+├── utils/ GTK4 helpers, logging, settings, signal handlers
 └── resources/
-    └── ui/
-        └── style.css     Cinnamon-inspired cross-DE stylesheet
+└── ui/
+├── style.css Application stylesheet
+└── icons/ Application icons
 ```
+
+## Contributing
+
+See [CONTRIBUTING](https://github.com/Peter-L-SVK/sql-schema-studio/blob/main/CONTRIBUTING.md) for details.
+Please open an issue or pull request for bug fixes, feature suggestions, or documentation improvements.
 
 ## License
 
-GNU General Public License v3 or later. See [LICENSE](LICENSE).  
+GNU General Public License v3 or later. See [LICENSE](LICENSE).
 
 ---
