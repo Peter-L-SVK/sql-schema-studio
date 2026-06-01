@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.5 - Plugin Registry (GPLv3)
+# SQL Schema Studio 0.6 - Plugin Registry (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -97,12 +97,9 @@ class PluginRegistry:
                 result.append(hook)
         return result
 
-    def list_hooks(self) -> Dict[str, Dict]:
-        """List all registered hooks with metadata"""
+    def list_hooks(self) -> Dict[str, Any]:
+        """List all registered hooks."""
         result = {}
         for name, hook in self._hooks.items():
-            if isinstance(hook, BaseHook):
-                result[name] = hook.get_metadata()
-            else:
-                result[name] = {"name": name, "type": "perl", "status": "available"}
+            result[name] = hook
         return result

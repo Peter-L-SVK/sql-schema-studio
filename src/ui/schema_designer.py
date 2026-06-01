@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.5 - Schema Designer (GPLv3)
+# SQL Schema Studio 0.6 - Schema Designer (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -11,6 +11,7 @@
 import gi
 
 gi.require_version("Gtk", "4.0")
+gi.require_version("Gdk", "4.0")
 from gi.repository import Gtk, Gdk, GObject
 import cairo
 
@@ -95,13 +96,19 @@ class SchemaDesigner(Gtk.Box):
         click_gesture.connect("pressed", self._on_click)
         self._canvas.add_controller(click_gesture)
 
-        # Right-click for relationship creation — ADD THIS
+        # Right-click for relationship creation
         right_click = Gtk.GestureClick()
         right_click.set_button(3)
         right_click.connect("pressed", self._on_right_click)
         self._canvas.add_controller(right_click)
 
         self.append(self._canvas)
+        self.set_focusable(True)
+
+        # Keyboard shortcuts
+        key_controller = Gtk.EventControllerKey()
+        key_controller.connect("key-pressed", self._on_key_pressed)
+        self.add_controller(key_controller)
 
         # State
         self._tables: list[SchemaTable] = []
@@ -234,9 +241,9 @@ class SchemaDesigner(Gtk.Box):
 
     def _on_click(self, gesture, n_press, x, y):
         """Handle click on tables."""
-        table = self._find_table_at(x, y)
+        self.grab_focus()
 
-        # Select table on single click
+        table = self._find_table_at(x, y)
         self._selected_table = table
 
         if table and n_press == 2:
@@ -293,6 +300,15 @@ class SchemaDesigner(Gtk.Box):
             self._creating_relationship = None
 
         self._canvas.queue_draw()
+
+    def _on_key_pressed(self, controller, keyval, keycode, state):
+        """Handle keyboard shortcuts."""
+        if keyval == Gdk.KEY_Delete and self._selected_table:
+            logger.debug(f"Key pressed: {keyval}")
+            logger.info(f"Deleting selected table: {self._selected_table.name}")
+            self._on_delete_table(None)
+            return True
+        return False
 
     def _edit_table(self, table):
         """Open dialog to edit table columns."""
