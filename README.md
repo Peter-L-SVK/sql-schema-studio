@@ -53,6 +53,7 @@ recommendations. Extend with Python and Perl hooks for custom automation.
 ## Requirements
 
 - Linux or FreeBSD
+- Windows 10/11 via WSL2
 - Python 3.12 or later
 - GTK 4 and GtkSourceView 5
 - PostgreSQL 12 or later
@@ -75,7 +76,31 @@ sudo dnf install python3-gobject gtk4 gtksourceview5 libadwaita cairo python3-ca
 
 ## Quick Start
 
+### Linux/FreeBSD
+
 ```bash
+git clone https://github.com/peter-leukanic/sql-schema-studio.git
+cd sql-schema-studio
+pip install -r requirements.txt
+python3 -m src.main
+```
+
+### Windows (WSL2)
+
+```bash
+# Install WSL2 and WSLg
+wsl --install
+wsl --update
+
+# Inside WSL2 terminal (Debian / Ubuntu):
+sudo apt update && sudo apt upgrade -y
+sudo apt install python3-pip python3-gi python3-gi-cairo \
+  gir1.2-gtk-4.0 gir1.2-gtksource-5.0 \
+  libgtk-4-1 libgtksourceview-5-0 \
+  libcairo2-dev python3-cairo postgresql postgresql-client -y
+
+sudo service postgresql start
+
 git clone https://github.com/peter-leukanic/sql-schema-studio.git
 cd sql-schema-studio
 pip install -r requirements.txt
