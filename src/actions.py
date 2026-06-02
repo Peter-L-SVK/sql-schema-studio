@@ -61,9 +61,9 @@ class ActionHandler:
 
     def _register_file_actions(self):
         self._add_action("new_connection", self._on_new_connection)
-        self._add_action("open_schema", self._on_open_schema)
-        self._add_action("save_schema", self._on_save_schema)
-        self._add_action("save_schema_as", self._on_save_schema_as)
+        self._add_action("open_schema", self._on_open_schema, ["<Ctrl>O"])
+        self._add_action("save_schema", self._on_save_schema, ["<Ctrl>S"])
+        self._add_action("save_schema_as", self._on_save_schema_as, ["<Ctrl><Shift>S"])
         self._add_action("export", self._on_export)
         self._add_action("quit", self._on_quit, ["<Ctrl>Q"])
 
@@ -72,13 +72,16 @@ class ActionHandler:
             self._window._on_connect_clicked()
 
     def _on_open_schema(self, action, param):
-        logger.info("Open schema file... (not implemented)")
+        if self._window:
+            self._window._on_file_open()
 
     def _on_save_schema(self, action, param):
-        logger.info("Save schema (not implemented)")
+        if self._window:
+            self._window._on_file_save()
 
     def _on_save_schema_as(self, action, param):
-        logger.info("Save schema as... (not implemented)")
+        if self._window:
+            self._window._on_file_save_as()
 
     def _on_export(self, action, param):
         logger.info("Export schema (not implemented)")
@@ -89,11 +92,11 @@ class ActionHandler:
     # --- Edit ---
 
     def _register_edit_actions(self):
-        self._add_action("undo", self._on_undo)
-        self._add_action("redo", self._on_redo)
-        self._add_action("cut", self._on_cut)
-        self._add_action("copy", self._on_copy)
-        self._add_action("paste", self._on_paste)
+        self._add_action("undo", self._on_undo, ["<Ctrl>Z"])
+        self._add_action("redo", self._on_redo, ["<Ctrl>Y"])
+        self._add_action("cut", self._on_cut, ["<Ctrl>X"])
+        self._add_action("copy", self._on_copy, ["<Ctrl>C"])
+        self._add_action("paste", self._on_paste, ["<Ctrl>V"])
         self._add_action("preferences", self._on_preferences)
 
     def _on_undo(self, action, param):

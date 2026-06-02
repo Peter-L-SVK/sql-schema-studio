@@ -22,9 +22,9 @@ def build_menubar():
     # File
     file_menu = Gio.Menu()
     file_menu.append("New Connection...", "app.new_connection")
-    file_menu.append("Open Schema File...", "app.open_schema")
-    file_menu.append("Save Schema", "app.save_schema")
-    file_menu.append("Save Schema As...", "app.save_schema_as")
+    file_menu.append("Open SQL File...", "app.open_schema")
+    file_menu.append("Save File", "app.save_schema")
+    file_menu.append("Save SQL As...", "app.save_schema_as")
     file_menu.append_section(None, Gio.Menu())
     file_menu.append("Export", "app.export")
     file_menu.append_section(None, Gio.Menu())

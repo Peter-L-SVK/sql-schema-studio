@@ -14,6 +14,7 @@ from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
+import os
 import time
 import gi
 
@@ -54,6 +55,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self.results = ResultsPanel()
         self.statusbar = StatusBar()
         self._query_history = QueryHistory()
+        self._current_file = None
 
         self._build_layout()
         self._load_css()
@@ -268,3 +270,88 @@ class MainWindow(Gtk.ApplicationWindow):
 
         dialog = QueryHistoryDialog(self, self._query_history, on_select=on_select)
         dialog.present()
+
+    def _on_file_open(self):
+        """Open a .sql file into the editor."""
+        dialog = Gtk.FileDialog()
+        dialog.set_title("Open SQL File")
+    
+        filter_sql = Gtk.FileFilter()
+        filter_sql.set_name("SQL Files (*.sql, *.psql)")
+        filter_sql.add_pattern("*.sql")
+        filter_sql.add_pattern("*.psql")
+    
+        filter_all = Gtk.FileFilter()
+        filter_all.set_name("All Files")
+        filter_all.add_pattern("*")
+    
+        from gi.repository import Gio
+        filter_store = Gio.ListStore.new(Gtk.FileFilter)
+        filter_store.append(filter_sql)
+        filter_store.append(filter_all)
+    
+        dialog.set_filters(filter_store)
+        dialog.open(self, None, self._on_file_open_response)
+
+
+    def _on_file_open_response(self, dialog, result):
+        """Handle file open response."""
+        try:
+            file = dialog.open_finish(result)
+            if file:
+                path = file.get_path()
+                with open(path, 'r') as f:
+                    content = f.read()
+                self.editor.set_text(content)
+                self._current_file = path
+                self.statusbar.set_connection(f"Opened: {os.path.basename(path)}")
+                logger.info(f"Opened file: {path}")
+        except Exception as e:
+            logger.error(f"Failed to open file: {e}")
+
+
+    def _on_file_save(self):
+        """Save current editor content to file."""
+        if hasattr(self, '_current_file') and self._current_file:
+            self._save_to_file(self._current_file)
+        else:
+            self._on_file_save_as()
+
+
+    def _on_file_save_as(self):
+        """Save editor content to a new file."""
+        dialog = Gtk.FileDialog()
+        dialog.set_title("Save SQL File")
+        dialog.set_initial_name("query.sql")
+    
+        filter_sql = Gtk.FileFilter()
+        filter_sql.set_name("SQL Files (*.sql)")
+        filter_sql.add_pattern("*.sql")
+    
+        from gi.repository import Gio
+        filter_store = Gio.ListStore.new(Gtk.FileFilter)
+        filter_store.append(filter_sql)
+        dialog.set_filters(filter_store)
+    
+        dialog.save(self, None, self._on_file_save_response)
+
+
+    def _on_file_save_response(self, dialog, result):
+        """Handle file save response."""
+        try:
+            file = dialog.save_finish(result)
+            if file:
+                path = file.get_path()
+                self._save_to_file(path)
+                self._current_file = path
+        except Exception as e:
+            logger.error(f"Failed to save file: {e}")
+
+
+    def _save_to_file(self, path):
+        """Write editor content to file."""
+        content = self.editor.get_text()
+        with open(path, 'w') as f:
+            f.write(content)
+        self.statusbar.set_connection(f"Saved: {os.path.basename(path)}")
+        logger.info(f"Saved file: {path}")
