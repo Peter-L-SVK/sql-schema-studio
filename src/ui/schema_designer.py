@@ -21,6 +21,8 @@ from src.config import (
     SCHEMA_TABLE_HEADER_HEIGHT,
     SCHEMA_TABLE_ROW_HEIGHT,
     SCHEMA_TABLE_BODY_PADDING,
+    SCHEMA_CANVAS_WIDTH,
+    SCHEMA_CANVAS_HEIGHT,
 )
 from src.utils.logging import get_logger
 from src.utils.gtk_helpers import set_margin
@@ -102,6 +104,8 @@ class SchemaDesigner(Gtk.Box):
         self._canvas.set_draw_func(self._on_draw)
         self._canvas.set_hexpand(True)
         self._canvas.set_vexpand(True)
+        self._canvas.set_content_width(SCHEMA_CANVAS_WIDTH)
+        self._canvas.set_content_height(SCHEMA_CANVAS_HEIGHT)
 
         # Drop target — accept tables from browser
         drop_target = Gtk.DropTarget.new(GObject.TYPE_STRING, Gdk.DragAction.COPY)
@@ -130,7 +134,11 @@ class SchemaDesigner(Gtk.Box):
         right_click.connect("pressed", self._on_right_click)
         self._canvas.add_controller(right_click)
 
-        self.append(self._canvas)
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_child(self._canvas)
+        scroll.set_hexpand(True)
+        scroll.set_vexpand(True)
+        self.append(scroll)  
         self.set_focusable(True)
 
         # Keyboard shortcuts
@@ -167,7 +175,23 @@ class SchemaDesigner(Gtk.Box):
         table.columns.append(TableColumn("id", "serial", is_primary=True))
         self._tables.append(table)
         logger.info(f"Added table: {table.name}")
+        self._update_canvas_size()
         self._canvas.queue_draw()
+
+    def _update_canvas_size(self):
+        """Resize canvas to fit all tables plus margin."""
+        if not self._tables:
+            return
+    
+        max_x = 0
+        max_y = 0
+        for table in self._tables:
+            w, h = table.get_size()
+            max_x = max(max_x, table.x + w + 200)
+            max_y = max(max_y, table.y + h + 200)
+    
+        self._canvas.set_content_width(max(SCHEMA_CANVAS_WIDTH, int(max_x)))
+        self._canvas.set_content_height(max(SCHEMA_CANVAS_HEIGHT, int(max_y)))
 
     def _on_delete_table(self, button):
         """Delete the selected table and its relationships."""
@@ -193,7 +217,9 @@ class SchemaDesigner(Gtk.Box):
         self._selected_table = None
 
         logger.info(f"Deleted table: {table.name}")
+        self._update_canvas_size()
         self._canvas.queue_draw()
+        
 
     def _on_generate_sql(self, button):
         """Generate SQL and show in editor."""
@@ -277,6 +303,7 @@ class SchemaDesigner(Gtk.Box):
                 f"({self._dragging.x:.0f}, {self._dragging.y:.0f})"
             )
             self._dragging = None
+            self._update_canvas_size()
             self._canvas.queue_draw()
 
     def _on_click(self, gesture, n_press, x, y):
@@ -646,6 +673,7 @@ class SchemaDesigner(Gtk.Box):
             )
 
         self._tables.append(table)
+        self._update_canvas_size()
         self._canvas.queue_draw()
         logger.info(f"Imported table: {name} with {len(table.columns)} columns")
         return True
@@ -732,6 +760,7 @@ class SchemaDesigner(Gtk.Box):
                 f"Imported FK: {fk.from_table}.{fk.from_column} -> {fk.to_table}.{fk.to_column}"
             )
 
+        self._update_canvas_size()
         self._canvas.queue_draw()
 
 

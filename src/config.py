@@ -40,6 +40,7 @@ DML_COMMANDS: frozenset[str] = frozenset(
 # Combined — any statement that should trigger a browser refresh
 REFRESH_TRIGGER_COMMANDS: frozenset[str] = DDL_COMMANDS | DML_COMMANDS
 
+# Default values when openning Connect
 DEFAULT_PORT: int = 5432
 DEFAULT_HOST: str = "localhost"
 DEFAULT_DATABASE: str = "postgres"
@@ -67,3 +68,5 @@ SCHEMA_TABLE_WIDTH: int = 200
 SCHEMA_TABLE_ROW_HEIGHT: int = 26
 SCHEMA_TABLE_HEADER_HEIGHT: int = 32
 SCHEMA_TABLE_BODY_PADDING: int = 4
+SCHEMA_CANVAS_WIDTH: int = 1200
+SCHEMA_CANVAS_HEIGHT: int = 800
