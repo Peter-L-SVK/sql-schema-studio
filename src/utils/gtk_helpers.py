@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.6 - GTK4 Helpers (GPLv3)
+# SQL Schema Studio 0.7 - GTK4 Helpers (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -16,6 +16,7 @@ logger = get_logger(__name__)
 
 
 import gi
+import traceback
 import threading
 
 gi.require_version("Gtk", "4.0")
@@ -23,17 +24,13 @@ from gi.repository import Gtk, GLib
 
 
 def run_async(func, callback=None):
-    """Run a function in a background thread, callback in main thread"""
-
     def _run():
         try:
-            result = func()  # Call the sync function directly
+            result = func()
             if callback:
                 GLib.idle_add(callback, result)
         except Exception as e:
             logger.error(f"Async error: {e}")
-            import traceback
-
             traceback.print_exc()
 
     thread = threading.Thread(target=_run, daemon=True)

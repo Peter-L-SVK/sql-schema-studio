@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.6 - Schema Designer (GPLv3)
+# SQL Schema Studio 0.7 - Schema Designer (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -14,12 +14,15 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Gdk", "4.0")
 from gi.repository import Gtk, Gdk, GObject
 import cairo
+import math
 
 from src.config import (
     SCHEMA_TABLE_WIDTH,
     SCHEMA_TABLE_HEADER_HEIGHT,
     SCHEMA_TABLE_ROW_HEIGHT,
     SCHEMA_TABLE_BODY_PADDING,
+    SCHEMA_CANVAS_WIDTH,
+    SCHEMA_CANVAS_HEIGHT,
 )
 from src.utils.logging import get_logger
 from src.utils.gtk_helpers import set_margin
@@ -31,12 +34,25 @@ GType = GObject.GType
 class ForeignKey:
     """Represents a foreign key relationship between two tables."""
 
-    def __init__(self, name: str, from_table: str, from_column: str, to_table: str, to_column: str):
+    def __init__(
+        self,
+        name,
+        from_table,
+        from_column,
+        to_table,
+        to_column,
+        from_col_index=None,
+        to_col_index=None,
+        line_style="straight",
+    ):
         self.name = name
         self.from_table = from_table
         self.to_table = to_table
         self.from_column = from_column
         self.to_column = to_column
+        self.from_col_index = from_col_index
+        self.to_col_index = to_col_index
+        self.line_style = line_style
 
 
 class SchemaDesigner(Gtk.Box):
@@ -49,6 +65,7 @@ class SchemaDesigner(Gtk.Box):
         self._relationships: list[ForeignKey] = []
         self._creating_relationship: tuple | None = None  # (table, column) waiting for target
         self._selected_table: SchemaTable | None = None
+        self._line_style = "straight"  # Default style
 
         # Toolbar
         toolbar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
@@ -67,6 +84,29 @@ class SchemaDesigner(Gtk.Box):
         btn_generate.connect("clicked", self._on_generate_sql)
         toolbar.append(btn_generate)
 
+        # Separator
+        sep = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
+        toolbar.append(sep)
+
+        # Create a box for each button to properly contain the image
+        # Straight line button
+        self.btn_line_straight = Gtk.Button(label="╱")
+        self.btn_line_straight.set_tooltip_text("Straight lines")
+        self.btn_line_straight.connect("clicked", lambda b: self._set_line_style("straight"))
+        toolbar.append(self.btn_line_straight)
+
+        # Curve line button
+        self.btn_line_curve = Gtk.Button(label="∿")
+        self.btn_line_curve.set_tooltip_text("S-curve lines")
+        self.btn_line_curve.connect("clicked", lambda b: self._set_line_style("curve"))
+        toolbar.append(self.btn_line_curve)
+
+        # Orthogonal line button
+        self.btn_line_ortho = Gtk.Button(label="└┐")
+        self.btn_line_ortho.set_tooltip_text("Orthogonal lines (L-shape)")
+        self.btn_line_ortho.connect("clicked", lambda b: self._set_line_style("ortho"))
+        toolbar.append(self.btn_line_ortho)
+
         self.append(toolbar)
 
         # Drawing area
@@ -74,6 +114,8 @@ class SchemaDesigner(Gtk.Box):
         self._canvas.set_draw_func(self._on_draw)
         self._canvas.set_hexpand(True)
         self._canvas.set_vexpand(True)
+        self._canvas.set_content_width(SCHEMA_CANVAS_WIDTH)
+        self._canvas.set_content_height(SCHEMA_CANVAS_HEIGHT)
 
         # Drop target — accept tables from browser
         drop_target = Gtk.DropTarget.new(GObject.TYPE_STRING, Gdk.DragAction.COPY)
@@ -102,7 +144,11 @@ class SchemaDesigner(Gtk.Box):
         right_click.connect("pressed", self._on_right_click)
         self._canvas.add_controller(right_click)
 
-        self.append(self._canvas)
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_child(self._canvas)
+        scroll.set_hexpand(True)
+        scroll.set_vexpand(True)
+        self.append(scroll)
         self.set_focusable(True)
 
         # Keyboard shortcuts
@@ -116,6 +162,18 @@ class SchemaDesigner(Gtk.Box):
         self._drag_offset_x: float = 0.0
         self._drag_offset_y: float = 0.0
 
+    def _set_line_style(self, style):
+        self._line_style = style
+        for btn in [self.btn_line_straight, self.btn_line_curve, self.btn_line_ortho]:
+            btn.remove_css_class("suggested-action")
+        if style == "straight":
+            self.btn_line_straight.add_css_class("suggested-action")
+        elif style == "curve":
+            self.btn_line_curve.add_css_class("suggested-action")
+        elif style == "ortho":
+            self.btn_line_ortho.add_css_class("suggested-action")
+        self._canvas.queue_draw()
+
     def _on_add_table(self, button):
         """Add a new table to the canvas."""
         count = len(self._tables) + 1
@@ -127,7 +185,23 @@ class SchemaDesigner(Gtk.Box):
         table.columns.append(TableColumn("id", "serial", is_primary=True))
         self._tables.append(table)
         logger.info(f"Added table: {table.name}")
+        self._update_canvas_size()
         self._canvas.queue_draw()
+
+    def _update_canvas_size(self):
+        """Resize canvas to fit all tables plus margin."""
+        if not self._tables:
+            return
+
+        max_x = 0
+        max_y = 0
+        for table in self._tables:
+            w, h = table.get_size()
+            max_x = max(max_x, table.x + w + 200)
+            max_y = max(max_y, table.y + h + 200)
+
+        self._canvas.set_content_width(max(SCHEMA_CANVAS_WIDTH, int(max_x)))
+        self._canvas.set_content_height(max(SCHEMA_CANVAS_HEIGHT, int(max_y)))
 
     def _on_delete_table(self, button):
         """Delete the selected table and its relationships."""
@@ -153,6 +227,7 @@ class SchemaDesigner(Gtk.Box):
         self._selected_table = None
 
         logger.info(f"Deleted table: {table.name}")
+        self._update_canvas_size()
         self._canvas.queue_draw()
 
     def _on_generate_sql(self, button):
@@ -191,7 +266,7 @@ class SchemaDesigner(Gtk.Box):
         if not table or not table.columns:
             return None
 
-        line_height = 20
+        line_height = table._row_height
         header_height = line_height + 6  # Same as in _draw_table
 
         # The body starts right after the header
@@ -237,19 +312,54 @@ class SchemaDesigner(Gtk.Box):
                 f"({self._dragging.x:.0f}, {self._dragging.y:.0f})"
             )
             self._dragging = None
+            self._update_canvas_size()
             self._canvas.queue_draw()
 
     def _on_click(self, gesture, n_press, x, y):
-        """Handle click on tables."""
         self.grab_focus()
 
         table = self._find_table_at(x, y)
-        self._selected_table = table
 
-        if table and n_press == 2:
-            self._edit_table(table)
+        if table:
+            self._selected_table = table
+            if n_press == 2:
+                self._edit_table(table)
+        else:
+            self._selected_table = None
+            # Check if click is on a relationship line
+            fk = self._find_relationship_at(x, y)
+            if fk and n_press == 2:
+                self._relationships.remove(fk)
+                logger.info(
+                    f"Deleted FK: {fk.from_table}.{fk.from_column} -> {fk.to_table}.{fk.to_column}"
+                )
 
         self._canvas.queue_draw()
+
+    def _find_relationship_at(self, x, y):
+        """Find a relationship line near the click position."""
+        for fk in self._relationships:
+            source_table = next((t for t in self._tables if t.name == fk.from_table), None)
+            target_table = next((t for t in self._tables if t.name == fk.to_table), None)
+            if not source_table or not target_table:
+                continue
+
+            # Check if click is near the line
+            src_w, src_h = source_table.get_size()
+            tgt_w, tgt_h = target_table.get_size()
+
+            x1 = source_table.x + src_w
+            y1 = source_table.y + src_h / 2
+            x2 = target_table.x
+            y2 = target_table.y + tgt_h / 2
+
+            # Simple distance check
+            dist = abs((y2 - y1) * x - (x2 - x1) * y + x2 * y1 - y2 * x1) / math.sqrt(
+                (y2 - y1) ** 2 + (x2 - x1) ** 2
+            )
+            if dist < 15:  # Within 15 pixels
+                return fk
+        return None
 
     def _on_right_click(self, gesture, n_press, x, y):
         """Right-click a table to start/complete a relationship."""
@@ -292,6 +402,9 @@ class SchemaDesigner(Gtk.Box):
                 from_column=source_col.name,
                 to_table=table.name,
                 to_column=clicked_column.name,
+                from_col_index=source_table.columns.index(source_col),
+                to_col_index=table.columns.index(clicked_column),
+                line_style=self._line_style,
             )
             self._relationships.append(fk)
             logger.info(
@@ -349,7 +462,7 @@ class SchemaDesigner(Gtk.Box):
             self._draw_table(cr, table)
 
     def _draw_relationship(self, cr, fk):
-        """Draw a relationship line between two tables."""
+        """Draw a relationship line between two tables with column-level precision."""
         # Find source and target tables
         source_table = None
         target_table = None
@@ -362,24 +475,73 @@ class SchemaDesigner(Gtk.Box):
         if not source_table or not target_table:
             return
 
-        # Calculate connection points
         src_w, src_h = source_table.get_size()
         tgt_w, tgt_h = target_table.get_size()
 
-        # Start from bottom-center of source
-        x1 = source_table.x + src_w / 2
-        y1 = source_table.y + src_h
+        # Source connection point — right edge at FK column row
+        if fk.from_col_index is not None:
+            col_y = (
+                source_table.y
+                + source_table._header_height
+                + fk.from_col_index * source_table._row_height
+                + source_table._row_height / 2
+            )
+            x1 = source_table.x + src_w  # Right edge of source table
+            y1 = col_y
+        else:
+            x1 = source_table.x + src_w / 2
+            y1 = source_table.y + src_h
 
-        # End at top-center of target
-        x2 = target_table.x + tgt_w / 2
-        y2 = target_table.y
+        # Target connection point — left edge at referenced column row
+        if fk.to_col_index is not None:
+            col_y = (
+                target_table.y
+                + target_table._header_height
+                + fk.to_col_index * target_table._row_height
+                + target_table._row_height / 2
+            )
+            x2 = target_table.x  # Left edge of target table
+            y2 = col_y
+        else:
+            x2 = target_table.x + tgt_w / 2
+            y2 = target_table.y
 
-        # Draw line with FK label
+        # Draw line
         cr.set_source_rgb(0.2, 0.4, 0.6)
         cr.set_line_width(2)
-        cr.move_to(x1, y1)
-        cr.line_to(x2, y2)
+
+        if fk.line_style == "straight":
+            cr.move_to(x1, y1)
+            cr.line_to(x2, y2)
+        elif fk.line_style == "curve":
+            mid_x = (x1 + x2) / 2
+            cr.move_to(x1, y1)
+            cr.curve_to(mid_x, y1, mid_x, y2, x2, y2)
+        elif fk.line_style == "ortho":
+            mid_x = (x1 + x2) / 2
+            cr.move_to(x1, y1)
+            cr.line_to(mid_x, y1)
+            cr.line_to(mid_x, y2)
+            cr.line_to(x2, y2)
+
         cr.stroke()
+
+        # Draw arrowhead at target end
+        arrow_size = 10
+        angle = math.atan2(y2 - y1, x2 - x1)
+
+        cr.move_to(x2, y2)
+        cr.line_to(
+            x2 - arrow_size * math.cos(angle - 0.4),
+            y2 - arrow_size * math.sin(angle - 0.4),
+        )
+        cr.line_to(
+            x2 - arrow_size * math.cos(angle + 0.4),
+            y2 - arrow_size * math.sin(angle + 0.4),
+        )
+        cr.close_path()
+        cr.set_source_rgb(0.2, 0.4, 0.6)
+        cr.fill()
 
         # Draw "1" at source end and "N" at target end
         cr.set_source_rgb(0.2, 0.4, 0.6)
@@ -387,11 +549,11 @@ class SchemaDesigner(Gtk.Box):
         cr.set_font_size(10)
 
         # Source: "1"
-        cr.move_to(x1 + 5, y1 - 5)
+        cr.move_to(x1 + 8, y1 - 8)
         cr.show_text("1")
 
         # Target: "N"
-        cr.move_to(x2 - 15, y2 + 12)
+        cr.move_to(x2 - 20, y2 - 8)
         cr.show_text("N")
 
     def _draw_table(self, cr, table):
@@ -411,11 +573,12 @@ class SchemaDesigner(Gtk.Box):
         else:
             max_line = len(title)
 
-        line_height = 20
-        header_height = line_height + 6
-        body_height = len(col_lines) * line_height + 6
+        line_height = table._row_height
+        header_height = table._header_height
+        body_padding = table._body_padding
+        body_height = len(col_lines) * line_height + body_padding
         total_height = header_height + body_height
-        total_width = max(max_line * 8, 120)
+        total_width = max(max_line * 8, table._width)
 
         # Shadow
         cr.set_source_rgba(0, 0, 0, 0.15)
@@ -456,6 +619,15 @@ class SchemaDesigner(Gtk.Box):
         cr.set_font_size(13)
         cr.move_to(table.x + 6, table.y + header_height - 6)
         cr.show_text(table.name)
+
+        # Column separator lines
+        cr.set_source_rgba(0.7, 0.7, 0.7, 0.4)
+        cr.set_line_width(0.5)
+        for i in range(1, len(col_lines)):
+            sep_y = table.y + header_height + i * line_height
+            cr.move_to(table.x + 4, sep_y)
+            cr.line_to(table.x + total_width - 4, sep_y)
+            cr.stroke()
 
         # Column text
         cr.set_source_rgb(0.1, 0.1, 0.1)
@@ -524,6 +696,7 @@ class SchemaDesigner(Gtk.Box):
             )
 
         self._tables.append(table)
+        self._update_canvas_size()
         self._canvas.queue_draw()
         logger.info(f"Imported table: {name} with {len(table.columns)} columns")
         return True
@@ -579,18 +752,42 @@ class SchemaDesigner(Gtk.Box):
             logger.info(f"Imported table: {table.name} with {len(table.columns)} columns")
 
         for fk_data in foreign_keys:
+            # Find table objects to get column indices
+            source_table_obj = next(
+                (t for t in self._tables if t.name == fk_data["from_table"]), None
+            )
+            target_table_obj = next(
+                (t for t in self._tables if t.name == fk_data["to_table"]), None
+            )
+
+            from_idx = None
+            to_idx = None
+            if source_table_obj:
+                for i, col in enumerate(source_table_obj.columns):
+                    if col.name == fk_data["from_column"]:
+                        from_idx = i
+                        break
+            if target_table_obj:
+                for i, col in enumerate(target_table_obj.columns):
+                    if col.name == fk_data["to_column"]:
+                        to_idx = i
+                        break
+
             fk = ForeignKey(
                 name=fk_data["name"],
                 from_table=fk_data["from_table"],
                 from_column=fk_data["from_column"],
                 to_table=fk_data["to_table"],
                 to_column=fk_data["to_column"],
+                from_col_index=from_idx,
+                to_col_index=to_idx,
             )
             self._relationships.append(fk)
             logger.info(
                 f"Imported FK: {fk.from_table}.{fk.from_column} -> {fk.to_table}.{fk.to_column}"
             )
 
+        self._update_canvas_size()
         self._canvas.queue_draw()
 
 

@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.6 - Menu Bar (GPLv3)
+# SQL Schema Studio 0.7 - Menu Bar (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -22,12 +22,21 @@ def build_menubar():
     # File
     file_menu = Gio.Menu()
     file_menu.append("New Connection...", "app.new_connection")
-    file_menu.append("Open Schema File...", "app.open_schema")
-    file_menu.append("Save Schema", "app.save_schema")
-    file_menu.append("Save Schema As...", "app.save_schema_as")
+    file_menu.append("Open SQL File...", "app.open_schema")
+    file_menu.append("Save File", "app.save_schema")
+    file_menu.append("Save SQL As...", "app.save_schema_as")
     file_menu.append_section(None, Gio.Menu())
-    file_menu.append("Export", "app.export")
+    # Export submenu
+    export_menu = Gio.Menu()
+    export_menu.append("Export as CSV", "app.export_csv")
+    export_menu.append("Export as JSON", "app.export_json")
+    file_menu.append_submenu("Export", export_menu)
     file_menu.append_section(None, Gio.Menu())
+    # Import submenu
+    import_menu = Gio.Menu()
+    import_menu.append("Import CSV...", "app.import_csv")
+    import_menu.append("Import JSON...", "app.import_json")
+    file_menu.append_submenu("Import", import_menu)
     file_menu.append("Quit", "app.quit")
 
     # Edit

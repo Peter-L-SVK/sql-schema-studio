@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.6 - Configuration (GPLv3)
+# SQL Schema Studio 0.7 - Configuration (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -40,6 +40,7 @@ DML_COMMANDS: frozenset[str] = frozenset(
 # Combined — any statement that should trigger a browser refresh
 REFRESH_TRIGGER_COMMANDS: frozenset[str] = DDL_COMMANDS | DML_COMMANDS
 
+# Default values when openning Connect
 DEFAULT_PORT: int = 5432
 DEFAULT_HOST: str = "localhost"
 DEFAULT_DATABASE: str = "postgres"
@@ -63,7 +64,9 @@ HOOK_TIME_LIMIT_SECONDS: int = 30
 KEYRING_SERVICE_NAME: str = "sql-schema-studio"
 
 # Schema designer
-SCHEMA_TABLE_WIDTH: int = 160
-SCHEMA_TABLE_HEADER_HEIGHT: int = 28
-SCHEMA_TABLE_ROW_HEIGHT: int = 22
+SCHEMA_TABLE_WIDTH: int = 200
+SCHEMA_TABLE_ROW_HEIGHT: int = 26
+SCHEMA_TABLE_HEADER_HEIGHT: int = 32
 SCHEMA_TABLE_BODY_PADDING: int = 4
+SCHEMA_CANVAS_WIDTH: int = 1200
+SCHEMA_CANVAS_HEIGHT: int = 800
