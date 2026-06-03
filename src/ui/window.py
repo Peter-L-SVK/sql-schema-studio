@@ -185,9 +185,10 @@ class MainWindow(Gtk.ApplicationWindow):
             self.db_connector.disconnect()
         except Exception as e:
             logger.error(f"Disconnect error: {e}")
-            self.toolbar.set_status(False)
-            self.statusbar.set_connection("No database connected")
-            self.browser.clear()
+
+        self.toolbar.set_status(False)
+        self.statusbar.set_connection("No database connected")
+        self.browser.clear()
 
     def _on_run_clicked(self):
         query = self.editor.get_selected_text()
