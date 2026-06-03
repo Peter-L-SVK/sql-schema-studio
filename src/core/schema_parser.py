@@ -58,7 +58,9 @@ class SchemaParser:
 
     def _is_create_table(self, parsed) -> bool:
         """Check if statement is CREATE TABLE."""
-        return parsed.get_type() == "CREATE"
+        if not parsed.get_type() == "CREATE":
+            return False
+        return True
 
     def _is_alter_table_fk(self, parsed) -> bool:
         """Check if statement is ALTER TABLE ... ADD CONSTRAINT ... FOREIGN KEY."""
@@ -134,7 +136,7 @@ class SchemaParser:
         """Split table body into individual column/constraint lines."""
         # Handle nested parentheses in DEFAULT values and CHECK constraints
         lines = []
-        current = []
+        current: list[str] = []
         depth = 0
 
         for char in body:

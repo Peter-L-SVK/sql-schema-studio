@@ -69,7 +69,7 @@ class IndexAdvisor:
                 (schema, table),
             )
 
-            existing_columns = set()
+            existing_columns: set[str] = set()
             for idx in indexes:
                 # Extract column names from index definition
                 import re

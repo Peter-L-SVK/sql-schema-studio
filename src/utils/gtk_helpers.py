@@ -27,7 +27,6 @@ def run_async(func, callback=None):
     def _run():
         try:
             result = func()
-            logger.debug(f"run_async done, callback={callback is not None}")
             if callback:
                 GLib.idle_add(callback, result)
         except Exception as e:

@@ -32,6 +32,11 @@ def build_menubar():
     export_menu.append("Export as JSON", "app.export_json")
     file_menu.append_submenu("Export", export_menu)
     file_menu.append_section(None, Gio.Menu())
+    # Import submenu
+    import_menu = Gio.Menu()
+    import_menu.append("Import CSV...", "app.import_csv")
+    import_menu.append("Import JSON...", "app.import_json")
+    file_menu.append_submenu("Import", import_menu)
     file_menu.append("Quit", "app.quit")
 
     # Edit

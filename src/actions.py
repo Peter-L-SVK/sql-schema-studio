@@ -66,6 +66,8 @@ class ActionHandler:
         self._add_action("save_schema_as", self._on_save_schema_as, ["<Ctrl><Shift>S"])
         self._add_action("export_csv", self._on_export_csv)
         self._add_action("export_json", self._on_export_json)
+        self._add_action("import_csv", self._on_import_csv)
+        self._add_action("import_json", self._on_import_json)
         self._add_action("quit", self._on_quit, ["<Ctrl>Q"])
 
     def _on_new_connection(self, action, param):
@@ -91,6 +93,14 @@ class ActionHandler:
     def _on_export_json(self, action, param):
         if self._window:
             self._window._on_export_json()
+
+    def _on_import_csv(self, action, param):
+        if self._window:
+            self._window._on_import_csv()
+
+    def _on_import_json(self, action, param):
+        if self._window:
+            self._window._on_import_json()
 
     def _on_quit(self, action, param):
         self._app.quit()
