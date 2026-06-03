@@ -56,6 +56,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self.statusbar = StatusBar()
         self._query_history = QueryHistory()
         self._current_file = None
+        self._last_result = None
 
         self._build_layout()
         self._load_css()
@@ -237,6 +238,7 @@ class MainWindow(Gtk.ApplicationWindow):
             else:
                 columns = list(result[0].keys())
                 rows = [list(r.values()) for r in result]
+                self._last_result = (columns, rows)  # Ulož pre export
                 self.results.show_query_result(columns, rows, elapsed)
                 self.statusbar.set_query_stats(len(rows), elapsed)
                 self._query_history.add(
@@ -362,3 +364,63 @@ class MainWindow(Gtk.ApplicationWindow):
             f.write(content)
         self.statusbar.set_connection(f"Saved: {os.path.basename(path)}")
         logger.info(f"Saved file: {path}")
+
+    def _on_export_csv(self):
+        """Export last query results to CSV."""
+        self._export_results("csv")
+
+    def _on_export_json(self):
+        """Export last query results to JSON."""
+        self._export_results("json")
+
+    def _export_results(self, format_type):
+        """Export results to file."""
+        if not self._last_result:
+            logger.warning("No results to export")
+            return
+    
+        columns, rows = self._last_result
+    
+        dialog = Gtk.FileDialog()
+        dialog.set_title(f"Export as {format_type.upper()}")
+        dialog.set_initial_name(f"query_results.{format_type}")
+    
+        filter_f = Gtk.FileFilter()
+        if format_type == "csv":
+            filter_f.set_name("CSV Files (*.csv)")
+            filter_f.add_pattern("*.csv")
+        else:
+            filter_f.set_name("JSON Files (*.json)")
+            filter_f.add_pattern("*.json")
+    
+        from gi.repository import Gio
+        filter_store = Gio.ListStore.new(Gtk.FileFilter)
+        filter_store.append(filter_f)
+        dialog.set_filters(filter_store)
+    
+        dialog.save(self, None, lambda d, r: self._on_export_response(d, r, columns, rows, format_type))
+
+    def _on_export_response(self, dialog, result, columns, rows, format_type):
+        """Handle export file save."""
+        try:
+            file = dialog.save_finish(result)
+            if file:
+                path = file.get_path()
+            
+                if format_type == "csv":
+                    import csv
+                    with open(path, 'w', newline='') as f:
+                        writer = csv.writer(f)
+                        writer.writerow(columns)
+                        writer.writerows(rows)
+                else:
+                    import json
+                    data = [dict(zip(columns, row)) for row in rows]
+                    with open(path, 'w') as f:
+                        json.dump(data, f, indent=2, default=str)
+            
+                self.statusbar.set_connection(f"Exported: {os.path.basename(path)}")
+                logger.info(f"Exported {len(rows)} rows to {path}")
+        except Exception as e:
+            logger.error(f"Export failed: {e}")
+

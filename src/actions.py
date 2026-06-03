@@ -64,7 +64,8 @@ class ActionHandler:
         self._add_action("open_schema", self._on_open_schema, ["<Ctrl>O"])
         self._add_action("save_schema", self._on_save_schema, ["<Ctrl>S"])
         self._add_action("save_schema_as", self._on_save_schema_as, ["<Ctrl><Shift>S"])
-        self._add_action("export", self._on_export)
+        self._add_action("export_csv", self._on_export_csv)
+        self._add_action("export_json", self._on_export_json)
         self._add_action("quit", self._on_quit, ["<Ctrl>Q"])
 
     def _on_new_connection(self, action, param):
@@ -83,8 +84,13 @@ class ActionHandler:
         if self._window:
             self._window._on_file_save_as()
 
-    def _on_export(self, action, param):
-        logger.info("Export schema (not implemented)")
+    def _on_export_csv(self, action, param):
+        if self._window:
+            self._window._on_export_csv()
+
+    def _on_export_json(self, action, param):
+        if self._window:
+            self._window._on_export_json()
 
     def _on_quit(self, action, param):
         self._app.quit()

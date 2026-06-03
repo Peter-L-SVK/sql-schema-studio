@@ -26,7 +26,11 @@ def build_menubar():
     file_menu.append("Save File", "app.save_schema")
     file_menu.append("Save SQL As...", "app.save_schema_as")
     file_menu.append_section(None, Gio.Menu())
-    file_menu.append("Export", "app.export")
+    # Export submenu
+    export_menu = Gio.Menu()
+    export_menu.append("Export as CSV", "app.export_csv")
+    export_menu.append("Export as JSON", "app.export_json")
+    file_menu.append_submenu("Export", export_menu)
     file_menu.append_section(None, Gio.Menu())
     file_menu.append("Quit", "app.quit")
 
