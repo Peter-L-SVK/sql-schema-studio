@@ -96,13 +96,13 @@ class SchemaParser:
             body = self._extract_create_body(str(parsed))
             columns = self._parse_columns(body)
 
-            pk_match = re.search(r'PRIMARY\s+KEY\s*\(([^)]+)\)', body, re.IGNORECASE)
+            pk_match = re.search(r"PRIMARY\s+KEY\s*\(([^)]+)\)", body, re.IGNORECASE)
             if pk_match:
-                pk_cols = [c.strip().strip('"') for c in pk_match.group(1).split(',')]
+                pk_cols = [c.strip().strip('"') for c in pk_match.group(1).split(",")]
                 for col in columns:
                     if col["name"] in pk_cols:
                         col["is_pk"] = True
-    
+
             return {
                 "name": table_name,
                 "schema": table_schema,

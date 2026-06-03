@@ -155,10 +155,11 @@ class DatabaseConnector:
         return self._build_conn_string(self._active_profile_obj)
 
     def execute_sync(self, query: str, params: tuple | None = None) -> list[dict[str, Any]]:
-        """Execute a query from a background thread using a direct sync connection."""
+        """Execute a query from a background thread using a direct sync connection"""
         conn_string = self._get_conn_string()
 
         with psycopg.connect(conn_string) as conn:
+            conn.autocommit = True  # Pridaj toto!
             with conn.cursor() as cur:
                 cur.execute(query, params)
                 if cur.description:

@@ -16,6 +16,7 @@ logger = get_logger(__name__)
 
 
 import gi
+import traceback
 import threading
 
 gi.require_version("Gtk", "4.0")
@@ -23,17 +24,14 @@ from gi.repository import Gtk, GLib
 
 
 def run_async(func, callback=None):
-    """Run a function in a background thread, callback in main thread"""
-
     def _run():
         try:
-            result = func()  # Call the sync function directly
+            result = func()
+            logger.debug(f"run_async done, callback={callback is not None}")
             if callback:
                 GLib.idle_add(callback, result)
         except Exception as e:
             logger.error(f"Async error: {e}")
-            import traceback
-
             traceback.print_exc()
 
     thread = threading.Thread(target=_run, daemon=True)

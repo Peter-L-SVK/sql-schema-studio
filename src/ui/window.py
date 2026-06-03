@@ -202,17 +202,21 @@ class MainWindow(Gtk.ApplicationWindow):
 
         def run():
             try:
+                logger.debug("Executing query in thread...")
                 result = self.db_connector.execute_sync(query)
                 elapsed = time.time() - start_time
                 return result, elapsed, None
             except Exception as e:
+                logger.error(f"Query execution failed: {e}")
                 elapsed = time.time() - start_time
                 return [], elapsed, str(e)
 
         def display(data):
-            logger.debug("display called")
+            logger.debug(f"display called with: error={data[2] is not None}")
             result, elapsed, error = data
             self.toolbar.set_run_sensitive(True)
+
+            q = query.strip().upper()
 
             if error:
                 self.results.show_error(error, elapsed)
@@ -220,6 +224,7 @@ class MainWindow(Gtk.ApplicationWindow):
                 self._query_history.add(
                     query=query, execution_time=elapsed, row_count=0, success=False
                 )
+                self._refresh_browser_if_ddl(q)
                 return
 
             if not result:
@@ -237,11 +242,15 @@ class MainWindow(Gtk.ApplicationWindow):
                     query=query, execution_time=elapsed, row_count=len(rows), success=True
                 )
 
-            q = query.strip().upper()
-            if any(q.startswith(c) for c in REFRESH_TRIGGER_COMMANDS):
-                self.browser.refresh()
+            self._refresh_browser_if_ddl(q)
 
         run_async(run, display)
+
+    def _refresh_browser_if_ddl(self, query_upper):
+        """Refresh browser if query is a DDL/DML statement."""
+        if any(query_upper.startswith(c) for c in REFRESH_TRIGGER_COMMANDS):
+            logger.info(f"Refreshing browser after: {query_upper[:60]}")
+            self.browser.refresh()
 
     def _on_stop_clicked(self):
         logger.info("Query cancelled by user")
@@ -275,24 +284,24 @@ class MainWindow(Gtk.ApplicationWindow):
         """Open a .sql file into the editor."""
         dialog = Gtk.FileDialog()
         dialog.set_title("Open SQL File")
-    
+
         filter_sql = Gtk.FileFilter()
         filter_sql.set_name("SQL Files (*.sql, *.psql)")
         filter_sql.add_pattern("*.sql")
         filter_sql.add_pattern("*.psql")
-    
+
         filter_all = Gtk.FileFilter()
         filter_all.set_name("All Files")
         filter_all.add_pattern("*")
-    
+
         from gi.repository import Gio
+
         filter_store = Gio.ListStore.new(Gtk.FileFilter)
         filter_store.append(filter_sql)
         filter_store.append(filter_all)
-    
+
         dialog.set_filters(filter_store)
         dialog.open(self, None, self._on_file_open_response)
-
 
     def _on_file_open_response(self, dialog, result):
         """Handle file open response."""
@@ -300,7 +309,7 @@ class MainWindow(Gtk.ApplicationWindow):
             file = dialog.open_finish(result)
             if file:
                 path = file.get_path()
-                with open(path, 'r') as f:
+                with open(path, "r") as f:
                     content = f.read()
                 self.editor.set_text(content)
                 self._current_file = path
@@ -309,32 +318,30 @@ class MainWindow(Gtk.ApplicationWindow):
         except Exception as e:
             logger.error(f"Failed to open file: {e}")
 
-
     def _on_file_save(self):
         """Save current editor content to file."""
-        if hasattr(self, '_current_file') and self._current_file:
+        if hasattr(self, "_current_file") and self._current_file:
             self._save_to_file(self._current_file)
         else:
             self._on_file_save_as()
-
 
     def _on_file_save_as(self):
         """Save editor content to a new file."""
         dialog = Gtk.FileDialog()
         dialog.set_title("Save SQL File")
         dialog.set_initial_name("query.sql")
-    
+
         filter_sql = Gtk.FileFilter()
         filter_sql.set_name("SQL Files (*.sql)")
         filter_sql.add_pattern("*.sql")
-    
+
         from gi.repository import Gio
+
         filter_store = Gio.ListStore.new(Gtk.FileFilter)
         filter_store.append(filter_sql)
         dialog.set_filters(filter_store)
-    
-        dialog.save(self, None, self._on_file_save_response)
 
+        dialog.save(self, None, self._on_file_save_response)
 
     def _on_file_save_response(self, dialog, result):
         """Handle file save response."""
@@ -347,11 +354,10 @@ class MainWindow(Gtk.ApplicationWindow):
         except Exception as e:
             logger.error(f"Failed to save file: {e}")
 
-
     def _save_to_file(self, path):
         """Write editor content to file."""
         content = self.editor.get_text()
-        with open(path, 'w') as f:
+        with open(path, "w") as f:
             f.write(content)
         self.statusbar.set_connection(f"Saved: {os.path.basename(path)}")
         logger.info(f"Saved file: {path}")
