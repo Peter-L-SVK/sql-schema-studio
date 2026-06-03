@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.6 - Schema Parser (GPLv3)
+# SQL Schema Studio 0.7 - Schema Parser (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -58,7 +58,9 @@ class SchemaParser:
 
     def _is_create_table(self, parsed) -> bool:
         """Check if statement is CREATE TABLE."""
-        return parsed.get_type() == "CREATE"
+        if not parsed.get_type() == "CREATE":
+            return False
+        return True
 
     def _is_alter_table_fk(self, parsed) -> bool:
         """Check if statement is ALTER TABLE ... ADD CONSTRAINT ... FOREIGN KEY."""
@@ -96,6 +98,13 @@ class SchemaParser:
             body = self._extract_create_body(str(parsed))
             columns = self._parse_columns(body)
 
+            pk_match = re.search(r"PRIMARY\s+KEY\s*\(([^)]+)\)", body, re.IGNORECASE)
+            if pk_match:
+                pk_cols = [c.strip().strip('"') for c in pk_match.group(1).split(",")]
+                for col in columns:
+                    if col["name"] in pk_cols:
+                        col["is_pk"] = True
+
             return {
                 "name": table_name,
                 "schema": table_schema,
@@ -127,7 +136,7 @@ class SchemaParser:
         """Split table body into individual column/constraint lines."""
         # Handle nested parentheses in DEFAULT values and CHECK constraints
         lines = []
-        current = []
+        current: list[str] = []
         depth = 0
 
         for char in body:

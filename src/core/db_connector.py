@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.6 - Database Connector (GPLv3)
+# SQL Schema Studio 0.7 - Database Connector (GPLv3)
 # Copyright (C) 2025-2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -155,10 +155,11 @@ class DatabaseConnector:
         return self._build_conn_string(self._active_profile_obj)
 
     def execute_sync(self, query: str, params: tuple | None = None) -> list[dict[str, Any]]:
-        """Execute a query from a background thread using a direct sync connection."""
+        """Execute a query from a background thread using a direct sync connection"""
         conn_string = self._get_conn_string()
 
         with psycopg.connect(conn_string) as conn:
+            conn.autocommit = True  # Pridaj toto!
             with conn.cursor() as cur:
                 cur.execute(query, params)
                 if cur.description:

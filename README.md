@@ -26,29 +26,33 @@ recommendations. Extend with Python and Perl hooks for custom automation.
 - **Database browser** with schema/table tree, live filtering, and double-click to query
 - **SQL editor** with GtkSourceView syntax highlighting, line numbers, and F5 execution
 - **Query execution** with formatted results, timing, and EXPLAIN ANALYZE support
+- **File operations** — open, save, and save as for SQL files (Ctrl+O/S/Shift+S)
+- **Data export** — export query results to CSV and JSON
+- **Data import** — import CSV and JSON files with preview dialog
 - **Visual schema designer** with drag-and-drop tables, column editor, and FK relationships
+  with multiple line styles (straight, S-curve, orthogonal) and arrow heads
 - **SQL file import** — drag .sql files onto the designer to reverse-engineer schemas
 - **Query history** with SQLite storage, search, and type categorization
 - **AI index advisor** — rule-based index recommendations for foreign keys and columns
 - **Hook system** with Python and Perl plugin support and execution
 - **Preferences dialog** with persistent editor settings (font, color scheme, tab width)
 - **Window state persistence** — remembers size and pane positions across sessions
-- Full menu bar with undo/redo, clipboard, SQL formatting
+- Full menu bar with keyboard shortcuts, undo/redo, clipboard, SQL formatting
 - Cross-desktop theming (Cinnamon, GNOME, MATE, XFCE, KDE Plasma)
 - Clean shutdown with automatic disconnection
 
 ## Planned
 
-- File operations UI/UX — open, save, and export SQL files
+- Completion of built-in hooks (Auto-Vacuum Advisor, Schema Anomaly Detector, Log Analyzer)
 - Browse data with inline editing
 - Migration generator with up/down SQL diffs
-- Export to CSV, JSON, and SQL dump
 - Multi-CPU analytics for large datasets
 - Visual query builder with drag-and-drop JOINs
 - Bidirectional FK support with cascade rules
 - Star/Snowflake schema detection and visualization
 - Data normalization hook (Kebola)
 - Cython optimization for heavy analytics
+- User manual and documentation
 
 ## Requirements
 
