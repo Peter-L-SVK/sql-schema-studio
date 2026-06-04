@@ -77,7 +77,6 @@
 ### Documentation
 - [ ] LaTeX manual (PDF + EPUB)
 - [ ] AI-powered documentation reader
-- [ ] Tutorial videos / screencasts
 - [ ] API documentation for hooks
 
 ### Distribution
