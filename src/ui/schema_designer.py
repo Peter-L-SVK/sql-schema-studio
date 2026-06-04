@@ -67,7 +67,7 @@ class SchemaDesigner(Gtk.Box):
         self._table_index: dict[str, SchemaTable] = {}  # O(1) lookup
         self._selected_table: SchemaTable | None = None
         self._line_style = "straight"  # Default style
-        
+
         # Toolbar
         toolbar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
         toolbar.add_css_class("toolbar")

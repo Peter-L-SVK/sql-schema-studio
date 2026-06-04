@@ -32,7 +32,6 @@ from src.ui.browser import DatabaseBrowser
 from src.ui.statusbar import StatusBar
 from src.utils.gtk_helpers import run_async
 from src.ui.dialogs.connection import ConnectionDialog
-from src.ui.dialogs.hook_manager import HookManagerDialog
 from src.ui.schema_designer import SchemaDesigner
 
 
@@ -268,9 +267,9 @@ class MainWindow(Gtk.ApplicationWindow):
         dialog.set_child(self._designer)
         dialog.present()
 
-    
     def _on_hooks_clicked(self):
         from src.ui.dialogs.hook_manager import HookManagerDialog
+
         dialog = HookManagerDialog(self, db_connector=self.db_connector)
         dialog.present()
 

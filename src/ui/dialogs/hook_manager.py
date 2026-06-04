@@ -11,7 +11,7 @@
 import gi
 
 gi.require_version("Gtk", "4.0")
-from gi.repository import Gtk
+from gi.repository import Gtk, Gdk
 
 from src.config import HOOK_RESULT_DIALOG_WIDTH, HOOK_RESULT_DIALOG_HEIGHT
 from src.utils.gtk_helpers import set_margin
@@ -145,7 +145,7 @@ class HookManagerDialog(Gtk.Window):
             all_hooks = registry.list_hooks()
             hook = all_hooks.get(hook_name)
 
-            if hook and hasattr(hook, 'execute_sync'):
+            if hook and hasattr(hook, "execute_sync"):
                 # Sync hook (new style)
                 conn_string = ""
                 if self._db_connector and self._db_connector.is_connected:
@@ -161,7 +161,7 @@ class HookManagerDialog(Gtk.Window):
                 result = hook.execute_sync(conn_string)
                 self._show_result(hook_name, str(result))
 
-            elif hook and hasattr(hook, 'execute'):
+            elif hook and hasattr(hook, "execute"):
                 # Async hook (original style) — run in event loop
                 context = HookContext(
                     trigger=HookTrigger.SCHEDULED_INTERVAL,
@@ -171,7 +171,7 @@ class HookManagerDialog(Gtk.Window):
                 )
 
                 import asyncio
-                
+
                 async def run():
                     return await hook.execute(context)
 
@@ -205,27 +205,27 @@ class HookManagerDialog(Gtk.Window):
     def _show_result(self, hook_name, result):
         """Show hook execution result in a readable dialog."""
         import json
-    
+
         # Parse result if it's a string
         if isinstance(result, str):
             try:
                 data = json.loads(result.replace("'", '"'))
-            except:
+            except Exception:
                 data = {"message": result}
         else:
             data = result
-    
+
         # Format as readable text
         text = f"<b>Hook:</b> {hook_name}\n\n"
-    
+
         if isinstance(data, dict):
             if data.get("status") == "error":
                 text += f"<span color='red'><b>Error:</b> {data.get('message', 'Unknown error')}</span>\n"
             else:
-                text += f"<span color='green'><b>Status:</b> OK</span>\n"
+                text += "<span color='green'><b>Status:</b> OK</span>\n"
                 text += f"<b>Tables analyzed:</b> {data.get('tables_analyzed', 'N/A')}\n"
                 text += f"<b>Recommendations:</b> {data.get('recommendations_count', 0)}\n\n"
-            
+
                 recommendations = data.get("recommendations", [])
                 if recommendations:
                     text += "<b>Recommendations:</b>\n"
@@ -234,12 +234,12 @@ class HookManagerDialog(Gtk.Window):
                         text += f"    Priority: {r.get('priority', '?')}\n"
                         text += f"    Action: {r.get('action', '?')}\n"
                         text += f"    Reason: {r.get('reason', '?')}\n"
-                        if r.get('sql'):
+                        if r.get("sql"):
                             text += f"    SQL: <tt>{r['sql']}</tt>\n"
                         text += "\n"
         else:
             text += str(data)
-    
+
         # Create dialog with copy button
         dialog = Gtk.Window(
             transient_for=self,
@@ -250,7 +250,7 @@ class HookManagerDialog(Gtk.Window):
         )
         main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         set_margin(main_box, 12)
-    
+
         # Result text (selectable)
         label = Gtk.Label()
         label.set_markup(text)
@@ -262,29 +262,30 @@ class HookManagerDialog(Gtk.Window):
         scroll.set_vexpand(True)
         scroll.set_child(label)
         main_box.append(scroll)
-    
+
         # Copy button
         btn_copy = Gtk.Button(label="Copy to Clipboard")
         btn_copy.connect("clicked", lambda b: self._copy_to_clipboard(text))
 
         btn_close = Gtk.Button(label="Close")
         btn_close.connect("clicked", lambda b: dialog.close())
-    
+
         button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         button_box.set_halign(Gtk.Align.END)
         button_box.append(btn_copy)
         button_box.append(btn_close)
         main_box.append(button_box)
-    
+
         dialog.set_child(main_box)
         dialog.present()
 
     def _copy_to_clipboard(self, text):
         """Copy text to clipboard."""
         import re
+
         # Strip HTML tags for plain text
-        plain = re.sub(r'<[^>]+>', '', text)
-        plain = plain.replace('&lt;', '<').replace('&gt;', '>').replace('&amp;', '&')
+        plain = re.sub(r"<[^>]+>", "", text)
+        plain = plain.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
 
         clipboard = Gdk.Display.get_default().get_clipboard()
         clipboard.set(plain)

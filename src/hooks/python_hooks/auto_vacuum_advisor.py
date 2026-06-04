@@ -25,7 +25,7 @@ class Plugin(BaseHook):
             "description": "Analyzes table bloat and recommends vacuum timing",
             "triggers": [HookTrigger.SCHEDULED_INTERVAL.value],
         }
-    
+
     async def execute(self, context: HookContext) -> dict:
         """Abstract method — required by BaseHook. Delegates to execute_sync."""
         conn_string = context.data.get("conn_string", "")
@@ -41,23 +41,33 @@ class Plugin(BaseHook):
             cur = conn.cursor()
 
             cur.execute("""
-    SELECT 
-        schemaname,
-        relname AS tablename,
-        n_live_tup,
-        n_dead_tup,
-        CASE WHEN n_live_tup > 0 
+            SELECT
+            schemaname,
+            relname AS tablename,
+            n_live_tup,
+            n_dead_tup,
+            CASE WHEN n_live_tup > 0
             THEN round(100.0 * n_dead_tup / n_live_tup, 1)
             ELSE 0 END AS dead_ratio,
-        last_vacuum,
-        last_autovacuum,
-        autovacuum_count,
-        n_tup_ins + n_tup_upd + n_tup_del AS total_activity
-    FROM pg_stat_user_tables
-    ORDER BY n_dead_tup DESC
-""")
-
+            last_vacuum,
+            last_autovacuum,
+            autovacuum_count,
+            n_tup_ins + n_tup_upd + n_tup_del AS total_activity
+            FROM pg_stat_user_tables
+            ORDER BY n_dead_tup DESC
+            """)
             rows = cur.fetchall()
+            if not rows:
+                conn.close()
+                return {
+                    "status": "ok",
+                    "tables_analyzed": 0,
+                    "recommendations_count": 0,
+                    "recommendations": [],
+                }
+            if not cur.description:
+                conn.close()
+                return {"status": "error", "message": "Query returned no column data"}
             columns = [desc[0] for desc in cur.description]
             stats = [dict(zip(columns, row)) for row in rows]
             conn.close()
@@ -87,17 +97,19 @@ class Plugin(BaseHook):
                     days_since = (datetime.now() - last_vacuum).days
                     reason += f", last vacuumed {days_since} days ago"
 
-                recommendations.append({
-                    "table": table_name,
-                    "dead_ratio": dead_ratio,
-                    "dead_tuples": row["n_dead_tup"],
-                    "live_tuples": row["n_live_tup"],
-                    "action": action,
-                    "priority": priority,
-                    "reason": reason,
-                    "sql": f"{action} {table_name};",
-                    "last_vacuum": str(last_vacuum) if last_vacuum else "never",
-                })
+                recommendations.append(
+                    {
+                        "table": table_name,
+                        "dead_ratio": dead_ratio,
+                        "dead_tuples": row["n_dead_tup"],
+                        "live_tuples": row["n_live_tup"],
+                        "action": action,
+                        "priority": priority,
+                        "reason": reason,
+                        "sql": f"{action} {table_name};",
+                        "last_vacuum": str(last_vacuum) if last_vacuum else "never",
+                    }
+                )
 
             return {
                 "status": "ok",
