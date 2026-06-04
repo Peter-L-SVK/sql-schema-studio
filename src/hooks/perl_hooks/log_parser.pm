@@ -9,8 +9,6 @@
 package log_parser;
 use strict;
 use warnings;
-use JSON;
-use File::Basename;
 use DBI;
 use Text::CSV;
 
