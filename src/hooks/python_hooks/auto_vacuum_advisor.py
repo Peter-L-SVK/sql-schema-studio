@@ -1,5 +1,3 @@
-# src/hooks/python_hooks/auto_vacuum_advisor.py
-
 # ----------------------------------------------------------------------
 # SQL Schema Studio 0.8 - Auto-Vacuum Advisor Hook (GPLv3)
 # Copyright (C) 2026 Peter Leukanič

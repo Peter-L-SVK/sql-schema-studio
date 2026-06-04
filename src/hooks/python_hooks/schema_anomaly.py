@@ -1,5 +1,3 @@
-# src/hooks/python_hooks/schema_anomaly.py
-
 # ----------------------------------------------------------------------
 # SQL Schema Studio 0.8 - Schema Anomaly Detector Hook (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
