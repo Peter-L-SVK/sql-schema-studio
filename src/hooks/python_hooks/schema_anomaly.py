@@ -128,7 +128,7 @@ class Plugin(BaseHook):
                     "table": table,
                     "priority": "LOW",
                     "action": "Add indexes on frequently queried columns",
-                    "reason": "No indexes found (besides primary key) -可能导致全表扫描性能问题",
+                    "reason": "No indexes found (besides primary key) -may cause full table scans and performance issues",
                     "sql": f"-- Review query patterns and add indexes on {table}\n-- Example: CREATE INDEX idx_{row[1]}_column ON {table} (column);",
                 })
 
@@ -229,7 +229,7 @@ class Plugin(BaseHook):
             cur.execute("""
                 SELECT 
                     schemaname,
-                    tablename,
+                    relname AS tablename,
                     n_dead_tup,
                     n_live_tup,
                     round(100.0 * n_dead_tup / NULLIF(n_live_tup + n_dead_tup, 0), 2) as dead_ratio
