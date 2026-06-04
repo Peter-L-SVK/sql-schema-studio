@@ -13,6 +13,7 @@ import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk
 
+from src.config import HOOK_RESULT_DIALOG_WIDTH, HOOK_RESULT_DIALOG_HEIGHT
 from src.utils.gtk_helpers import set_margin
 from src.utils.logging import get_logger
 
@@ -202,17 +203,92 @@ class HookManagerDialog(Gtk.Window):
             self._show_error(hook_name, str(e))
 
     def _show_result(self, hook_name, result):
-        """Show hook execution result."""
-        dialog = Gtk.MessageDialog(
+        """Show hook execution result in a readable dialog."""
+        import json
+    
+        # Parse result if it's a string
+        if isinstance(result, str):
+            try:
+                data = json.loads(result.replace("'", '"'))
+            except:
+                data = {"message": result}
+        else:
+            data = result
+    
+        # Format as readable text
+        text = f"<b>Hook:</b> {hook_name}\n\n"
+    
+        if isinstance(data, dict):
+            if data.get("status") == "error":
+                text += f"<span color='red'><b>Error:</b> {data.get('message', 'Unknown error')}</span>\n"
+            else:
+                text += f"<span color='green'><b>Status:</b> OK</span>\n"
+                text += f"<b>Tables analyzed:</b> {data.get('tables_analyzed', 'N/A')}\n"
+                text += f"<b>Recommendations:</b> {data.get('recommendations_count', 0)}\n\n"
+            
+                recommendations = data.get("recommendations", [])
+                if recommendations:
+                    text += "<b>Recommendations:</b>\n"
+                    for r in recommendations[:10]:  # Limit to 10
+                        text += f"  • <b>{r.get('table', '?')}</b>\n"
+                        text += f"    Priority: {r.get('priority', '?')}\n"
+                        text += f"    Action: {r.get('action', '?')}\n"
+                        text += f"    Reason: {r.get('reason', '?')}\n"
+                        if r.get('sql'):
+                            text += f"    SQL: <tt>{r['sql']}</tt>\n"
+                        text += "\n"
+        else:
+            text += str(data)
+    
+        # Create dialog with copy button
+        dialog = Gtk.Window(
             transient_for=self,
             modal=True,
-            message_type=Gtk.MessageType.INFO,
-            buttons=Gtk.ButtonsType.OK,
-            text=hook_name,
-            secondary_text=str(result),
+            title=f"Hook Result: {hook_name}",
+            default_width=HOOK_RESULT_DIALOG_WIDTH,
+            default_height=HOOK_RESULT_DIALOG_HEIGHT,
         )
-        dialog.connect("response", lambda d, r: d.close())
+        main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        set_margin(main_box, 12)
+    
+        # Result text (selectable)
+        label = Gtk.Label()
+        label.set_markup(text)
+        label.set_selectable(True)
+        label.set_halign(Gtk.Align.START)
+        label.set_wrap(True)
+
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_vexpand(True)
+        scroll.set_child(label)
+        main_box.append(scroll)
+    
+        # Copy button
+        btn_copy = Gtk.Button(label="Copy to Clipboard")
+        btn_copy.connect("clicked", lambda b: self._copy_to_clipboard(text))
+
+        btn_close = Gtk.Button(label="Close")
+        btn_close.connect("clicked", lambda b: dialog.close())
+    
+        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        button_box.set_halign(Gtk.Align.END)
+        button_box.append(btn_copy)
+        button_box.append(btn_close)
+        main_box.append(button_box)
+    
+        dialog.set_child(main_box)
         dialog.present()
+
+    def _copy_to_clipboard(self, text):
+        """Copy text to clipboard."""
+        import re
+        # Strip HTML tags for plain text
+        plain = re.sub(r'<[^>]+>', '', text)
+        plain = plain.replace('&lt;', '<').replace('&gt;', '>').replace('&amp;', '&')
+
+        clipboard = Gdk.Display.get_default().get_clipboard()
+        clipboard.set(plain)
+        logger.info("Result copied to clipboard")
 
     def _show_error(self, hook_name, error):
         """Show hook execution error."""
