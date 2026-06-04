@@ -158,8 +158,8 @@ class HookManagerDialog(Gtk.Window):
                     self._show_error(hook_name, "No active database connection")
                     return
 
-                result = hook.execute_sync(conn_string)
-                self._show_result(hook_name, str(result))
+                hook_result = hook.execute_sync(conn_string)
+                self._show_result(hook_name, hook_result)
 
             elif hook and hasattr(hook, "execute"):
                 # Async hook (original style) — run in event loop
