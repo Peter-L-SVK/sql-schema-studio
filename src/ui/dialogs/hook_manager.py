@@ -9,6 +9,9 @@
 """Hook manager dialog for enabling and configuring plugins."""
 
 import gi
+import os
+from datetime import datetime
+from pathlib import Path
 
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk, Gdk
@@ -29,6 +32,11 @@ class HookManagerDialog(Gtk.Window):
             transient_for=parent,
             modal=True,
         )
+
+        self._results_dir = Path.home() / ".config" / "sql-schema-studio" / "hook_results"
+        self._results_dir.mkdir(parents=True, exist_ok=True)
+        self._last_results = {} 
+        
         self.set_default_size(500, 400)
         self._build_ui()
         self._load_hooks()
@@ -78,6 +86,11 @@ class HookManagerDialog(Gtk.Window):
         button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         button_box.set_halign(Gtk.Align.END)
 
+        btn_export_all = Gtk.Button(label="Export All to JSON")
+        btn_export_all.set_tooltip_text("Save all hook results to JSON files")
+        btn_export_all.connect("clicked", self._on_export_all)
+        button_box.append(btn_export_all)
+        
         btn_refresh = Gtk.Button(label="Refresh")
         btn_refresh.connect("clicked", lambda b: self._load_hooks())
         button_box.append(btn_refresh)
@@ -159,6 +172,7 @@ class HookManagerDialog(Gtk.Window):
                     return
 
                 hook_result = hook.execute_sync(conn_string)
+                self._save_result(hook_name, hook_result)
                 self._show_result(hook_name, hook_result)
 
             elif hook and hasattr(hook, "execute"):
@@ -192,6 +206,7 @@ class HookManagerDialog(Gtk.Window):
 
                 with asyncio.Runner() as runner:
                     result = runner.run(run_perl())
+                    self._save_result(hook_name, result)
                     self._show_result(hook_name, str(result))
 
             else:
@@ -279,6 +294,92 @@ class HookManagerDialog(Gtk.Window):
         dialog.set_child(main_box)
         dialog.present()
 
+    def _save_result(self, hook_name, result):
+        """Save hook result to JSON file."""
+        import json
+    
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"{hook_name.replace(' ', '_').lower()}_{timestamp}.json"
+        filepath = self._results_dir / filename
+    
+        try:
+            with open(filepath, "w") as f:
+                json.dump({
+                    "hook": hook_name,
+                    "timestamp": datetime.now().isoformat(),
+                    "result": result if isinstance(result, dict) else str(result),
+                }, f, indent=2, default=str)
+        
+                self._last_results[hook_name] = filepath
+                logger.info(f"Result saved to {filepath}")
+        except Exception as e:
+            logger.error(f"Failed to save result: {e}")
+
+    def _on_export_all(self, button):
+        """Export all saved results to a single JSON file."""
+        import json
+        import shutil
+    
+        if not self._last_results:
+            self._show_error("Export All", "No results to export. Run some hooks first.")
+            return
+    
+        dialog = Gtk.FileDialog()
+        dialog.set_title("Export All Hook Results")
+        dialog.set_initial_name(f"hook_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
+    
+        filter_json = Gtk.FileFilter()
+        filter_json.set_name("JSON Files (*.json)")
+        filter_json.add_pattern("*.json")
+    
+        from gi.repository import Gio
+        filter_store = Gio.ListStore.new(Gtk.FileFilter)
+        filter_store.append(filter_json)
+        dialog.set_filters(filter_store)
+    
+        dialog.save(self, None, lambda d, r: self._on_export_all_response(d, r))
+
+    def _on_export_all_response(self, dialog, result):
+        """Handle export all response."""
+        import json
+        from datetime import datetime
+            
+        try:
+            file = dialog.save_finish(result)
+            if not file:
+                return
+        
+            path = file.get_path()
+            
+            # Collect all saved results
+            all_results = []
+            results_dir = self._results_dir
+        
+            for json_file in sorted(results_dir.glob("*.json")):
+                try:
+                    with open(json_file, "r") as f:
+                        data = json.load(f)
+                        all_results.append(data)
+                except Exception:
+                    continue
+        
+            # Write combined export
+            with open(path, "w") as f:
+                json.dump({
+                    "exported_at": datetime.now().isoformat(),
+                    "total_hooks": len(all_results),
+                    "results": all_results,
+                }, f, indent=2, default=str)
+        
+                logger.info(f"Exported {len(all_results)} results to {path}")
+                self._show_result("Export All", {
+                    "status": "ok",
+                    "message": f"Exported {len(all_results)} hook results to {path}"
+                })
+        
+        except Exception as e:
+            logger.error(f"Export all failed: {e}")
+        
     def _copy_to_clipboard(self, text):
         """Copy text to clipboard."""
         import re
