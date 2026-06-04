@@ -171,8 +171,10 @@ class ActionHandler:
     def _on_view_hooks(self, action, param):
         if self._window:
             from src.ui.dialogs.hook_manager import HookManagerDialog
-
-            dialog = HookManagerDialog(self._window)
+            dialog = HookManagerDialog(
+                self._window,
+                db_connector=self._window.db_connector
+            )
             dialog.present()
 
     def _on_view_analytics(self, action, param):

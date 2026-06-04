@@ -22,7 +22,7 @@ logger = get_logger(__name__)
 class HookManagerDialog(Gtk.Window):
     """Dialog for managing Python and Perl hooks."""
 
-    def __init__(self, parent):
+    def __init__(self, parent, db_connector=None):
         super().__init__(
             title="Hook Manager",
             transient_for=parent,
@@ -31,6 +31,7 @@ class HookManagerDialog(Gtk.Window):
         self.set_default_size(500, 400)
         self._build_ui()
         self._load_hooks()
+        self._db_connector = db_connector
 
     def _build_ui(self):
         main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
@@ -141,12 +142,26 @@ class HookManagerDialog(Gtk.Window):
             registry.discover_plugins()
 
             all_hooks = registry.list_hooks()
-            logger.debug(f"Available hooks: {list(all_hooks.keys())}")
-
-            # Find the hook
             hook = all_hooks.get(hook_name)
 
-            if hook and hasattr(hook, "execute"):
+            if hook and hasattr(hook, 'execute_sync'):
+                # Sync hook (new style)
+                conn_string = ""
+                if self._db_connector and self._db_connector.is_connected:
+                    try:
+                        conn_string = self._db_connector._get_conn_string()
+                    except Exception:
+                        pass
+
+                if not conn_string:
+                    self._show_error(hook_name, "No active database connection")
+                    return
+
+                result = hook.execute_sync(conn_string)
+                self._show_result(hook_name, str(result))
+
+            elif hook and hasattr(hook, 'execute'):
+                # Async hook (original style) — run in event loop
                 context = HookContext(
                     trigger=HookTrigger.SCHEDULED_INTERVAL,
                     database="",
@@ -155,7 +170,7 @@ class HookManagerDialog(Gtk.Window):
                 )
 
                 import asyncio
-
+                
                 async def run():
                     return await hook.execute(context)
 
@@ -163,6 +178,7 @@ class HookManagerDialog(Gtk.Window):
                     result = runner.run(run())
 
                 self._show_result(hook_name, str(result))
+
             elif hook and isinstance(hook, dict) and hook.get("type") == "perl":
                 # Perl hook
                 from src.hooks.perl.executor import PerlHookExecutor
@@ -176,9 +192,11 @@ class HookManagerDialog(Gtk.Window):
                 with asyncio.Runner() as runner:
                     result = runner.run(run_perl())
                     self._show_result(hook_name, str(result))
+
             else:
                 logger.warning(f"Hook not executable: {hook_name}")
                 self._show_error(hook_name, "Hook not executable")
+
         except Exception as e:
             logger.error(f"Error: {e}")
             self._show_error(hook_name, str(e))

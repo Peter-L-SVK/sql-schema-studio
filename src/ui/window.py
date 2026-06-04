@@ -268,8 +268,10 @@ class MainWindow(Gtk.ApplicationWindow):
         dialog.set_child(self._designer)
         dialog.present()
 
+    
     def _on_hooks_clicked(self):
-        dialog = HookManagerDialog(self)
+        from src.ui.dialogs.hook_manager import HookManagerDialog
+        dialog = HookManagerDialog(self, db_connector=self.db_connector)
         dialog.present()
 
     def _on_query_history_clicked(self):
