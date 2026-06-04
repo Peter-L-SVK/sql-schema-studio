@@ -3,9 +3,9 @@
 ## v0.8.0 — Hooks + Optimization + AI/ML
 
 ### Hooks
-- [ ] Auto-Vacuum Advisor — reads pg_stat_user_tables, calculates bloat ratio
-- [ ] Schema Anomaly Detector — detects missing FKs, missing indexes, denormalization
-- [ ] PostgreSQL Log Analyzer (Perl) — parses PostgreSQL log files
+- [x] Auto-Vacuum Advisor — reads pg_stat_user_tables, calculates bloat ratio
+- [x] Schema Anomaly Detector — detects missing FKs, missing indexes, denormalization
+- [x] PostgreSQL Log Analyzer (Perl) — parses PostgreSQL log files
 - [ ] Kebola normalization hook — detects denormalized schemas, suggests fixes
 
 ### Optimization

@@ -359,7 +359,7 @@ sub _analyze_logs {
     
     # Top error categories
     my @sorted = sort { $error_cats{$b} <=> $error_cats{$a} } keys %error_cats;
-    for my $cat (@sorted[0..2]) {
+    for my $cat (@sorted[0 .. ($#sorted < 2 ? $#sorted : 2)]) {
         my $count = $error_cats{$cat};
         if ($count > 3) {
             push @{$analysis->{recommendations}}, {
@@ -388,7 +388,7 @@ SELECT query, mean_time, calls FROM pg_stat_statements ORDER BY mean_time DESC L
     }
     
     # Error samples (first 5)
-    for my $err (@errors[0..4]) {
+    for my $err (@errors[0 .. ($#errors < 4 ? $#errors : 4)]) {
         push @{$analysis->{error_samples}}, $err->{message};
     }
     
