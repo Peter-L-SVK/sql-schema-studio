@@ -4,7 +4,7 @@ build-backend = "setuptools.backends._legacy:_Backend"
 
 [project]
 name = "sql-schema-studio"
-version = "0.1.0"
+version = "0.8.0"
 description = "Intelligent PostgreSQL Management Platform with Python/Perl hooks and AI analytics"
 readme = "README.md"
 license = {text = "GPL-3.0-or-later"}
@@ -31,11 +31,14 @@ requires-python = ">=3.12"
 dependencies = [
     "psycopg[binary]>=3.1.0",
     "sqlparse>=0.4.4",
+    "keyring>=24.0.0",
     "PyGObject>=3.46.0",
+    "pycairo>=1.24.0",
     "numpy>=1.24.0",
     "pandas>=2.0.0",
     "scikit-learn>=1.3.0",
     "matplotlib>=3.7.0",
+    "paramiko>=3.0.0",
 ]
 
 [project.optional-dependencies]
@@ -44,6 +47,7 @@ dev = [
     "pytest-asyncio>=0.21.0",
     "black>=23.0.0",
     "mypy>=1.5.0",
+    "flake8>=6.0.0",
 ]
 analytics = [
     "plotly>=5.15.0",
@@ -86,9 +90,7 @@ src = ["resources/ui/*.css"]
 max-line-length = 100
 extend-ignore = "E402,W503"
 exclude = [
-    # No need to traverse our git directory
     ".git",
-    # There's no value in checking cache directories
     "__pycache__",
     "buld_dist"
 ]
