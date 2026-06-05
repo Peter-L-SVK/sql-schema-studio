@@ -207,7 +207,7 @@ class HookManagerDialog(Gtk.Window):
                 with asyncio.Runner() as runner:
                     result = runner.run(run_perl())
                     self._save_result(hook_name, result)
-                    self._show_result(hook_name, str(result))
+                    self._show_result(hook_name, result) 
 
             else:
                 logger.warning(f"Hook not executable: {hook_name}")
@@ -230,6 +230,10 @@ class HookManagerDialog(Gtk.Window):
         else:
             data = result
 
+        # Unpack "result" KEY
+        if isinstance(data, dict) and "result" in data:
+            data = data["result"]
+            logger.debug(f"Unpacked result: {list(data.keys())}")
         # Format as readable text
         text = f"<b>Hook:</b> {hook_name}\n\n"
 
@@ -239,12 +243,12 @@ class HookManagerDialog(Gtk.Window):
             else:
                 text += "<span color='green'><b>Status:</b> OK</span>\n"
                 text += f"<b>Tables analyzed:</b> {data.get('tables_analyzed', 'N/A')}\n"
-                text += f"<b>Recommendations:</b> {data.get('recommendations_count', 0)}\n\n"
+                text += f"<b>Recommendations:</b> {data.get('recommendations_count', len(data.get('recommendations', [])))}\n\n"
 
                 recommendations = data.get("recommendations", [])
                 if recommendations:
                     text += "<b>Recommendations:</b>\n"
-                    for r in recommendations[:10]:  # Limit to 10
+                    for r in recommendations[:10]:
                         text += f"  • <b>{r.get('table', '?')}</b>\n"
                         text += f"    Priority: {r.get('priority', '?')}\n"
                         text += f"    Action: {r.get('action', '?')}\n"
@@ -252,6 +256,21 @@ class HookManagerDialog(Gtk.Window):
                         if r.get("sql"):
                             text += f"    SQL: <tt>{r['sql']}</tt>\n"
                         text += "\n"
+            
+                error_samples = data.get('error_samples', [])
+                if error_samples:
+                    text += "\n<b>Error samples (from logs):</b>\n"
+                    for sample in error_samples[:5]:
+                        if len(sample) > 150:
+                            sample = sample[:147] + "..."
+                        text += f"  • {sample}\n"
+                    text += "\n"
+            
+                error_cats = data.get('error_categories', {})
+                if error_cats:
+                    text += "<b>Error categories:</b>\n"
+                    for cat, count in sorted(error_cats.items(), key=lambda x: x[1], reverse=True):
+                        text += f"  • {cat}: {count}\n"
         else:
             text += str(data)
 

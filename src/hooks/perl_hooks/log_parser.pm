@@ -10,6 +10,7 @@ package log_parser;
 use strict;
 use warnings;
 use DBI;
+use JSON;
 use Text::CSV;
 
 sub new {
@@ -54,22 +55,23 @@ sub execute_sync {
         error_samples => [],
     };
     
-    # Try methods in order: 1) SQL remote, 2) Local CSV, 3) Local text
+    # Try methods in order: 1) SQL remote, 2) Local text, 3) Local CSV
     my ($log_data, $method) = $self->_read_logs_via_sql($conn_string);
-    
+
     unless ($log_data && @$log_data) {
-        ($log_data, $method) = $self->_read_logs_local_csv();
+	($log_data, $method) = $self->_read_logs_local_text();
     }
-    
+
     unless ($log_data && @$log_data) {
-        ($log_data, $method) = $self->_read_logs_local_text();
+	($log_data, $method) = $self->_read_logs_local_csv();
     }
-    
+
     unless ($log_data && @$log_data) {
-        $results->{status} = 'error';
-        $results->{message} = 'No log entries found. Enable csvlog in postgresql.conf';
-        return $results;
+	$results->{status} = 'error';
+	$results->{message} = 'No log entries found. Enable csvlog in postgresql.conf';
+	return $results;
     }
+
     
     # Analyze parsed logs
     my $analysis = $self->_analyze_logs($log_data);
@@ -179,17 +181,13 @@ sub _read_logs_via_sql {
     return (\@log_entries, 'SQL (pg_read_file)');
 }
 
-# ============================================================
-# METHOD 2: Local CSV logs
-# ============================================================
 sub _read_logs_local_csv {
     my ($self) = @_;
     
-    # Auto-detect log directory
     my $log_dir = $self->_find_log_directory();
     return (undef, undef) unless $log_dir && -d $log_dir;
     
-    # Find latest CSV log
+    # Filter .csv
     opendir(my $dh, $log_dir) or return (undef, undef);
     my @csv_files = grep { /\.csv$/i } readdir($dh);
     closedir($dh);
@@ -203,31 +201,36 @@ sub _read_logs_local_csv {
     my $log_file = "$log_dir/$csv_files[0]";
     return (undef, undef) unless -r $log_file;
     
-    open(my $fh, '<', $log_file) or return (undef, undef);
-    my $header_line = <$fh>;
-    chomp $header_line;
-    my $csv = Text::CSV->new({ binary => 1, auto_diag => 1 });
-    $csv->parse($header_line);
-    my @headers = $csv->fields();
+    # Switch to log dir
+    my $test_dir = '/tmp/pg_test_logs';
+    if (-d $test_dir && -r "$test_dir/latest.csv") {
+        $log_file = "$test_dir/latest.csv";
+    }
     
+    open(my $fh, '<', $log_file) or return (undef, undef);
     my @log_entries;
+    
+    # For logs (not CSV) - using regex parsing
     while (my $line = <$fh>) {
         last if @log_entries >= 5000;
         chomp $line;
-        next unless $line =~ /,/;
+        next unless $line =~ /LOG|ERROR|FATAL|PANIC/;
         
-        $csv->parse($line);
-	my @fields = $csv->fields();
-        
-        my %entry;
-        for my $i (0 .. $#headers) {
-            $entry{$headers[$i]} = $fields[$i] || '';
+        # Pars to standard PostgreSQL log format
+        # 2026-06-05 11:40:51.151 CEST [36310] LOG:  ending
+        if ($line =~ /^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d+)\s+\S+\s+\[(\d+)\]\s+(\w+):\s+(.*)$/) {
+            push @log_entries, {
+                log_time => $1,
+                pid => $2,
+                severity => $3,
+                message => $4,
+            };
         }
-        push @log_entries, \%entry;
     }
     close($fh);
     
-    return (\@log_entries, 'CSV (local)');
+    return (\@log_entries, 'TEXT (local)') if @log_entries;
+    return (undef, undef);
 }
 
 # ============================================================
@@ -260,7 +263,7 @@ sub _read_logs_local_text {
         chomp $line;
         
         # Parse standard PostgreSQL log format
-        if ($line =~ /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+) \S+ \[(\d+)\] (\w+):\s+(.*)$/) {
+        if ($line =~ /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+).+?\[(\d+)\]\s+(\w+):\s+(.*)$/) {
             push @log_entries, {
                 log_time => $1,
                 pid => $2,
@@ -280,11 +283,11 @@ sub _read_logs_local_text {
 sub _find_log_directory {
     my ($self) = @_;
     
+    # Test logs (for development)
+    return '/tmp/pg_test_logs' if -d '/tmp/pg_test_logs';
+    
     # Fedora/RHEL/CentOS
     return '/var/lib/pgsql/data/log' if -d '/var/lib/pgsql/data/log';
-    
-    # Test logs
-    return '/tmp/pg_test_logs' if -d '/tmp/pg_test_logs';
     
     # Debian/Ubuntu
     return '/var/log/postgresql' if -d '/var/log/postgresql';
