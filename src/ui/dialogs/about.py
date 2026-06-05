@@ -36,7 +36,7 @@ def show_about(parent):
         transient_for=parent,
         modal=True,
         program_name="SQL Schema Studio",
-        version="0.6.0",
+        version="0.8.0",
         comments="Intelligent PostgreSQL Management Platform\n\n"
         "Visual schema designer • SQL editor • AI analytics\n"
         "Written in Python3 and Gtk-4.0\n\n"
