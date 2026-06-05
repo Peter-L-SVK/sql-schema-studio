@@ -181,6 +181,13 @@ sub _read_logs_via_sql {
     return (\@log_entries, 'SQL (pg_read_file)');
 }
 
+# ============================================================
+# METHOD 2: Local CSV/TEXT logs (auto-detects format)
+# ============================================================
+# This method reads PostgreSQL log files from the local filesystem.
+# It auto-detects whether the file is a true CSV log or a plain text
+# log and parses accordingly. Falls back to regex-based parsing when
+# CSV parsing fails. Reads up to 5000 lines from the latest log file.
 sub _read_logs_local_csv {
     my ($self) = @_;
     
