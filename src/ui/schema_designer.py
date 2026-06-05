@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.7 - Schema Designer (GPLv3)
+# SQL Schema Studio 0.8 - Schema Designer (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -64,6 +64,7 @@ class SchemaDesigner(Gtk.Box):
         self.set_size_request(800, 600)
         self._relationships: list[ForeignKey] = []
         self._creating_relationship: tuple | None = None  # (table, column) waiting for target
+        self._table_index: dict[str, SchemaTable] = {}  # O(1) lookup
         self._selected_table: SchemaTable | None = None
         self._line_style = "straight"  # Default style
 
@@ -184,6 +185,7 @@ class SchemaDesigner(Gtk.Box):
         )
         table.columns.append(TableColumn("id", "serial", is_primary=True))
         self._tables.append(table)
+        self._table_index[table.name] = table
         logger.info(f"Added table: {table.name}")
         self._update_canvas_size()
         self._canvas.queue_draw()
@@ -223,6 +225,7 @@ class SchemaDesigner(Gtk.Box):
             self._creating_relationship = None
 
         # Remove the table
+        del self._table_index[table.name]
         self._tables.remove(table)
         self._selected_table = None
 
@@ -241,8 +244,8 @@ class SchemaDesigner(Gtk.Box):
             sql_lines.append("")
 
         for fk in self._relationships:
-            source_table = next((t for t in self._tables if t.name == fk.from_table), None)
-            target_table = next((t for t in self._tables if t.name == fk.to_table), None)
+            source_table = self._table_index.get(fk.from_table)
+            target_table = self._table_index.get(fk.to_table)
 
             src_schema = source_table.schema if source_table else "public"
             tgt_schema = target_table.schema if target_table else "public"
@@ -339,8 +342,8 @@ class SchemaDesigner(Gtk.Box):
     def _find_relationship_at(self, x, y):
         """Find a relationship line near the click position."""
         for fk in self._relationships:
-            source_table = next((t for t in self._tables if t.name == fk.from_table), None)
-            target_table = next((t for t in self._tables if t.name == fk.to_table), None)
+            source_table = self._table_index.get(fk.from_table)
+            target_table = self._table_index.get(fk.to_table)
             if not source_table or not target_table:
                 continue
 
@@ -464,13 +467,8 @@ class SchemaDesigner(Gtk.Box):
     def _draw_relationship(self, cr, fk):
         """Draw a relationship line between two tables with column-level precision."""
         # Find source and target tables
-        source_table = None
-        target_table = None
-        for t in self._tables:
-            if t.name == fk.from_table:
-                source_table = t
-            if t.name == fk.to_table:
-                target_table = t
+        source_table = self._table_index.get(fk.from_table)
+        target_table = self._table_index.get(fk.to_table)
 
         if not source_table or not target_table:
             return
@@ -696,6 +694,7 @@ class SchemaDesigner(Gtk.Box):
             )
 
         self._tables.append(table)
+        self._table_index[table.name] = table
         self._update_canvas_size()
         self._canvas.queue_draw()
         logger.info(f"Imported table: {name} with {len(table.columns)} columns")
@@ -732,7 +731,7 @@ class SchemaDesigner(Gtk.Box):
         for table_data in tables:
             table = SchemaTable(name=table_data["name"], x=offset_x, y=offset_y)
             table.schema = table_data["schema"]
-
+            self._table_index[table.name] = table
             for col_data in table_data["columns"]:
                 table.columns.append(
                     TableColumn(
@@ -753,12 +752,8 @@ class SchemaDesigner(Gtk.Box):
 
         for fk_data in foreign_keys:
             # Find table objects to get column indices
-            source_table_obj = next(
-                (t for t in self._tables if t.name == fk_data["from_table"]), None
-            )
-            target_table_obj = next(
-                (t for t in self._tables if t.name == fk_data["to_table"]), None
-            )
+            source_table_obj = self._table_index.get(fk_data["from_table"])
+            target_table_obj = self._table_index.get(fk_data["to_table"])
 
             from_idx = None
             to_idx = None

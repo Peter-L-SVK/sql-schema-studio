@@ -6,9 +6,11 @@
 [![GitHub last commit](https://img.shields.io/github/last-commit/Peter-L-SVK/sql-schema-studio)](https://github.com/Peter-L-SVK/sql-schema-studio/commits/main)
 <a href="https://buymeacoffee.com/leukanic.peter"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" height="20px"></a>
 
-Intelligent PostgreSQL Management Platform. A GTK4 desktop application for
-database administrators and developers who want a clean, fast, and extensible
-SQL tool.
+SQL Schema Studio is a native GTK4 PostgreSQL client built for Linux — not Electron, not a web app.
+It runs lean on any Linux desktop, extends via Python or Perl hooks, and ships a visual schema designer
+without a subscription fee or a JVM. Windows users can run it via WSL2 with full GUI support through WSLg.
+
+If you live in a terminal but want a GUI when it earns it, this is for you.
 
 **Alpha software — under active development.**
 
@@ -34,7 +36,9 @@ recommendations. Extend with Python and Perl hooks for custom automation.
 - **SQL file import** — drag .sql files onto the designer to reverse-engineer schemas
 - **Query history** with SQLite storage, search, and type categorization
 - **AI index advisor** — rule-based index recommendations for foreign keys and columns
-- **Hook system** with Python and Perl plugin support and execution
+- **Hook system** with Python and Perl plugin support, execution, and JSON export
+- **Built-in hooks** — Auto-Vacuum Advisor with ML prediction, Schema Anomaly Detector with
+  9 detection rules, PostgreSQL Log Analyzer with 3 reading methods
 - **Preferences dialog** with persistent editor settings (font, color scheme, tab width)
 - **Window state persistence** — remembers size and pane positions across sessions
 - Full menu bar with keyboard shortcuts, undo/redo, clipboard, SQL formatting
@@ -43,33 +47,111 @@ recommendations. Extend with Python and Perl hooks for custom automation.
 
 ## Planned
 
-- Completion of built-in hooks (Auto-Vacuum Advisor, Schema Anomaly Detector, Log Analyzer)
-- Browse data with inline editing
+- Multi-tab SQL editor and results panel
 - Migration generator with up/down SQL diffs
-- Multi-CPU analytics for large datasets
+- Color schemes and bidirectional FK for schema designer
+- Polars analytics engine and Kebola normalization hook
+- RPM/DEB packaging and installation
+- Browse data with inline editing
 - Visual query builder with drag-and-drop JOINs
-- Bidirectional FK support with cascade rules
-- Star/Snowflake schema detection and visualization
-- Data normalization hook (Kebola)
-- Cython optimization for heavy analytics
+- SSH tunnel support for remote connections
 - User manual and documentation
 
-## Requirements
+## Installation from Packages
 
-- Linux or FreeBSD
-- Windows 10/11 via WSL2
-- Python 3.12 or later
-- GTK 4 and GtkSourceView 5
-- PostgreSQL 12 or later
-- Perl 5.30 or later (optional, for Perl hooks)
-- Developed on Fedora 43 Cinnamon and tested on Fedora 43 KDE Plasma 6
+### Fedora / RHEL (RPM)
+
+```bash
+sudo dnf install rpm-build rpmdevtools rpmlint python3-devel
+git clone https://github.com/Peter-L-SVK/sql-schema-studio.git
+cd sql-schema-studio
+./scripts/packaging/build_rpm.sh
+sudo dnf install ~/rpmbuild/RPMS/noarch/sql-schema-studio-*.rpm
+```
+
+### Debian / Ubuntu / Mint (DEB) / WSL2
+
+```bash
+sudo apt install dpkg-dev debhelper python3-dev
+git clone https://github.com/Peter-L-SVK/sql-schema-studio.git
+cd sql-schema-studio
+./scripts/packaging/build_deb.sh
+sudo dpkg -i sql-schema-studio_*.deb
+sudo apt --fix-broken install
+```
+
+### Run
+
+```bash
+sql-schema-studio
+```
+
+**Note:** Currently the application can only be launched via terminal. Desktop launcher (.desktop file) is planned for v0.9.0.
+
+## From Source
+
+### Debian / Ubuntu / Mint / WSL2
+
+```bash
+sudo apt update
+sudo apt install -y python3-psycopg python3-gi python3-sqlparse python3-keyring \
+  python3-numpy python3-pandas python3-sklearn python3-matplotlib python3-cairo \
+  python3-paramiko gir1.2-gtk-4.0 gir1.2-gtksource-5
+
+git clone https://github.com/Peter-L-SVK/sql-schema-studio.git
+cd sql-schema-studio
+pip install --user -e .
+sql-schema-studio
+```
+
+### Fedora / CentOS / RedHat
+
+```bash
+sudo dnf install python3-gobject gtk4 gtksourceview5 libadwaita cairo python3-cairo
+
+git clone https://github.com/Peter-L-SVK/sql-schema-studio.git
+cd sql-schema-studio
+pip install --user -e .
+sql-schema-studio
+```
+
+### Windows (WSL2)
+
+```bash
+wsl --install
+wsl --update
+
+# Inside WSL2 terminal (Debian / Ubuntu):
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y python3-psycopg python3-gi python3-sqlparse python3-keyring \
+  python3-numpy python3-pandas python3-sklearn python3-matplotlib python3-cairo \
+  python3-paramiko gir1.2-gtk-4.0 gir1.2-gtksource-5 \
+  postgresql postgresql-client
+
+sudo service postgresql start
+
+git clone https://github.com/Peter-L-SVK/sql-schema-studio.git
+cd sql-schema-studio
+pip install --user -e .
+sql-schema-studio
+```
+
+## Development
+
+```bash
+pip install -e ".[dev]"
+python3 -m pytest tests/ -v
+python3 -m black src/ tests/
+python3 -m flake8 src/ tests/
+python3 -m mypy src/
+```
 
 ## System Requirements
 
 **Debian / Ubuntu / Mint:**
 ```bash
 sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-4.0 \
-  gir1.2-gtksource-5.0 libgtk-4-1 libgtksourceview-5-0 \
+  gir1.2-gtksource-5 libgtk-4-1 libgtksourceview-5-0 \
   libcairo2-dev python3-cairo
 ```
 
@@ -78,80 +160,36 @@ sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-4.0 \
 sudo dnf install python3-gobject gtk4 gtksourceview5 libadwaita cairo python3-cairo
 ```
 
-## Quick Start
-
-### Linux/FreeBSD
-
-```bash
-git clone https://github.com/peter-leukanic/sql-schema-studio.git
-cd sql-schema-studio
-pip install -r requirements.txt
-python3 -m src.main
-```
-
-### Windows (WSL2)
-
-```bash
-# Install WSL2 and WSLg
-wsl --install
-wsl --update
-
-# Inside WSL2 terminal (Debian / Ubuntu):
-sudo apt update && sudo apt upgrade -y
-sudo apt install python3-pip python3-gi python3-gi-cairo \
-  gir1.2-gtk-4.0 gir1.2-gtksource-5.0 \
-  libgtk-4-1 libgtksourceview-5-0 \
-  libcairo2-dev python3-cairo postgresql postgresql-client -y
-
-sudo service postgresql start
-
-git clone https://github.com/peter-leukanic/sql-schema-studio.git
-cd sql-schema-studio
-pip install -r requirements.txt
-python3 -m src.main
-```
-
-## Development
-
-```bash
-pip install -r requirements.txt
-pip install pytest black flake8 mypy
-
-python3 -m pytest tests/ -v
-python3 -m black src/ tests/
-python3 -m flake8 src/ tests/
-python3 -m mypy src/
-```
-
 ## Architecture
 
 ```
 src/
-├── main.py Entry point
-├── app.py Gtk.Application lifecycle
-├── actions.py Menu and toolbar handlers
-├── config.py Centralized constants
-├── core/ Database connectivity, query execution, SQL parsing
-├── ui/ GTK4 interface (window, browser, editor, designer)
-│ └── dialogs/ Connection, about, preferences, column editor, hooks
-├── models/ Table, column, and relationship data models
-├── hooks/ Plugin system with Python and Perl executors
-│ ├── python/ Python hook runtime
-│ ├── perl/ Perl hook runtime
-│ ├── python_hooks/ Python hook implementations
-│ └── perl_hooks/ Perl hook implementations
-├── analytics/ Index advisor and query analysis
-├── utils/ GTK4 helpers, logging, settings, signal handlers
+├── main.py                     Entry point
+├── app.py                      Gtk.Application lifecycle
+├── actions.py                  Menu and toolbar handlers
+├── config.py                   Centralized constants
+├── core/                       Database connectivity, query execution, SQL parsing
+├── ui/                         GTK4 interface (window, browser, editor, designer)
+│   └── dialogs/                Connection, about, preferences, column editor, hooks
+├── models/                     Table, column, and relationship data models
+├── hooks/                      Plugin system with Python and Perl executors
+│   ├── python/                 Python hook runtime
+│   ├── perl/                   Perl hook runtime
+│   ├── python_hooks/           Python hook implementations
+│   └── perl_hooks/             Perl hook implementations
+├── analytics/                  Index advisor and query analysis
+├── utils/                      GTK4 helpers, logging, settings, signal handlers
 └── resources/
-└── ui/
-├── style.css Application stylesheet
-└── icons/ Application icons
+    └── ui/
+        ├── style.css           Application stylesheet
+        └── icons/              Application icons
 ```
 
 ## Contributing
 
-See [CONTRIBUTING](https://github.com/Peter-L-SVK/sql-schema-studio/blob/main/CONTRIBUTING.md) for details.
+See [CONTRIBUTING](https://github.com/Peter-L-SVK/sql-schema-studio/blob/main/CONTRIBUTING.md) for details.  
 Please open an issue or pull request for bug fixes, feature suggestions, or documentation improvements.
+Also discussion on repo is allowed.
 
 ## License
 

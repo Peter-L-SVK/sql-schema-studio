@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.7 - Main Application Window (GPLv3)
+# SQL Schema Studio 0.8 - Main Application Window (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -32,7 +32,6 @@ from src.ui.browser import DatabaseBrowser
 from src.ui.statusbar import StatusBar
 from src.utils.gtk_helpers import run_async
 from src.ui.dialogs.connection import ConnectionDialog
-from src.ui.dialogs.hook_manager import HookManagerDialog
 from src.ui.schema_designer import SchemaDesigner
 
 
@@ -269,7 +268,9 @@ class MainWindow(Gtk.ApplicationWindow):
         dialog.present()
 
     def _on_hooks_clicked(self):
-        dialog = HookManagerDialog(self)
+        from src.ui.dialogs.hook_manager import HookManagerDialog
+
+        dialog = HookManagerDialog(self, db_connector=self.db_connector)
         dialog.present()
 
     def _on_query_history_clicked(self):
