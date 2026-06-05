@@ -6,6 +6,8 @@
 
 ![Demo](4.png)
 
+![preferences dialog](18.png)
+
 ![schema manager1](10.png)
 
 ![schema manager2](5.png)
@@ -37,6 +39,16 @@ Applying AI Index Advisor
 Insertion of values to it.  
 
 ![doubleclick dialog](17.png)
-List content by left double click
+List content by left double click  
 
-![preferences dialog](18.png)
+![auto_vacuum advisor](19.png)
+Auto vacuum hook in action  
+
+![schema anomaly detector](20.png)
+Anomaly detector finished  
+
+![log parser](21.png)
+Log parser in action  
+
+![exporting all to json](22.png)
+After exporting all 

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=SQL Schema Studio
+Comment=Intelligent PostgreSQL Management Platform
+Exec=/usr/bin/sql-schema-studio
+Icon=sql-schema-studio
+Terminal=false
+StartupNotify=true
+Categories=Development;Database;IDE;
+MimeType=text/x-sql;

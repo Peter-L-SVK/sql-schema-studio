@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.7 - Configuration (GPLv3)
+# SQL Schema Studio 0.8 - Configuration (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -70,3 +70,7 @@ SCHEMA_TABLE_HEADER_HEIGHT: int = 32
 SCHEMA_TABLE_BODY_PADDING: int = 4
 SCHEMA_CANVAS_WIDTH: int = 1200
 SCHEMA_CANVAS_HEIGHT: int = 800
+
+# Hook manager
+HOOK_RESULT_DIALOG_WIDTH: int = 500
+HOOK_RESULT_DIALOG_HEIGHT: int = 400
