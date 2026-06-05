@@ -60,17 +60,19 @@ class Plugin(BaseHook):
             for row in cur.fetchall():
                 table = f"{row[0]}.{row[1]}"
                 tables_analyzed.add(table)
-                anomalies.append({
-                    "table": table,
-                    "priority": "HIGH",
-                    "action": "Add primary key",
-                    "reason": "Missing primary key - table cannot be properly indexed or replicated",
-                    "sql": f"ALTER TABLE {row[0]}.{row[1]} ADD COLUMN id SERIAL PRIMARY KEY;",
-                })
+                anomalies.append(
+                    {
+                        "table": table,
+                        "priority": "HIGH",
+                        "action": "Add primary key",
+                        "reason": "Missing primary key - table cannot be properly indexed or replicated",
+                        "sql": f"ALTER TABLE {row[0]}.{row[1]} ADD COLUMN id SERIAL PRIMARY KEY;",
+                    }
+                )
 
             # 2. Detect columns named *_id without foreign keys
             cur.execute("""
-                SELECT 
+                SELECT
                     c.table_schema,
                     c.table_name,
                     c.column_name,
@@ -81,7 +83,7 @@ class Plugin(BaseHook):
                   AND c.column_name LIKE '%_id'
                   AND c.column_name != 'id'
                   AND (c.table_schema, c.table_name, c.column_name) NOT IN (
-                      SELECT 
+                      SELECT
                           kcu.table_schema,
                           kcu.table_name,
                           kcu.column_name
@@ -97,13 +99,15 @@ class Plugin(BaseHook):
                 table = f"{row[0]}.{row[1]}"
                 column = row[2]
                 tables_analyzed.add(table)
-                anomalies.append({
-                    "table": table,
-                    "priority": "MEDIUM",
-                    "action": "Add foreign key constraint",
-                    "reason": f"Column '{column}' looks like a foreign key but has no FK constraint - data integrity at risk",
-                    "sql": f"-- Find referenced table first, then add FK:\n-- ALTER TABLE {table} ADD CONSTRAINT fk_{row[1]}_{column} FOREIGN KEY ({column}) REFERENCES ? (id);",
-                })
+                anomalies.append(
+                    {
+                        "table": table,
+                        "priority": "MEDIUM",
+                        "action": "Add foreign key constraint",
+                        "reason": f"Column '{column}' looks like a foreign key but has no FK constraint - data integrity at risk",
+                        "sql": f"-- Find referenced table first, then add FK:\n-- ALTER TABLE {table} ADD CONSTRAINT fk_{row[1]}_{column} FOREIGN KEY ({column}) REFERENCES ? (id);",
+                    }
+                )
 
             # 3. Detect tables without any indexes (excluding PK)
             cur.execute("""
@@ -124,13 +128,15 @@ class Plugin(BaseHook):
             for row in cur.fetchall():
                 table = f"{row[0]}.{row[1]}"
                 tables_analyzed.add(table)
-                anomalies.append({
-                    "table": table,
-                    "priority": "LOW",
-                    "action": "Add indexes on frequently queried columns",
-                    "reason": "No indexes found (besides primary key) -may cause full table scans and performance issues",
-                    "sql": f"-- Review query patterns and add indexes on {table}\n-- Example: CREATE INDEX idx_{row[1]}_column ON {table} (column);",
-                })
+                anomalies.append(
+                    {
+                        "table": table,
+                        "priority": "LOW",
+                        "action": "Add indexes on frequently queried columns",
+                        "reason": "No indexes found (besides primary key) -may cause full table scans and performance issues",
+                        "sql": f"-- Review query patterns and add indexes on {table}\n-- Example: CREATE INDEX idx_{row[1]}_column ON {table} (column);",
+                    }
+                )
 
             # 4. Detect VARCHAR without length
             cur.execute("""
@@ -147,17 +153,19 @@ class Plugin(BaseHook):
                 table = f"{row[0]}.{row[1]}"
                 column = row[2]
                 tables_analyzed.add(table)
-                anomalies.append({
-                    "table": table,
-                    "priority": "LOW",
-                    "action": "Specify VARCHAR length limit",
-                    "reason": f"Column '{column}' is VARCHAR without length limit - can allow excessively long values",
-                    "sql": f"ALTER TABLE {table} ALTER COLUMN {column} TYPE VARCHAR(255);",
-                })
+                anomalies.append(
+                    {
+                        "table": table,
+                        "priority": "LOW",
+                        "action": "Specify VARCHAR length limit",
+                        "reason": f"Column '{column}' is VARCHAR without length limit - can allow excessively long values",
+                        "sql": f"ALTER TABLE {table} ALTER COLUMN {column} TYPE VARCHAR(255);",
+                    }
+                )
 
             # 5. Detect foreign key columns that are nullable (should be NOT NULL)
             cur.execute("""
-                SELECT 
+                SELECT
                     c.table_schema,
                     c.table_name,
                     c.column_name
@@ -183,13 +191,15 @@ class Plugin(BaseHook):
                 table = f"{row[0]}.{row[1]}"
                 column = row[2]
                 tables_analyzed.add(table)
-                anomalies.append({
-                    "table": table,
-                    "priority": "MEDIUM",
-                    "action": "Add NOT NULL constraint",
-                    "reason": f"Foreign key column '{column}' is nullable - references should never be NULL",
-                    "sql": f"ALTER TABLE {table} ALTER COLUMN {column} SET NOT NULL;",
-                })
+                anomalies.append(
+                    {
+                        "table": table,
+                        "priority": "MEDIUM",
+                        "action": "Add NOT NULL constraint",
+                        "reason": f"Foreign key column '{column}' is nullable - references should never be NULL",
+                        "sql": f"ALTER TABLE {table} ALTER COLUMN {column} SET NOT NULL;",
+                    }
+                )
 
             # 6. Detect foreign keys without indexes (performance critical!)
             cur.execute("""
@@ -217,17 +227,19 @@ class Plugin(BaseHook):
                 table = f"{row[0]}.{row[1]}"
                 column = row[2]
                 tables_analyzed.add(table)
-                anomalies.append({
-                    "table": table,
-                    "priority": "HIGH",
-                    "action": "Add index on foreign key column",
-                    "reason": f"Foreign key column '{column}' has no index - JOINs and DELETE/UPDATE operations will be slow",
-                    "sql": f"CREATE INDEX idx_{row[1]}_{column} ON {row[0]}.{row[1]} ({column});",
-                })
+                anomalies.append(
+                    {
+                        "table": table,
+                        "priority": "HIGH",
+                        "action": "Add index on foreign key column",
+                        "reason": f"Foreign key column '{column}' has no index - JOINs and DELETE/UPDATE operations will be slow",
+                        "sql": f"CREATE INDEX idx_{row[1]}_{column} ON {row[0]}.{row[1]} ({column});",
+                    }
+                )
 
             # 7. Detect tables with high dead tuple ratio (bloat)
             cur.execute("""
-                SELECT 
+                SELECT
                     schemaname,
                     relname AS tablename,
                     n_dead_tup,
@@ -244,19 +256,21 @@ class Plugin(BaseHook):
                 table = f"{row[0]}.{row[1]}"
                 tables_analyzed.add(table)
                 dead_ratio = row[4]
-                
+
                 priority = "HIGH" if dead_ratio > 30 else "MEDIUM" if dead_ratio > 15 else "LOW"
-                anomalies.append({
-                    "table": table,
-                    "priority": priority,
-                    "action": "Run VACUUM to reclaim space and update statistics",
-                    "reason": f"{dead_ratio}% dead tuples ({row[2]:,} dead, {row[3]:,} live) - wasted space and slow queries",
-                    "sql": f"VACUUM (VERBOSE, ANALYZE) {row[0]}.{row[1]};",
-                })
+                anomalies.append(
+                    {
+                        "table": table,
+                        "priority": priority,
+                        "action": "Run VACUUM to reclaim space and update statistics",
+                        "reason": f"{dead_ratio}% dead tuples ({row[2]:,} dead, {row[3]:,} live) - wasted space and slow queries",
+                        "sql": f"VACUUM (VERBOSE, ANALYZE) {row[0]}.{row[1]};",
+                    }
+                )
 
             # 8. Detect tables without comments (documentation)
             cur.execute("""
-                SELECT 
+                SELECT
                     c.table_schema,
                     c.table_name
                 FROM information_schema.tables c
@@ -264,7 +278,7 @@ class Plugin(BaseHook):
                   AND c.table_schema != 'information_schema'
                   AND c.table_type = 'BASE TABLE'
                   AND (c.table_schema, c.table_name) NOT IN (
-                      SELECT 
+                      SELECT
                           schemaname,
                           tablename
                       FROM pg_tables
@@ -277,17 +291,19 @@ class Plugin(BaseHook):
             for row in cur.fetchall():
                 table = f"{row[0]}.{row[1]}"
                 tables_analyzed.add(table)
-                anomalies.append({
-                    "table": table,
-                    "priority": "LOW",
-                    "action": "Add table comment for documentation",
-                    "reason": "Table has no description - makes schema harder to understand",
-                    "sql": f"COMMENT ON TABLE {table} IS 'Description of what this table stores';",
-                })
+                anomalies.append(
+                    {
+                        "table": table,
+                        "priority": "LOW",
+                        "action": "Add table comment for documentation",
+                        "reason": "Table has no description - makes schema harder to understand",
+                        "sql": f"COMMENT ON TABLE {table} IS 'Description of what this table stores';",
+                    }
+                )
 
             # 9. Detect columns that allow NULL but probably shouldn't
             cur.execute("""
-                SELECT 
+                SELECT
                     c.table_schema,
                     c.table_name,
                     c.column_name,
@@ -309,13 +325,15 @@ class Plugin(BaseHook):
                 table = f"{row[0]}.{row[1]}"
                 column = row[2]
                 tables_analyzed.add(table)
-                anomalies.append({
-                    "table": table,
-                    "priority": "LOW",
-                    "action": "Consider adding NOT NULL constraint",
-                    "reason": f"Column '{column}' probably should not be NULL based on its name",
-                    "sql": f"ALTER TABLE {table} ALTER COLUMN {column} SET NOT NULL;",
-                })
+                anomalies.append(
+                    {
+                        "table": table,
+                        "priority": "LOW",
+                        "action": "Consider adding NOT NULL constraint",
+                        "reason": f"Column '{column}' probably should not be NULL based on its name",
+                        "sql": f"ALTER TABLE {table} ALTER COLUMN {column} SET NOT NULL;",
+                    }
+                )
 
             conn.close()
 
@@ -337,7 +355,7 @@ class Plugin(BaseHook):
         except Exception as e:
             logger.error(f"Schema anomaly detector failed: {e}", exc_info=True)
             return {
-                "status": "error", 
+                "status": "error",
                 "message": str(e),
                 "tables_analyzed": 0,
                 "recommendations_count": 0,

@@ -9,7 +9,6 @@
 """Hook that analyzes table bloat, tracks history, and predicts vacuum timing."""
 
 import json
-import os
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -47,7 +46,7 @@ class Plugin(BaseHook):
         history_file = HISTORY_DIR / f"{table_name.replace('.', '_')}.json"
         if not history_file.exists():
             return []
-        
+
         try:
             with open(history_file, "r") as f:
                 data = json.load(f)
@@ -61,24 +60,26 @@ class Plugin(BaseHook):
     def _save_history(self, table_name: str, snapshot: Dict):
         """Save current snapshot to history."""
         history_file = HISTORY_DIR / f"{table_name.replace('.', '_')}.json"
-        
+
         try:
             # Load existing history
             history = self._load_history(table_name)
-            
+
             # Add new snapshot
-            history.append({
-                "timestamp": datetime.now().isoformat(),
-                "dead_tuples": snapshot["n_dead_tup"],
-                "live_tuples": snapshot["n_live_tup"],
-                "dead_ratio": snapshot["dead_ratio"],
-                "total_activity": snapshot.get("total_activity", 0),
-            })
-            
+            history.append(
+                {
+                    "timestamp": datetime.now().isoformat(),
+                    "dead_tuples": snapshot["n_dead_tup"],
+                    "live_tuples": snapshot["n_live_tup"],
+                    "dead_ratio": snapshot["dead_ratio"],
+                    "total_activity": snapshot.get("total_activity", 0),
+                }
+            )
+
             # Keep only last MAX_HISTORY_DAYS
             cutoff = datetime.now() - timedelta(days=MAX_HISTORY_DAYS)
             history = [h for h in history if datetime.fromisoformat(h["timestamp"]) > cutoff]
-            
+
             # Save
             with open(history_file, "w") as f:
                 json.dump(history, f, indent=2)
@@ -87,97 +88,103 @@ class Plugin(BaseHook):
 
     def _predict_bloat_growth(self, history: List[Dict]) -> Tuple[Optional[float], Optional[int]]:
         """Predict when dead tuple ratio will reach critical levels.
-        
+
         Returns:
             (expected_growth_rate_per_day, days_until_critical)
         """
         if len(history) < 3:
             return None, None
-        
+
         try:
             # Try to import scikit-learn for better prediction
             from sklearn.linear_model import LinearRegression
             import numpy as np
-            
+
             # Prepare data
             days = []
             ratios = []
             start_date = datetime.fromisoformat(history[0]["timestamp"])
-            
+
             for h in history:
                 days.append((datetime.fromisoformat(h["timestamp"]) - start_date).days)
                 ratios.append(h["dead_ratio"])
-            
+
             if len(days) < 2:
                 return None, None
-            
+
             # Linear regression
             X = np.array(days).reshape(-1, 1)
             y = np.array(ratios)
             model = LinearRegression()
             model.fit(X, y)
-            
+
             growth_rate = model.coef_[0]  # % per day
             current_ratio = ratios[-1]
-            
+
             # Days until 50% (critical)
             if growth_rate > 0:
                 days_until_critical = max(0, int((50 - current_ratio) / growth_rate))
             else:
                 days_until_critical = None
-            
+
             return growth_rate, days_until_critical
-            
+
         except ImportError:
             # Fallback to simple linear approximation without sklearn
             logger.debug("scikit-learn not available, using simple prediction")
-            
+
             if len(history) < 5:
                 return None, None
-            
+
             # Simple average growth
             growth_rates = []
             for i in range(1, len(history)):
-                prev_ratio = history[i-1]["dead_ratio"]
+                prev_ratio = history[i - 1]["dead_ratio"]
                 curr_ratio = history[i]["dead_ratio"]
-                
+
                 # Parse timestamps
-                prev_date = datetime.fromisoformat(history[i-1]["timestamp"])
+                prev_date = datetime.fromisoformat(history[i - 1]["timestamp"])
                 curr_date = datetime.fromisoformat(history[i]["timestamp"])
                 days_diff = max(1, (curr_date - prev_date).days)
-                
+
                 growth_rates.append((curr_ratio - prev_ratio) / days_diff)
-            
+
             if not growth_rates:
                 return None, None
-            
+
             avg_growth = sum(growth_rates) / len(growth_rates)
             current_ratio = history[-1]["dead_ratio"]
-            
+
             if avg_growth > 0:
                 days_until_critical = max(0, int((50 - current_ratio) / avg_growth))
             else:
                 days_until_critical = None
-            
+
             return avg_growth, days_until_critical
 
-    def _estimate_space_waste(self, conn_string: str, schema: str, table: str, dead_ratio: float) -> str:
+    def _estimate_space_waste(
+        self, conn_string: str, schema: str, table: str, dead_ratio: float
+    ) -> str:
         """Estimate how much space would be reclaimed by VACUUM."""
         try:
             import psycopg
+
             conn = psycopg.connect(conn_string)
             cur = conn.cursor()
-            
-            cur.execute("""
-                SELECT 
+
+            cur.execute(
+                """
+                SELECT
                     pg_size_pretty(pg_total_relation_size(%s)) as total_size,
                     pg_size_pretty(pg_table_size(%s)) as table_size,
                     pg_size_pretty(pg_indexes_size(%s)) as indexes_size
-            """, (f"{schema}.{table}", f"{schema}.{table}", f"{schema}.{table}"))
-            
+            """,
+                (f"{schema}.{table}", f"{schema}.{table}", f"{schema}.{table}"),
+            )
+
             row = cur.fetchone()
             conn.close()
-            
+
             if row and dead_ratio > 0:
                 total_size = row[0]
                 return f"~{int(dead_ratio)}% of {total_size} potentially reclaimable"
@@ -189,25 +196,28 @@ class Plugin(BaseHook):
         """Check autovacuum configuration."""
         try:
             import psycopg
+
             conn = psycopg.connect(conn_string)
             cur = conn.cursor()
-            
+
             cur.execute("""
                 SELECT name, setting, unit, short_desc
                 FROM pg_settings
                 WHERE name LIKE 'autovacuum%'
                 ORDER BY name
             """)
-            
+
             config = []
             for row in cur.fetchall():
-                config.append({
-                    "name": row[0],
-                    "setting": row[1],
-                    "unit": row[2] or "",
-                    "description": row[3][:100] if row[3] else "",
-                })
-            
+                config.append(
+                    {
+                        "name": row[0],
+                        "setting": row[1],
+                        "unit": row[2] or "",
+                        "description": row[3][:100] if row[3] else "",
+                    }
+                )
+
             conn.close()
             return config
         except Exception as e:
@@ -239,13 +249,13 @@ class Plugin(BaseHook):
                     autovacuum_count,
                     n_tup_ins + n_tup_upd + n_tup_del AS total_activity
                 FROM pg_stat_all_tables
-                WHERE schemaname NOT LIKE 'pg_%' 
+                WHERE schemaname NOT LIKE 'pg_%'
                   AND schemaname != 'information_schema'
                 ORDER BY n_dead_tup DESC
             """)
-            
+
             rows = cur.fetchall()
-            
+
             if not rows:
                 conn.close()
                 return {
@@ -255,24 +265,24 @@ class Plugin(BaseHook):
                     "recommendations_count": 0,
                     "recommendations": [],
                 }
-            
+
             if not cur.description:
                 conn.close()
                 return {"status": "error", "message": "Query returned no column data"}
-            
+
             columns = [desc[0] for desc in cur.description]
             stats = [dict(zip(columns, row)) for row in rows]
             conn.close()
 
             recommendations = []
-            
+
             for row in stats:
                 table_name = f"{row['schemaname']}.{row['tablename']}"
-                
+
                 # Ak je tabuľka prázdna, preskočíme (ale započítame do analyzed)
-                if row['n_live_tup'] == 0 and row['n_dead_tup'] == 0:
+                if row["n_live_tup"] == 0 and row["n_dead_tup"] == 0:
                     continue
-                    
+
                 dead_ratio = float(row["dead_ratio"])
 
                 # Určenie priority a akcie
@@ -301,18 +311,20 @@ class Plugin(BaseHook):
                     reason += f", last vacuumed {days_since} days ago"
                 else:
                     reason += ", never vacuumed"
-                    
-                recommendations.append({
-                    "table": table_name,
-                    "dead_ratio": dead_ratio,
-                    "dead_tuples": row["n_dead_tup"],
-                    "live_tuples": row["n_live_tup"],
-                    "action": action,
-                    "priority": priority,
-                    "reason": reason,
-                    "sql": f"{action} {table_name};",
-                    "last_vacuum": str(last_vacuum) if last_vacuum else "never",
-                })
+
+                recommendations.append(
+                    {
+                        "table": table_name,
+                        "dead_ratio": dead_ratio,
+                        "dead_tuples": row["n_dead_tup"],
+                        "live_tuples": row["n_live_tup"],
+                        "action": action,
+                        "priority": priority,
+                        "reason": reason,
+                        "sql": f"{action} {table_name};",
+                        "last_vacuum": str(last_vacuum) if last_vacuum else "never",
+                    }
+                )
 
             return {
                 "status": "ok",
@@ -325,9 +337,9 @@ class Plugin(BaseHook):
         except Exception as e:
             logger.error(f"Auto-vacuum advisor failed: {e}")
             return {
-                "status": "error", 
+                "status": "error",
                 "message": str(e),
                 "tables_analyzed": 0,
                 "recommendations_count": 0,
-                "recommendations": []
+                "recommendations": [],
             }
