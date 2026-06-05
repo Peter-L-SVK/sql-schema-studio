@@ -1,40 +1,32 @@
 # SQL Schema Studio — Roadmap
 
-## v0.8.0 — Hooks + Optimization + AI/ML
+## v0.8.0 — Hooks + Optimization
 
 ### Hooks
 - [x] Auto-Vacuum Advisor — reads pg_stat_user_tables, calculates bloat ratio
 - [x] Schema Anomaly Detector — detects missing FKs, missing indexes, denormalization
 - [x] PostgreSQL Log Analyzer (Perl) — parses PostgreSQL log files
-- [ ] Kebola normalization hook — detects denormalized schemas, suggests fixes
+- [x] JSON export for hook results
 
 ### Optimization
 - [x] Big O: hash map O(1) for FK lookup in schema designer
-- [ ] Streaming/yield for large result sets (execute_stream)
-- [ ] Lazy loading in browser (only expanded nodes)
-
-### AI/ML
-- [ ] Polars replacing pandas for analytics
-- [ ] Query pattern clustering (scikit-learn KMeans + Polars)
-- [ ] Index impact prediction (XGBoost/RandomForest)
-- [ ] Workload classification (OLTP/OLAP/Mixed)
 
 ### Infrastructure
-- [ ] Move requirements to pyproject.toml
-- [ ] RPM/DEB packaging scripts
-- [ ] Install script for Fedora/Debian
+- [x] Move requirements to pyproject.toml
+- [x] RPM/DEB packaging scripts
+
+### Deferred to v0.9.0
+- Streaming/yield, lazy loading, Polars, Kebola hook
 
 ---
 
-## v0.9.0 — Schema Designer Pro + Migrations
+## v0.9.0 — Schema Designer Pro + Multi-Tab Editor
 
-### Multi-Tab Editor
-- [ ] Tabbed SQL editor (multiple .sql files open at once)
-- [ ] Ctrl+T new tab, Ctrl+W close tab
+### Multi-Tab System
+- [ ] Tabbed SQL editor (Ctrl+T, Ctrl+W, drag tabs)
 - [ ] Unsaved changes indicator (•)
-- [ ] Drag tabs to reorder
-- [ ] Tab context menu (close, close others, close all)
-- [ ] Restore open tabs on startup (session persistence)
+- [ ] Restore open tabs on startup
+- [ ] Tabbed results panel
 
 ### Schema Designer
 - [ ] Color schemes — blue, green, orange, red, purple, gray
@@ -46,23 +38,22 @@
 ### Migrations
 - [ ] Migration generator with up/down SQL diffs
 - [ ] Schema comparison (live DB vs designer)
-- [ ] Migration versioning
 
 ### Export/Import
 - [ ] Export schema to GraphQL
 - [ ] Export to SQL dump (pg_dump compatible)
-- [ ] Import from pg_dump
-
-### Graph Analysis
-- [ ] Graph visualization of table dependencies
-- [ ] Force-directed/hierarchical/radial layout
-- [ ] Nodes as tables, edges as FK
-- [ ] Node size by row/column count
 
 ### AI/ML Extensions
-- [ ] Prophet — database growth prediction (capacity planning)
-- [ ] XGBoost — more accurate index impact prediction
-- [ ] Anomaly detection — slow query detection vs history
+- [ ] Streaming/yield for large result sets
+- [ ] Lazy loading in browser
+- [ ] Polars replacing pandas
+- [ ] Kebola normalization hook
+- [ ] Prophet — database growth prediction
+- [ ] XGBoost — index impact prediction
+
+### Infrastructure
+- [ ] SSH tunnel support
+- [ ] Desktop launcher (.desktop file)
 
 ---
 
@@ -85,11 +76,6 @@
 - [ ] PyPI package
 - [ ] Windows installer (WSL2 helper)
 
-### Community
-- [ ]  Discord server
-- [ ] Plugin marketplace (GitHub topics)
-- [ ] Contributing guide v1.0
-
 ---
 
 ## v1.1+ — Future Ideas
@@ -98,19 +84,15 @@
 - [ ] Visual query builder (drag-and-drop JOINs, WHERE)
 - [ ] Multi-database support (MySQL/MariaDB, SQLite)
 - [ ] Data editor with inline editing
-- [ ] SSH tunneling for remote connections
+- [ ] Graph visualization of table dependencies
 - [ ] Dark mode / light mode toggle
-- [ ] Tabs for multiple open SQL files
 - [ ] Query profiler (execution timeline)
 
 ### AI/ML
 - [ ] Cython optimization for critical paths
 - [ ] Semantic SQL query analysis (sentence-transformers)
 - [ ] Auto-complete SQL with ML model
-- [ ] Intelligent SQL formatting
 
 ### Collaboration
-- [ ] Multi-user mode (shared connections)
 - [ ] Git integration for schemas
 - [ ] CI/CD pipeline for migrations
-- [ ] Cloud sync (GitHub Gist, Pastebin)
