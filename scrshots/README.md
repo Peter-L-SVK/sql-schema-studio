@@ -10,7 +10,7 @@
 
 ![schema manager1](10.png)
 
-![schema manager2](5.png)
+
 
 ![schema manager3](6.png)
 
