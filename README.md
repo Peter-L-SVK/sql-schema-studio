@@ -6,9 +6,11 @@
 [![GitHub last commit](https://img.shields.io/github/last-commit/Peter-L-SVK/sql-schema-studio)](https://github.com/Peter-L-SVK/sql-schema-studio/commits/main)
 <a href="https://buymeacoffee.com/leukanic.peter"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" height="20px"></a>
 
-Intelligent PostgreSQL Management Platform. A GTK4 desktop application for
-database administrators and developers who want a clean, fast, and extensible
-SQL tool.
+SQL Schema Studio is a native GTK4 PostgreSQL client built for Linux — not Electron, not a web app.
+It runs lean on any Linux desktop, extends via Python or Perl hooks, and ships a visual schema designer
+without a subscription fee or a JVM. Windows users can run it via WSL2 with full GUI support through WSLg.
+
+If you live in a terminal but want a GUI when it earns it, this is for you.
 
 **Alpha software — under active development.**
 
@@ -127,25 +129,25 @@ python3 -m mypy src/
 
 ```
 src/
-├── main.py Entry point
-├── app.py Gtk.Application lifecycle
-├── actions.py Menu and toolbar handlers
-├── config.py Centralized constants
-├── core/ Database connectivity, query execution, SQL parsing
-├── ui/ GTK4 interface (window, browser, editor, designer)
-│ └── dialogs/ Connection, about, preferences, column editor, hooks
-├── models/ Table, column, and relationship data models
-├── hooks/ Plugin system with Python and Perl executors
-│ ├── python/ Python hook runtime
-│ ├── perl/ Perl hook runtime
-│ ├── python_hooks/ Python hook implementations
-│ └── perl_hooks/ Perl hook implementations
-├── analytics/ Index advisor and query analysis
-├── utils/ GTK4 helpers, logging, settings, signal handlers
+├── main.py                     Entry point
+├── app.py                      Gtk.Application lifecycle
+├── actions.py                  Menu and toolbar handlers
+├── config.py                   Centralized constants
+├── core/                       Database connectivity, query execution, SQL parsing
+├── ui/                         GTK4 interface (window, browser, editor, designer)
+│   └── dialogs/                Connection, about, preferences, column editor, hooks
+├── models/                     Table, column, and relationship data models
+├── hooks/                      Plugin system with Python and Perl executors
+│   ├── python/                 Python hook runtime
+│   ├── perl/                   Perl hook runtime
+│   ├── python_hooks/           Python hook implementations
+│   └── perl_hooks/             Perl hook implementations
+├── analytics/                  Index advisor and query analysis
+├── utils/                      GTK4 helpers, logging, settings, signal handlers
 └── resources/
-└── ui/
-├── style.css Application stylesheet
-└── icons/ Application icons
+    └── ui/
+        ├── style.css           Application stylesheet
+        └── icons/              Application icons
 ```
 
 ## Contributing
