@@ -65,6 +65,11 @@
 - [ ] Bug fixing (from community)
 - [ ] Code freeze 2 weeks before release
 
+### Schema Analysis
+- [ ] Star/Snowflake schema detection and visualization
+- [ ] Schema normalization suggestions
+- [ ] Entity relationship diagram export
+
 ### Documentation
 - [ ] LaTeX manual (PDF + EPUB)
 - [ ] AI-powered documentation reader
