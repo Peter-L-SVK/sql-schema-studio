@@ -157,6 +157,9 @@ class HookManagerDialog(Gtk.Window):
 
             all_hooks = registry.list_hooks()
             hook = all_hooks.get(hook_name)
+            if hook_name == "Synthetic Data Generator":
+                self._show_generator_dialog(hook)
+                return
 
             if hook and hasattr(hook, "execute_sync"):
                 # Sync hook (new style)
@@ -431,4 +434,95 @@ class HookManagerDialog(Gtk.Window):
             secondary_text=error,
         )
         dialog.connect("response", lambda d, r: d.close())
+        dialog.present()
+
+    def _show_generator_dialog(self, hook):
+        """Show configuration dialog for data generator."""
+        from src.hooks.python_hooks.data_generator import PRESETS
+        
+        dialog = Gtk.Window(
+            transient_for=self,
+            modal=True,
+            title="Synthetic Data Generator",
+            default_width=400,
+            default_height=300,
+        )
+    
+        main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        set_margin(main_box, 16)
+    
+        # Preset selector
+        main_box.append(Gtk.Label(label="Data Preset:", halign=Gtk.Align.START))
+        preset_combo = Gtk.ComboBoxText()
+        for preset_name in PRESETS.keys():
+            preset_combo.append_text(preset_name)
+        preset_combo.set_active(0)
+        main_box.append(preset_combo)
+    
+        # Row count
+        main_box.append(Gtk.Label(label="Number of rows:", halign=Gtk.Align.START))
+        count_entry = Gtk.Entry()
+        count_entry.set_text("100")
+        main_box.append(count_entry)
+
+        drop_check = Gtk.CheckButton(label="Drop existing table first")
+        drop_check.set_active(False)
+        main_box.append(drop_check)
+    
+        # Preset description
+        desc_label = Gtk.Label()
+        desc_label.set_wrap(True)
+        desc_label.set_halign(Gtk.Align.START)
+        main_box.append(desc_label)
+    
+        def update_description(combo):
+            preset = combo.get_active_text()
+            config = PRESETS.get(preset, {})
+            cols = len(config.get("columns", {}))
+            table = config.get("table", "?")
+            desc_label.set_text(f"Creates table '{table}' with {cols} columns.")
+    
+        preset_combo.connect("changed", update_description)
+        update_description(preset_combo)
+    
+        # Buttons
+        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        button_box.set_halign(Gtk.Align.END)
+    
+        btn_cancel = Gtk.Button(label="Cancel")
+        btn_cancel.connect("clicked", lambda b: dialog.close())
+        button_box.append(btn_cancel)
+    
+        btn_generate = Gtk.Button(label="Generate")
+        btn_generate.add_css_class("suggested-action")
+    
+        def do_generate(b):
+            preset = preset_combo.get_active_text()
+            try:
+                count = int(count_entry.get_text())
+            except ValueError:
+                count = 100
+        
+            conn_string = ""
+            if self._db_connector and self._db_connector.is_connected:
+                try:
+                    conn_string = self._db_connector._get_conn_string()
+                except Exception:
+                    pass
+        
+            if not conn_string:
+                self._show_error("Data Generator", "No active database connection")
+                dialog.close()
+                return
+        
+            result = hook.execute_sync(conn_string, preset, count)
+            self._save_result("Synthetic Data Generator", result)
+            self._show_result("Synthetic Data Generator", result)
+            dialog.close()
+    
+        btn_generate.connect("clicked", do_generate)
+        button_box.append(btn_generate)
+    
+        main_box.append(button_box)
+        dialog.set_child(main_box)
         dialog.present()
