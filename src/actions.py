@@ -114,6 +114,10 @@ class ActionHandler:
         self._add_action("copy", self._on_copy, ["<Ctrl>C"])
         self._add_action("paste", self._on_paste, ["<Ctrl>V"])
         self._add_action("preferences", self._on_preferences)
+        self._add_action("find", self._on_find, ["<Ctrl>F"])
+        self._add_action("find_next", self._on_find_next, ["F3"])
+        self._add_action("find_prev", self._on_find_prev, ["<Shift>F3"])
+        self._add_action("replace", self._on_replace_dialog, ["<Ctrl>H"])
 
     def _on_undo(self, action, param):
         if self._window and hasattr(self._window, "editor"):
@@ -138,6 +142,23 @@ class ActionHandler:
     def _on_paste(self, action, param):
         if self._window and hasattr(self._window, "editor"):
             self._window.editor._view.emit("paste-clipboard")
+
+    def _on_find(self, action, param):
+        if self._window and hasattr(self._window, 'editor'):
+            self._window.editor._on_find()
+
+    def _on_find_next(self, action, param):
+        if self._window and hasattr(self._window, 'editor'):
+            self._window.editor._on_find_next()
+
+    def _on_find_prev(self, action, param):
+        if self._window and hasattr(self._window, 'editor'):
+            self._window.editor._on_find_prev()
+
+    def _on_replace_dialog(self, action, param):
+        if self._window and hasattr(self._window, 'editor'):
+            self._window.editor._on_find()
+            GLib.idle_add(self._window.editor._replace_entry.grab_focus)
 
     def _on_preferences(self, action, param):
         if self._window:

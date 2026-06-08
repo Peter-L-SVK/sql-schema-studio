@@ -48,6 +48,11 @@ def build_menubar():
     edit_menu.append("Copy", "app.copy")
     edit_menu.append("Paste", "app.paste")
     edit_menu.append_section(None, Gio.Menu())
+    edit_menu.append("Find...", "app.find")
+    edit_menu.append("Find Next", "app.find_next")
+    edit_menu.append("Find Previous", "app.find_prev")
+    edit_menu.append("Replace...", "app.replace")
+    edit_menu.append_section(None, Gio.Menu())
     edit_menu.append("Preferences", "app.preferences")
 
     # View
