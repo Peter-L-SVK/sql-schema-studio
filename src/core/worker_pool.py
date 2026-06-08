@@ -19,6 +19,35 @@ logger = get_logger(__name__)
 # Use N-1 cores so the UI stays responsive
 CPU_COUNT = max(1, multiprocessing.cpu_count() - 1)
 
+def _generate_chunk_worker(conn_string: str, table_name: str, col_names: list,
+                    preset: str, count: int) -> int:
+    """Generate a chunk of data in a separate process."""
+    import psycopg
+    from faker import Faker
+
+    preset_config = PRESETS[preset]
+    columns = preset_config["columns"]
+    params = preset_config["params"]
+    fake = Faker()
+
+    conn = psycopg.connect(conn_string)
+    conn.autocommit = True
+    cur = conn.cursor()
+
+    placeholders = ", ".join(["%s"] * len(col_names))
+    col_list = ", ".join(col_names)
+
+    for _ in range(count):
+        row = tuple(
+            getattr(fake, columns[col])(**params.get(col, {}))
+            for col in col_names
+        )
+        cur.execute(
+            f"INSERT INTO {table_name} ({col_list}) VALUES ({placeholders})", row
+        )
+
+    conn.close()
+    return count
 
 class WorkerPool:
     """Process pool for CPU-heavy tasks. Bypasses the GIL."""

@@ -468,6 +468,10 @@ class HookManagerDialog(Gtk.Window):
         drop_check = Gtk.CheckButton(label="Drop existing table first")
         drop_check.set_active(False)
         main_box.append(drop_check)
+
+        cpu_check = Gtk.CheckButton(label="Use multi-CPU (faster for >1000 rows)")
+        cpu_check.set_active(False)
+        main_box.append(cpu_check)
     
         # Preset description
         desc_label = Gtk.Label()
@@ -498,24 +502,26 @@ class HookManagerDialog(Gtk.Window):
     
         def do_generate(b):
             preset = preset_combo.get_active_text()
+            use_multi_cpu = cpu_check.get_active()
+            drop_existing = drop_check.get_active()
             try:
                 count = int(count_entry.get_text())
             except ValueError:
                 count = 100
-        
+
             conn_string = ""
             if self._db_connector and self._db_connector.is_connected:
                 try:
                     conn_string = self._db_connector._get_conn_string()
                 except Exception:
                     pass
-        
+
             if not conn_string:
                 self._show_error("Data Generator", "No active database connection")
                 dialog.close()
                 return
-        
-            result = hook.execute_sync(conn_string, preset, count)
+
+            result = hook.execute_sync(conn_string, preset, count, drop_existing, use_multi_cpu)
             self._save_result("Synthetic Data Generator", result)
             self._show_result("Synthetic Data Generator", result)
             dialog.close()

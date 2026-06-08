@@ -124,15 +124,10 @@ class Plugin(BaseHook):
         count = context.data.get("count", 100)
         return self.execute_sync(conn_string, preset, count)
 
-    def execute_sync(self, conn_string: str, preset: str = "Supermarket", count: int = 100, drop_existing: bool = False) -> dict:
-        
-        """Generate synthetic data synchronously.
-        
-        Args:
-            conn_string: PostgreSQL connection string
-            preset: One of 'Supermarket', 'Users', 'E-Commerce'
-            count: Number of rows to generate
-        """
+    def execute_sync(self, conn_string: str, preset: str = "Supermarket", 
+                     count: int = 100, drop_existing: bool = False,
+                     use_multi_cpu: bool = False) -> dict:
+        """Generate synthetic data synchronously."""
         import psycopg
         from faker import Faker
 
@@ -151,50 +146,93 @@ class Plugin(BaseHook):
             conn.autocommit = True
             cur = conn.cursor()
 
-            # Drop the previous
+            # Create table
             if drop_existing:
                 cur.execute(f"DROP TABLE IF EXISTS {table_name} CASCADE")
-                logger.info(f"Dropped existing table: {table_name}")
-            
-            # Create table
             cur.execute(f"CREATE TABLE IF NOT EXISTS {table_name} ({schema})")
 
-            # Generate rows
-            rows = []
-            for _ in range(count):
-                row = []
-                for col_name, faker_method in columns.items():
-                    col_params = params.get(col_name, {})
-                    value = getattr(fake, faker_method)(**col_params)
-                    row.append(value)
-                rows.append(tuple(row))
+            if use_multi_cpu and count > 1000:
+                 # Multi-CPU mode — split work across processes
+                from src.hooks.python_hooks.data_generator import _generate_chunk as worker
+                from src.core.worker_pool import get_pool
 
-            # Batch insert
-            col_names = list(columns.keys())
-            placeholders = ", ".join(["%s"] * len(col_names))
-            col_list = ", ".join(col_names)
+                pool = get_pool()
+                workers = pool._max_workers
+                chunk_size = count // workers
+                futures = []
+                for i in range(workers):
+                    start = i * chunk_size
+                    end = start + chunk_size if i < workers - 1 else count
+                    futures.append(
+                        pool.submit(worker, conn_string, table_name,
+                                    list(columns.keys()), preset, end - start)
+                    )
+    
+                total = sum(f.result() for f in futures)
+                conn.close()
+            else:
+                # Single-CPU mode
+                col_names = list(columns.keys())
+                placeholders = ", ".join(["%s"] * len(col_names))
+                col_list = ", ".join(col_names)
             
-            for row in rows:
-                cur.execute(
-                    f"INSERT INTO {table_name} ({col_list}) VALUES ({placeholders})", row
-                )
-
-            conn.close()
+                for _ in range(count):
+                    row = tuple(
+                        getattr(fake, columns[col])(**params.get(col, {}))
+                        for col in col_names
+                    )
+                    cur.execute(
+                        f"INSERT INTO {table_name} ({col_list}) VALUES ({placeholders})", row
+                    )
+                total = count
+                conn.close()
 
             return {
                 "status": "ok",
-                "message": f"Generated {count} rows in {table_name} table ({preset} preset)",
+                "message": f"Generated {total} rows in {table_name} table ({preset} preset)"
+                + (" [multi-CPU]" if use_multi_cpu else ""),
                 "tables_analyzed": 1,
                 "recommendations_count": 1,
                 "recommendations": [{
                     "table": f"public.{table_name}",
                     "priority": "INFO",
                     "action": f"Data generated ({preset})",
-                    "reason": f"Added {count} synthetic records for testing",
-                    "sql": f"-- {count} rows inserted into {table_name}",
+                    "reason": f"Added {total} synthetic records for testing",
+                    "sql": f"-- {total} rows inserted into {table_name}",
                 }],
             }
 
         except Exception as e:
             logger.error(f"Data generator failed: {e}")
             return {"status": "error", "message": str(e)}
+
+
+def _generate_chunk(conn_string: str, table_name: str, col_names: list,
+                    preset: str, count: int) -> int:
+    """Generate a chunk of data in a separate process."""
+    import psycopg
+    from faker import Faker
+
+    preset_config = PRESETS[preset]
+    columns = preset_config["columns"]
+    params = preset_config["params"]
+    fake = Faker()
+
+    conn = psycopg.connect(conn_string)
+    conn.autocommit = True
+    cur = conn.cursor()
+
+    placeholders = ", ".join(["%s"] * len(col_names))
+    col_list = ", ".join(col_names)
+
+    for _ in range(count):
+        row = tuple(
+            getattr(fake, columns[col])(**params.get(col, {}))
+            for col in col_names
+        )
+        cur.execute(
+            f"INSERT INTO {table_name} ({col_list}) VALUES ({placeholders})", row
+        )
+
+    conn.close()
+    return count
