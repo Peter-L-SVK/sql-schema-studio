@@ -24,6 +24,7 @@ from src.config import (
     SCHEMA_CANVAS_WIDTH,
     SCHEMA_CANVAS_HEIGHT,
     SCHEMA_COLORS,
+    SCHEMA_CANVAS_BG,
 )
 from src.utils.logging import get_logger
 from src.utils.gtk_helpers import set_margin
@@ -131,7 +132,12 @@ class SchemaDesigner(Gtk.Box):
             else:
                 button.set_label("←")
                 button.set_tooltip_text("FK direction: reverse (parent → child)")
-        
+
+        btn_reset_zoom = Gtk.Button(label="1:1")
+        btn_reset_zoom.set_tooltip_text("Reset zoom and pan")
+        btn_reset_zoom.connect("clicked", self._on_reset_zoom)
+        toolbar.append(btn_reset_zoom)
+
         # Separator
         sep = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
         toolbar.append(sep)
@@ -203,6 +209,26 @@ class SchemaDesigner(Gtk.Box):
         key_controller = Gtk.EventControllerKey()
         key_controller.connect("key-pressed", self._on_key_pressed)
         self.add_controller(key_controller)
+
+        # Zoom gesture (Ctrl+Scroll)
+        zoom_controller = Gtk.EventControllerScroll()
+        zoom_controller.set_flags(Gtk.EventControllerScrollFlags.VERTICAL)
+        zoom_controller.connect("scroll", self._on_scroll)
+        self._canvas.add_controller(zoom_controller)
+
+        # Pan gesture (Middle mouse button drag)
+        pan_gesture = Gtk.GestureDrag()
+        pan_gesture.set_button(2)  # Middle mouse button
+        pan_gesture.connect("drag-begin", self._on_pan_begin)
+        pan_gesture.connect("drag-update", self._on_pan_update)
+        self._canvas.add_controller(pan_gesture)
+
+        # Zoom level
+        self._zoom_level = 1.0
+        self._min_zoom = 0.3
+        self._max_zoom = 3.0
+        self._pan_offset_x = 0.0
+        self._pan_offset_y = 0.0
 
         # State
         self._tables: list[SchemaTable] = []
@@ -391,7 +417,10 @@ class SchemaDesigner(Gtk.Box):
         self._canvas.queue_draw()
 
     def _find_relationship_at(self, x, y):
-        """Find a relationship line near the click position."""
+        """Find the closest relationship line near the click position."""
+        closest_fk = None
+        closest_dist = float('inf')
+
         for fk in self._relationships:
             source_table = self._table_index.get(fk.from_table)
             target_table = self._table_index.get(fk.to_table)
@@ -406,12 +435,17 @@ class SchemaDesigner(Gtk.Box):
             x2 = target_table.x
             y2 = target_table.y + tgt_h / 2
 
-            # Simple distance check
+            # Distance from point to line
             dist = abs((y2 - y1) * x - (x2 - x1) * y + x2 * y1 - y2 * x1) / math.sqrt(
                 (y2 - y1) ** 2 + (x2 - x1) ** 2
             )
-            if dist < 175:  # Within 175 pixels
-                return fk
+        
+            if dist < closest_dist:
+                closest_dist = dist
+                closest_fk = fk
+    
+        if closest_fk and closest_dist < 15:  # Within 80 pixels
+            return closest_fk
         return None
 
     def _on_toggle_direction(self, button):
@@ -490,6 +524,41 @@ class SchemaDesigner(Gtk.Box):
             logger.info(f"Deleting selected table: {self._selected_table.name}")
             self._on_delete_table(None)
             return True
+        
+        # Ctrl+Plus = Zoom in
+        if keyval == Gdk.KEY_plus and (state & Gdk.ModifierType.CONTROL_MASK):
+            self._zoom_level = min(self._max_zoom, self._zoom_level + 0.1)
+            self._canvas.queue_draw()
+            return True
+
+        # Ctrl+Minus = Zoom out
+        if keyval == Gdk.KEY_minus and (state & Gdk.ModifierType.CONTROL_MASK):
+            self._zoom_level = max(self._min_zoom, self._zoom_level - 0.1)
+            self._canvas.queue_draw()
+            return True
+
+        # Ctrl+0 = Reset zoom
+        if keyval == Gdk.KEY_0 and (state & Gdk.ModifierType.CONTROL_MASK):
+            self._on_reset_zoom(None)
+            return True
+
+        # Arrow keys = Pan
+        if keyval == Gdk.KEY_Left:
+            self._pan_offset_x += 50
+            self._canvas.queue_draw()
+            return True
+        if keyval == Gdk.KEY_Right:
+            self._pan_offset_x -= 50
+            self._canvas.queue_draw()
+            return True
+        if keyval == Gdk.KEY_Up:
+            self._pan_offset_y += 50
+            self._canvas.queue_draw()
+            return True
+        if keyval == Gdk.KEY_Down:
+            self._pan_offset_y -= 50
+            self._canvas.queue_draw()
+            return True
         return False
 
     def _set_selected_color(self, color, color_name=None):
@@ -516,8 +585,14 @@ class SchemaDesigner(Gtk.Box):
         dialog.present()
 
     def _on_draw(self, area, cr, width, height):
-        """Draw the schema canvas."""
-        # Background and grid... (unchanged)
+        """Draw the schema canvas with zoom and pan."""
+        cr.save()
+        cr.translate(self._pan_offset_x, self._pan_offset_y)
+        cr.scale(self._zoom_level, self._zoom_level)
+    
+        # Use system theme background color
+        cr.set_source_rgb(*SCHEMA_CANVAS_BG)
+        cr.paint()
 
         # Draw relationships
         for fk in self._relationships:
@@ -542,6 +617,8 @@ class SchemaDesigner(Gtk.Box):
         # Tables
         for table in self._tables:
             self._draw_table(cr, table)
+
+        cr.restore()
 
     def _draw_relationship(self, cr, fk):
         """Draw a relationship line between two tables with column-level precision."""
@@ -879,6 +956,40 @@ class SchemaDesigner(Gtk.Box):
         self._update_canvas_size()
         self._canvas.queue_draw()
 
+    def _on_scroll(self, controller, dx, dy):
+        """Zoom canvas with Ctrl+Scroll."""
+        # Check if Ctrl is pressed
+        state = controller.get_current_event_state()
+        if state & Gdk.ModifierType.CONTROL_MASK:
+            zoom_step = 0.1
+            if dy > 0:
+                self._zoom_level = min(self._max_zoom, self._zoom_level + zoom_step)
+            else:
+                self._zoom_level = max(self._min_zoom, self._zoom_level - zoom_step)
+        
+            logger.debug(f"Zoom: {self._zoom_level:.1f}x")
+            self._canvas.queue_draw()
+            return True
+        return False
+
+    def _on_pan_begin(self, gesture, start_x, start_y):
+        """Begin panning with middle mouse button."""
+        self._pan_start_x = start_x
+        self._pan_start_y = start_y
+
+    def _on_pan_update(self, gesture, offset_x, offset_y):
+        """Pan canvas with middle mouse drag."""
+        self._pan_offset_x += offset_x
+        self._pan_offset_y += offset_y
+        gesture.set_state(Gtk.EventSequenceState.CLAIMED)
+        self._canvas.queue_draw()
+
+    def _on_reset_zoom(self, button):
+        """Reset zoom and pan to default."""
+        self._zoom_level = 1.0
+        self._pan_offset_x = 0.0
+        self._pan_offset_y = 0.0
+        self._canvas.queue_draw()
 
 class SchemaTable:
     """Represents a table on the designer canvas."""
@@ -951,4 +1062,4 @@ class TableColumn:
         parts = [f'"{self.name}"', dtype]
         if not self.nullable:
             parts.append("NOT NULL")
-        return " ".join(parts)
+        return " ".join(parts)    
