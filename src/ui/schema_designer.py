@@ -41,7 +41,8 @@ class ForeignKey:
             from_col_index=None,
             to_col_index=None,
             line_style="straight",
-            color=(0.2, 0.4, 0.6)): 
+            color=(0.2, 0.4, 0.6),
+            direction="forward"): 
    
         self.name = name
         self.from_table = from_table
@@ -52,6 +53,7 @@ class ForeignKey:
         self.to_col_index = to_col_index
         self.line_style = line_style
         self.color = color
+        self.direction = direction
 
 
 class SchemaDesigner(Gtk.Box):
@@ -109,6 +111,27 @@ class SchemaDesigner(Gtk.Box):
             toolbar.append(btn)
             self._color_buttons[color_name] = btn
 
+        # Separator
+        sep_dir = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
+        toolbar.append(sep_dir)
+
+        self._direction_forward = True
+        btn_dir = Gtk.Button(label="→")
+        btn_dir.set_tooltip_text("FK direction: forward (child → parent)")
+        btn_dir.connect("clicked", self._on_toggle_direction)
+        toolbar.append(btn_dir)
+        self._btn_direction = btn_dir
+
+        def _on_toggle_direction(self, button):
+            """Toggle FK direction."""
+            self._direction_forward = not self._direction_forward
+            if self._direction_forward:
+                button.set_label("→")
+                button.set_tooltip_text("FK direction: forward (child → parent)")
+            else:
+                button.set_label("←")
+                button.set_tooltip_text("FK direction: reverse (parent → child)")
+        
         # Separator
         sep = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
         toolbar.append(sep)
@@ -388,6 +411,16 @@ class SchemaDesigner(Gtk.Box):
                 return fk
         return None
 
+    def _on_toggle_direction(self, button):
+        """Toggle FK direction between forward and reverse."""
+        self._direction_forward = not self._direction_forward
+        if self._direction_forward:
+            button.set_label("→")
+            button.set_tooltip_text("FK direction: forward (child → parent)")
+        else:
+            button.set_label("←")
+            button.set_tooltip_text("FK direction: reverse (parent → child)")
+    
     def _on_right_click(self, gesture, n_press, x, y):
         """Right-click a table to start/complete a relationship."""
         button = gesture.get_current_button()
@@ -423,6 +456,7 @@ class SchemaDesigner(Gtk.Box):
                 return
 
             fk_name = f"fk_{table.name}_{source_table.name}"
+            direction = "forward" if self._direction_forward else "reverse"
             fk = ForeignKey(
                 name=fk_name,
                 from_table=source_table.name,
@@ -433,8 +467,12 @@ class SchemaDesigner(Gtk.Box):
                 to_col_index=table.columns.index(clicked_column),
                 color=source_table.color,
                 line_style=self._line_style,
+                direction=direction,
             )
             self._relationships.append(fk)
+            self._creating_relationship = None
+            self._canvas.queue_draw()
+
             logger.info(
                 f"Created FK: {source_table.name}.{source_col.name} -> {table.name}.{clicked_column.name}"
             )
@@ -542,6 +580,15 @@ class SchemaDesigner(Gtk.Box):
             x2 = target_table.x + tgt_w / 2
             y2 = target_table.y
 
+        # --- Bidirectional FK: swap ends if direction is "reverse" ---
+        arrow_x1, arrow_y1 = x1, y1  # Beginning of the arrow 
+        arrow_x2, arrow_y2 = x2, y2  # End of the arrow (target)
+    
+        if fk.direction == "reverse":
+            # Change — arrow comes from target do source
+            arrow_x1, arrow_y1 = x2, y2
+            arrow_x2, arrow_y2 = x1, y1
+
         # Draw line
         cr.set_source_rgb(*fk.color)
         cr.set_line_width(2)
@@ -562,35 +609,41 @@ class SchemaDesigner(Gtk.Box):
 
         cr.stroke()
 
-        # Draw arrowhead at target end
+        # Draw arrowhead — always at arrow_x2, arrow_y2
         arrow_size = 10
-        angle = math.atan2(y2 - y1, x2 - x1)
+        angle = math.atan2(arrow_y2 - arrow_y1, arrow_x2 - arrow_x1)
 
-        cr.move_to(x2, y2)
+        cr.move_to(arrow_x2, arrow_y2)
         cr.line_to(
-            x2 - arrow_size * math.cos(angle - 0.4),
-            y2 - arrow_size * math.sin(angle - 0.4),
+            arrow_x2 - arrow_size * math.cos(angle - 0.4),
+            arrow_y2 - arrow_size * math.sin(angle - 0.4),
         )
         cr.line_to(
-            x2 - arrow_size * math.cos(angle + 0.4),
-            y2 - arrow_size * math.sin(angle + 0.4),
+            arrow_x2 - arrow_size * math.cos(angle + 0.4),
+            arrow_y2 - arrow_size * math.sin(angle + 0.4),
         )
         cr.close_path()
         cr.set_source_rgb(0.2, 0.4, 0.6)
         cr.fill()
 
-        # Draw "1" at source end and "N" at target end
+        # Cardinality labels — depends on the direction
         cr.set_source_rgb(0.2, 0.4, 0.6)
         cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
         cr.set_font_size(10)
 
-        # Source: "1"
-        cr.move_to(x1 + 8, y1 - 8)
-        cr.show_text("1")
-
-        # Target: "N"
-        cr.move_to(x2 - 20, y2 - 8)
-        cr.show_text("N")
+        # Cardinality labels — use arrow coordinates so direction is correct
+        if fk.direction == "reverse":
+            # "N" at arrow start (target table), "1" at arrow end (source table)
+            cr.move_to(arrow_x1 - 20, arrow_y1 - 8)
+            cr.show_text("N")
+            cr.move_to(arrow_x2 + 8, arrow_y2 - 8)
+            cr.show_text("1")
+        else:
+            # "1" at arrow start (source table), "N" at arrow end (target table)
+            cr.move_to(arrow_x1 + 8, arrow_y1 - 8)
+            cr.show_text("1")
+            cr.move_to(arrow_x2 - 20, arrow_y2 - 8)
+            cr.show_text("N")
 
     def _draw_table(self, cr, table):
         """Draw a single table on the canvas."""
