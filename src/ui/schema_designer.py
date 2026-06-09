@@ -23,6 +23,7 @@ from src.config import (
     SCHEMA_TABLE_BODY_PADDING,
     SCHEMA_CANVAS_WIDTH,
     SCHEMA_CANVAS_HEIGHT,
+    SCHEMA_COLORS,
 )
 from src.utils.logging import get_logger
 from src.utils.gtk_helpers import set_margin
@@ -33,18 +34,15 @@ GType = GObject.GType
 
 class ForeignKey:
     """Represents a foreign key relationship between two tables."""
-
     def __init__(
-        self,
-        name,
-        from_table,
-        from_column,
-        to_table,
-        to_column,
-        from_col_index=None,
-        to_col_index=None,
-        line_style="straight",
-    ):
+            self, name,
+            from_table,
+            from_column, to_table, to_column,
+            from_col_index=None,
+            to_col_index=None,
+            line_style="straight",
+            color=(0.2, 0.4, 0.6)): 
+   
         self.name = name
         self.from_table = from_table
         self.to_table = to_table
@@ -53,6 +51,7 @@ class ForeignKey:
         self.from_col_index = from_col_index
         self.to_col_index = to_col_index
         self.line_style = line_style
+        self.color = color
 
 
 class SchemaDesigner(Gtk.Box):
@@ -67,7 +66,8 @@ class SchemaDesigner(Gtk.Box):
         self._table_index: dict[str, SchemaTable] = {}  # O(1) lookup
         self._selected_table: SchemaTable | None = None
         self._line_style = "straight"  # Default style
-
+        self._color_buttons = {}
+        self._selected_color = SCHEMA_COLORS["blue"] 
         # Toolbar
         toolbar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
         toolbar.add_css_class("toolbar")
@@ -84,6 +84,30 @@ class SchemaDesigner(Gtk.Box):
         btn_generate = Gtk.Button(label="Generate SQL")
         btn_generate.connect("clicked", self._on_generate_sql)
         toolbar.append(btn_generate)
+
+        sep_color = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
+        toolbar.append(sep_color)
+
+        for color_name, color_rgb in SCHEMA_COLORS.items():
+            btn = Gtk.Button()
+            btn.set_tooltip_text(f"Set table color: {color_name}")
+    
+            # Create color square as label
+            color_box = Gtk.DrawingArea()
+            color_box.set_size_request(16, 16)
+            color_box.set_draw_func(lambda area, cr, w, h, c=color_rgb: (
+                cr.set_source_rgb(*c),
+                cr.paint(),
+                cr.set_source_rgb(0.3, 0.3, 0.3),
+                cr.set_line_width(1),
+                cr.rectangle(0, 0, w, h),
+                cr.stroke()
+            ))
+            btn.set_child(color_box)
+    
+            btn.connect("clicked", lambda b, c=color_rgb, n=color_name: self._set_selected_color(c, n))
+            toolbar.append(btn)
+            self._color_buttons[color_name] = btn
 
         # Separator
         sep = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
@@ -407,6 +431,7 @@ class SchemaDesigner(Gtk.Box):
                 to_column=clicked_column.name,
                 from_col_index=source_table.columns.index(source_col),
                 to_col_index=table.columns.index(clicked_column),
+                color=source_table.color,
                 line_style=self._line_style,
             )
             self._relationships.append(fk)
@@ -425,6 +450,19 @@ class SchemaDesigner(Gtk.Box):
             self._on_delete_table(None)
             return True
         return False
+
+    def _set_selected_color(self, color, color_name=None):
+        """Apply color to selected table and highlight active color button."""
+        if self._selected_table:
+            self._selected_table.color = color
+            self._selected_color = color
+    
+        for btn in self._color_buttons.values():
+            btn.remove_css_class("suggested-action")
+        if color_name and color_name in self._color_buttons:
+            self._color_buttons[color_name].add_css_class("suggested-action")
+    
+        self._canvas.queue_draw()
 
     def _edit_table(self, table):
         """Open dialog to edit table columns."""
@@ -505,7 +543,7 @@ class SchemaDesigner(Gtk.Box):
             y2 = target_table.y
 
         # Draw line
-        cr.set_source_rgb(0.2, 0.4, 0.6)
+        cr.set_source_rgb(*fk.color)
         cr.set_line_width(2)
 
         if fk.line_style == "straight":
@@ -589,7 +627,7 @@ class SchemaDesigner(Gtk.Box):
         cr.fill()
 
         # Header background
-        cr.set_source_rgb(0.3, 0.5, 0.8)
+        cr.set_source_rgb(*table.color)
         cr.rectangle(table.x, table.y, total_width, header_height)
         cr.fill()
 
@@ -600,11 +638,11 @@ class SchemaDesigner(Gtk.Box):
         cr.stroke()
 
         # Body border
-        cr.set_source_rgb(0.5, 0.5, 0.5)
+        cr.set_source_rgb(table.color[0] * 0.5, table.color[1] * 0.5, table.color[2] * 0.5)
         cr.rectangle(table.x, table.y, total_width, total_height)
         cr.set_line_width(1)
         cr.stroke()
-
+        
         # Divider line
         cr.set_source_rgb(0.4, 0.5, 0.6)
         cr.move_to(table.x, table.y + header_height)
@@ -640,7 +678,7 @@ class SchemaDesigner(Gtk.Box):
 
         # Selection highlight
         if table == self._selected_table:
-            cr.set_source_rgb(0.3, 0.6, 1.0)
+            cr.set_source_rgb(*table.color)
             cr.set_line_width(2)
             cr.rectangle(table.x - 2, table.y - 2, total_width + 4, total_height + 4)
             cr.stroke()
@@ -789,7 +827,7 @@ class SchemaDesigner(Gtk.Box):
 class SchemaTable:
     """Represents a table on the designer canvas."""
 
-    def __init__(self, name: str, x: float = 50, y: float = 50):
+    def __init__(self, name: str, x: float = 50, y: float = 50, color=(0.3, 0.5, 0.8)):
         self.name = name
         self.x = x
         self.y = y
@@ -799,6 +837,7 @@ class SchemaTable:
         self._header_height = SCHEMA_TABLE_HEADER_HEIGHT
         self._row_height = SCHEMA_TABLE_ROW_HEIGHT
         self._body_padding = SCHEMA_TABLE_BODY_PADDING
+        self.color = color 
 
     def contains(self, px: float, py: float) -> bool:
         """Check if a point is inside this table."""

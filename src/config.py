@@ -71,6 +71,18 @@ SCHEMA_TABLE_BODY_PADDING: int = 4
 SCHEMA_CANVAS_WIDTH: int = 1200
 SCHEMA_CANVAS_HEIGHT: int = 800
 
+# Schema Designer colors
+SCHEMA_COLORS = {
+    "blue": (0.3, 0.5, 0.8),
+    "green": (0.3, 0.7, 0.4),
+    "orange": (0.9, 0.5, 0.2),
+    "red": (0.8, 0.3, 0.3),
+    "purple": (0.6, 0.4, 0.8),
+    "gray": (0.5, 0.5, 0.5),
+    "teal": (0.2, 0.7, 0.7),
+    "pink": (0.9, 0.4, 0.7),
+}
+
 # Hook manager
 HOOK_RESULT_DIALOG_WIDTH: int = 500
 HOOK_RESULT_DIALOG_HEIGHT: int = 400
