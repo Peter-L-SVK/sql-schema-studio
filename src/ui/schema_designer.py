@@ -378,11 +378,15 @@ class SchemaDesigner(Gtk.Box):
             self._selected_table = None
             # Check if click is on a relationship line
             fk = self._find_relationship_at(x, y)
-            if fk and n_press == 2:
-                self._relationships.remove(fk)
-                logger.info(
-                    f"Deleted FK: {fk.from_table}.{fk.from_column} -> {fk.to_table}.{fk.to_column}"
-                )
+            if fk:
+                if n_press == 2:
+                    # Double click = delete FK
+                    self._relationships.remove(fk)
+                    logger.info(f"Deleted FK: {fk.from_table}.{fk.from_column} -> {fk.to_table}.{fk.to_column}")
+                elif n_press == 1:
+                    # Single click = toggle FK direction
+                    fk.direction = "reverse" if fk.direction == "forward" else "forward"
+                    logger.info(f"Toggled FK direction to {fk.direction}: {fk.from_table}.{fk.from_column} -> {fk.to_table}.{fk.to_column}")
 
         self._canvas.queue_draw()
 
@@ -394,7 +398,6 @@ class SchemaDesigner(Gtk.Box):
             if not source_table or not target_table:
                 continue
 
-            # Check if click is near the line
             src_w, src_h = source_table.get_size()
             tgt_w, tgt_h = target_table.get_size()
 
@@ -407,7 +410,7 @@ class SchemaDesigner(Gtk.Box):
             dist = abs((y2 - y1) * x - (x2 - x1) * y + x2 * y1 - y2 * x1) / math.sqrt(
                 (y2 - y1) ** 2 + (x2 - x1) ** 2
             )
-            if dist < 15:  # Within 15 pixels
+            if dist < 175:  # Within 175 pixels
                 return fk
         return None
 
