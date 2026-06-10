@@ -12,7 +12,7 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Gdk", "4.0")
-from gi.repository import Gtk, Gdk, GObject
+from gi.repository import Gtk, Gdk, GObject, GLib
 import cairo
 import math
 
@@ -69,8 +69,13 @@ class SchemaDesigner(Gtk.Box):
         self._table_index: dict[str, SchemaTable] = {}  # O(1) lookup
         self._selected_table: SchemaTable | None = None
         self._line_style = "straight"  # Default style
-        self._color_buttons = {}
-        self._selected_color = SCHEMA_COLORS["blue"] 
+        # Single color button showing current table/selected color
+        self._selected_color = SCHEMA_COLORS["blue"]
+
+        # Custom colors storage
+        self._custom_colors: list[tuple] = []
+        self._max_custom_colors = 16
+        
         # Toolbar
         toolbar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
         toolbar.add_css_class("toolbar")
@@ -88,50 +93,23 @@ class SchemaDesigner(Gtk.Box):
         btn_generate.connect("clicked", self._on_generate_sql)
         toolbar.append(btn_generate)
 
-        sep_color = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
-        toolbar.append(sep_color)
-
-        for color_name, color_rgb in SCHEMA_COLORS.items():
-            btn = Gtk.Button()
-            btn.set_tooltip_text(f"Set table color: {color_name}")
-    
-            # Create color square as label
-            color_box = Gtk.DrawingArea()
-            color_box.set_size_request(16, 16)
-            color_box.set_draw_func(lambda area, cr, w, h, c=color_rgb: (
-                cr.set_source_rgb(*c),
-                cr.paint(),
-                cr.set_source_rgb(0.3, 0.3, 0.3),
-                cr.set_line_width(1),
-                cr.rectangle(0, 0, w, h),
-                cr.stroke()
-            ))
-            btn.set_child(color_box)
-    
-            btn.connect("clicked", lambda b, c=color_rgb, n=color_name: self._set_selected_color(c, n))
-            toolbar.append(btn)
-            self._color_buttons[color_name] = btn
-
         # Separator
         sep_dir = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
         toolbar.append(sep_dir)
 
+        # Color button — ToggleButton works, Button doesn't in this context
+        self._btn_color = Gtk.ToggleButton()
+        self._btn_color.set_tooltip_text("Table color")
+        self._btn_color.connect("toggled", self._on_color_button_toggled)
+        toolbar.append(self._btn_color)
+        self._update_color_button()
+        
         self._direction_forward = True
         btn_dir = Gtk.Button(label="→")
         btn_dir.set_tooltip_text("FK direction: forward (child → parent)")
         btn_dir.connect("clicked", self._on_toggle_direction)
         toolbar.append(btn_dir)
         self._btn_direction = btn_dir
-
-        def _on_toggle_direction(self, button):
-            """Toggle FK direction."""
-            self._direction_forward = not self._direction_forward
-            if self._direction_forward:
-                button.set_label("→")
-                button.set_tooltip_text("FK direction: forward (child → parent)")
-            else:
-                button.set_label("←")
-                button.set_tooltip_text("FK direction: reverse (parent → child)")
 
         btn_reset_zoom = Gtk.Button(label="1:1")
         btn_reset_zoom.set_tooltip_text("Reset zoom and pan")
@@ -298,7 +276,8 @@ class SchemaDesigner(Gtk.Box):
             self._creating_relationship = None
 
         # Remove the table
-        del self._table_index[table.name]
+        if table.name in self._table_index:
+            del self._table_index[table.name]
         self._tables.remove(table)
         self._selected_table = None
 
@@ -348,8 +327,6 @@ class SchemaDesigner(Gtk.Box):
         # The body starts right after the header
         body_start_y = table.y + header_height
 
-        # First column text is at body_start_y + line_height - 4 (from _draw_table)
-        # So column 0 occupies body_start_y to body_start_y + line_height
         col_index = int((y - body_start_y) / line_height)
 
         if 0 <= col_index < len(table.columns):
@@ -398,6 +375,7 @@ class SchemaDesigner(Gtk.Box):
 
         if table:
             self._selected_table = table
+            self._update_color_button()
             if n_press == 2:
                 self._edit_table(table)
         else:
@@ -444,7 +422,7 @@ class SchemaDesigner(Gtk.Box):
                 closest_dist = dist
                 closest_fk = fk
     
-        if closest_fk and closest_dist < 15:  # Within 80 pixels
+        if closest_fk and closest_dist < 80:
             return closest_fk
         return None
 
@@ -561,18 +539,140 @@ class SchemaDesigner(Gtk.Box):
             return True
         return False
 
-    def _set_selected_color(self, color, color_name=None):
-        """Apply color to selected table and highlight active color button."""
+    def _update_color_button(self):
+        """Update color button to show current table or default color."""
+        color = self._selected_table.color if self._selected_table else self._selected_color
+        color_box = Gtk.DrawingArea()
+        color_box.set_size_request(20, 20)
+        color_box.set_can_target(False) 
+        color_box.set_focusable(False)   
+    
+        def draw_color(area, cr, w, h, c=color):
+            cr.set_source_rgb(*c)
+            cr.paint()
+            cr.set_source_rgb(0.3, 0.3, 0.3)
+            cr.set_line_width(1)
+            cr.rectangle(0, 0, w, h)
+            cr.stroke()
+    
+        color_box.set_draw_func(draw_color)
+        self._btn_color.set_child(color_box)
+
+    def _on_color_button_toggled(self, button):
+        """Handle toggle — open popover."""
+        self._on_color_button_clicked(button)
+
+    def _on_color_button_clicked(self, button):
+        """Open popover menu with preset colors, custom colors, and color picker."""
+        popover = Gtk.Popover()
+        popover.set_has_arrow(False)
+        
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        set_margin(vbox, 8)
+    
+        # Preset colors section
+        vbox.append(Gtk.Label(label="Preset Colors", halign=Gtk.Align.START))
+        preset_box = Gtk.FlowBox()
+        preset_box.set_max_children_per_line(4)
+        preset_box.set_row_spacing(4)
+        preset_box.set_column_spacing(4)
+        
+        def make_swatch_callback(c):
+            return lambda b: (self._apply_color(c), popover.popdown())
+        
+        for color_name, color_rgb in SCHEMA_COLORS.items():
+            btn = Gtk.Button()
+            btn.set_tooltip_text(color_name)
+            swatch = Gtk.DrawingArea()
+            swatch.set_size_request(24, 24)
+            
+            def draw_swatch(area, cr, w, h, c=color_rgb):
+                cr.set_source_rgb(*c)
+                cr.paint()
+                cr.set_source_rgb(0.3, 0.3, 0.3)
+                cr.set_line_width(1)
+                cr.rectangle(0, 0, w, h)
+                cr.stroke()
+            
+            swatch.set_draw_func(draw_swatch)
+            btn.set_child(swatch)
+            btn.connect("clicked", make_swatch_callback(color_rgb))
+            preset_box.append(btn)
+        vbox.append(preset_box)
+    
+        # Custom colors section (if any)
+        if self._custom_colors:
+            vbox.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
+            vbox.append(Gtk.Label(label="Custom Colors", halign=Gtk.Align.START))
+            custom_box = Gtk.FlowBox()
+            custom_box.set_max_children_per_line(4)
+            custom_box.set_row_spacing(4)
+            custom_box.set_column_spacing(4)
+            
+            for rgb in self._custom_colors:
+                btn = Gtk.Button()
+                swatch = Gtk.DrawingArea()
+                swatch.set_size_request(24, 24)
+                
+                def draw_custom(area, cr, w, h, c=rgb):
+                    cr.set_source_rgb(*c)
+                    cr.paint()
+                    cr.set_source_rgb(0.3, 0.3, 0.3)
+                    cr.set_line_width(1)
+                    cr.rectangle(0, 0, w, h)
+                    cr.stroke()
+                
+                swatch.set_draw_func(draw_custom)
+                btn.set_child(swatch)
+                btn.connect("clicked", make_swatch_callback(rgb))
+                custom_box.append(btn)
+            vbox.append(custom_box)
+    
+        # Color picker button
+        vbox.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
+        btn_picker = Gtk.Button(label="Pick Custom Color...")
+        def on_picker_clicked(b):
+            popover.popdown()
+            self._on_pick_custom_color()
+        btn_picker.connect("clicked", on_picker_clicked)
+        vbox.append(btn_picker)
+    
+        popover.set_child(vbox)
+        popover.set_parent(button)
+        popover.popup()
+
+    def _apply_color(self, color):
+        """Apply color to selected table and update the color button."""
         if self._selected_table:
             self._selected_table.color = color
-            self._selected_color = color
-    
-        for btn in self._color_buttons.values():
-            btn.remove_css_class("suggested-action")
-        if color_name and color_name in self._color_buttons:
-            self._color_buttons[color_name].add_css_class("suggested-action")
-    
-        self._canvas.queue_draw()
+            self._update_color_button()
+            self._canvas.queue_draw()
+
+    def _on_pick_custom_color(self):
+        """Open GTK color dialog for custom color selection."""
+        if not self._selected_table:
+            return
+        
+        dialog = Gtk.ColorDialog()
+        dialog.set_title("Pick Custom Table Color")
+        dialog.set_modal(True)
+
+        def on_color_selected(dialog, result):
+            try:
+                color = dialog.choose_rgba_finish(result)
+                if color:
+                    rgb = (color.red, color.green, color.blue)
+                    # Save custom color
+                    if rgb not in self._custom_colors:
+                        GLib.idle_add(lambda: self._custom_colors.append(rgb))
+                        if len(self._custom_colors) > self._max_custom_colors:
+                            GLib.idle_add(lambda: self._custom_colors.pop(0))
+                    # Aplication of color on the table (back in main thread)
+                    GLib.idle_add(lambda: self._apply_color(rgb))
+            except Exception as e:
+                logger.error(f"Color picker failed: {e}")
+
+        dialog.choose_rgba(self._window, None, None, on_color_selected)
 
     def _edit_table(self, table):
         """Open dialog to edit table columns."""
@@ -991,6 +1091,7 @@ class SchemaDesigner(Gtk.Box):
         self._pan_offset_y = 0.0
         self._canvas.queue_draw()
 
+
 class SchemaTable:
     """Represents a table on the designer canvas."""
 
@@ -1062,4 +1163,4 @@ class TableColumn:
         parts = [f'"{self.name}"', dtype]
         if not self.nullable:
             parts.append("NOT NULL")
-        return " ".join(parts)    
+        return " ".join(parts)
