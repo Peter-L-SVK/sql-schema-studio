@@ -75,6 +75,10 @@ class SchemaDesigner(Gtk.Box):
         # Custom colors storage
         self._custom_colors: list[tuple] = []
         self._max_custom_colors = 16
+
+        self._undo_stack: list[dict] = []
+        self._redo_stack: list[dict] = []
+        self._max_history = 50
         
         # Toolbar
         toolbar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
@@ -115,6 +119,20 @@ class SchemaDesigner(Gtk.Box):
         btn_reset_zoom.set_tooltip_text("Reset zoom and pan")
         btn_reset_zoom.connect("clicked", self._on_reset_zoom)
         toolbar.append(btn_reset_zoom)
+
+        # Separator
+        sep_undo = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
+        toolbar.append(sep_undo)
+
+        btn_undo = Gtk.Button(label="↩")
+        btn_undo.set_tooltip_text("Undo (Ctrl+Z)")
+        btn_undo.connect("clicked", self._on_undo)
+        toolbar.append(btn_undo)
+
+        btn_redo = Gtk.Button(label="↪")
+        btn_redo.set_tooltip_text("Redo (Ctrl+Y)")
+        btn_redo.connect("clicked", self._on_redo)
+        toolbar.append(btn_redo)
 
         # Separator
         sep = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
@@ -231,6 +249,7 @@ class SchemaDesigner(Gtk.Box):
 
     def _on_add_table(self, button):
         """Add a new table to the canvas."""
+        self._save_state("add_table")
         count = len(self._tables) + 1
         table = SchemaTable(
             name=f"new_table_{count}",
@@ -260,6 +279,7 @@ class SchemaDesigner(Gtk.Box):
         self._canvas.set_content_height(max(SCHEMA_CANVAS_HEIGHT, int(max_y)))
 
     def _on_delete_table(self, button):
+        self._save_state("delete_table")
         """Delete the selected table and its relationships."""
         if self._selected_table is None:
             logger.warning("No table selected to delete")
@@ -347,6 +367,7 @@ class SchemaDesigner(Gtk.Box):
         """Start dragging a table."""
         table = self._find_table_at(start_x, start_y)
         if table:
+            self._save_state("drag_table")
             self._dragging = table
             self._drag_offset_x = table.x - start_x
             self._drag_offset_y = table.y - start_y
@@ -388,10 +409,12 @@ class SchemaDesigner(Gtk.Box):
             if fk:
                 if n_press == 2:
                     # Double click = delete FK
+                    self._save_state("delete_fk")
                     self._relationships.remove(fk)
                     logger.info(f"Deleted FK: {fk.from_table}.{fk.from_column} -> {fk.to_table}.{fk.to_column}")
                 elif n_press == 1:
                     # Single click = toggle FK direction
+                    self._save_state("toggle_fk_direction")
                     fk.direction = "reverse" if fk.direction == "forward" else "forward"
                     logger.info(f"Toggled FK direction to {fk.direction}: {fk.from_table}.{fk.from_column} -> {fk.to_table}.{fk.to_column}")
 
@@ -489,6 +512,7 @@ class SchemaDesigner(Gtk.Box):
                 line_style=self._line_style,
                 direction=direction,
             )
+            self._save_state("add_fk")
             self._relationships.append(fk)
             self._creating_relationship = None
             self._canvas.queue_draw()
@@ -540,6 +564,12 @@ class SchemaDesigner(Gtk.Box):
         if keyval == Gdk.KEY_Down:
             self._pan_offset_y -= 50
             self._canvas.queue_draw()
+            return True
+        if keyval == Gdk.KEY_z and (state & Gdk.ModifierType.CONTROL_MASK):
+            self._on_undo(None)
+            return True
+        if keyval == Gdk.KEY_y and (state & Gdk.ModifierType.CONTROL_MASK):
+            self._on_redo(None)
             return True
         return False
 
@@ -647,6 +677,7 @@ class SchemaDesigner(Gtk.Box):
 
     def _apply_color(self, color):
         """Apply color to selected table and update the color button."""
+        self._save_state("change_color")
         if self._selected_table:
             self._selected_table.color = color
             self._update_color_button()
@@ -1114,6 +1145,54 @@ class SchemaDesigner(Gtk.Box):
         self._zoom_level = 1.0
         self._pan_offset_x = 0.0
         self._pan_offset_y = 0.0
+        self._canvas.queue_draw()
+
+    def _save_state(self, action: str = ""):
+        """Save current state for undo."""
+        import copy
+        state = {
+            "action": action,
+            "tables": copy.deepcopy(self._tables),
+            "relationships": copy.deepcopy(self._relationships),
+        }
+        self._undo_stack.append(state)
+        if len(self._undo_stack) > self._max_history:
+            self._undo_stack.pop(0)
+        self._redo_stack.clear()
+
+    def _on_undo(self, button):
+        """Undo last action."""
+        if not self._undo_stack:
+            return
+        self._redo_stack.append(self._get_current_state())
+        state = self._undo_stack.pop()
+        self._restore_state(state)
+        logger.info(f"Undo: {state.get('action', 'unknown')}")
+
+    def _on_redo(self, button):
+        """Redo last undone action."""
+        if not self._redo_stack:
+            return
+        self._undo_stack.append(self._get_current_state())
+        state = self._redo_stack.pop()
+        self._restore_state(state)
+        logger.info(f"Redo: {state.get('action', 'unknown')}")
+
+    def _get_current_state(self):
+        """Get current tables and relationships as serializable dict."""
+        import copy
+        return {
+            "tables": copy.deepcopy(self._tables),
+            "relationships": copy.deepcopy(self._relationships),
+        }
+
+    def _restore_state(self, state):
+        """Restore tables and relationships from saved state."""
+        self._tables = state["tables"]
+        self._relationships = state["relationships"]
+        self._table_index = {t.name: t for t in self._tables}
+        self._selected_table = None
+        self._update_canvas_size()
         self._canvas.queue_draw()
 
 
