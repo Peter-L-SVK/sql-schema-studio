@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.8 - Schema Designer (GPLv3)
+# SQL Schema Studio 0.9 - Schema Designer (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -201,12 +201,15 @@ class SchemaDesigner(Gtk.Box):
         pan_gesture.connect("drag-update", self._on_pan_update)
         self._canvas.add_controller(pan_gesture)
 
-        # Zoom level
+        # Zoom level and pan offset
         self._zoom_level = 1.0
         self._min_zoom = 0.3
         self._max_zoom = 3.0
         self._pan_offset_x = 0.0
         self._pan_offset_y = 0.0
+        # Previous cumulative pan delta — used by _on_pan_update to compute frame delta
+        self._pan_prev_x = 0.0
+        self._pan_prev_y = 0.0
 
         # State
         self._tables: list[SchemaTable] = []
@@ -422,6 +425,8 @@ class SchemaDesigner(Gtk.Box):
                 closest_dist = dist
                 closest_fk = fk
     
+        # Return the closest FK line within 80px of the click point.
+        # 80px is intentionally generous — canvas is often zoomed or scaled.
         if closest_fk and closest_dist < 80:
             return closest_fk
         return None
@@ -491,7 +496,6 @@ class SchemaDesigner(Gtk.Box):
             logger.info(
                 f"Created FK: {source_table.name}.{source_col.name} -> {table.name}.{clicked_column.name}"
             )
-            self._creating_relationship = None
 
         self._canvas.queue_draw()
 
@@ -667,7 +671,7 @@ class SchemaDesigner(Gtk.Box):
                         GLib.idle_add(lambda: self._custom_colors.append(rgb))
                         if len(self._custom_colors) > self._max_custom_colors:
                             GLib.idle_add(lambda: self._custom_colors.pop(0))
-                    # Aplication of color on the table (back in main thread)
+                    # Apply color to the selected table (back on the main thread)
                     GLib.idle_add(lambda: self._apply_color(rgb))
             except Exception as e:
                 logger.error(f"Color picker failed: {e}")
@@ -780,9 +784,9 @@ class SchemaDesigner(Gtk.Box):
 
         cr.stroke()
 
-        # Arrowhead and labels based on direction
+        # Arrowhead and cardinality labels — inherit line color from FK
         arrow_size = 10
-        cr.set_source_rgb(0.2, 0.4, 0.6)
+        cr.set_source_rgb(*fk.color)
         cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
         cr.set_font_size(10)
 
@@ -1067,30 +1071,44 @@ class SchemaDesigner(Gtk.Box):
         self._canvas.queue_draw()
 
     def _on_scroll(self, controller, dx, dy):
-        """Zoom canvas with Ctrl+Scroll."""
-        # Check if Ctrl is pressed
+        """Zoom canvas with Ctrl+Scroll.
+
+        dy > 0 means scroll down (natural direction = zoom out).
+        dy < 0 means scroll up (zoom in).
+        """
         state = controller.get_current_event_state()
         if state & Gdk.ModifierType.CONTROL_MASK:
             zoom_step = 0.1
-            if dy > 0:
+            if dy < 0:
+                # Scroll up — zoom in
                 self._zoom_level = min(self._max_zoom, self._zoom_level + zoom_step)
             else:
+                # Scroll down — zoom out
                 self._zoom_level = max(self._min_zoom, self._zoom_level - zoom_step)
-        
+
             logger.debug(f"Zoom: {self._zoom_level:.1f}x")
             self._canvas.queue_draw()
             return True
         return False
 
     def _on_pan_begin(self, gesture, start_x, start_y):
-        """Begin panning with middle mouse button."""
-        self._pan_start_x = start_x
-        self._pan_start_y = start_y
+        """Begin panning with middle mouse button. Reset delta tracking."""
+        self._pan_prev_x = 0.0
+        self._pan_prev_y = 0.0
 
     def _on_pan_update(self, gesture, offset_x, offset_y):
-        """Pan canvas with middle mouse drag."""
-        self._pan_offset_x += offset_x
-        self._pan_offset_y += offset_y
+        """Pan canvas with middle mouse drag.
+
+        GestureDrag gives cumulative offset from drag-begin, not a per-frame
+        delta. Subtract the previous cumulative value to get the real delta,
+        then store the current value for the next frame.
+        """
+        delta_x = offset_x - self._pan_prev_x
+        delta_y = offset_y - self._pan_prev_y
+        self._pan_prev_x = offset_x
+        self._pan_prev_y = offset_y
+        self._pan_offset_x += delta_x
+        self._pan_offset_y += delta_y
         gesture.set_state(Gtk.EventSequenceState.CLAIMED)
         self._canvas.queue_draw()
 
