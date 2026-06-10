@@ -791,9 +791,9 @@ class SchemaDesigner(Gtk.Box):
         cr.set_font_size(10)
 
         if fk.direction == "forward":
-            # Arrow from source to target
+            # Arrow goes from_table (child/N) → to_table (parent/1)
             angle = math.atan2(y2 - y1, x2 - x1)
-            # Draw arrowhead at target
+            # Arrowhead at parent (to_table)
             cr.move_to(x2, y2)
             cr.line_to(
                 x2 - arrow_size * math.cos(angle - 0.4),
@@ -805,20 +805,18 @@ class SchemaDesigner(Gtk.Box):
             )
             cr.close_path()
             cr.fill()
-        
-            # Labels: "1" near source, "N" near target
-            # Offset based on direction to avoid overlapping the line
-            offset_x = 8 if x1 < x2 else -8
-            offset_y = -8
-            cr.move_to(x1 + offset_x, y1 + offset_y)
-            cr.show_text("1")
-            cr.move_to(x2 - 25, y2 - 8)
+
+            # "N" near from_table (child — holds the FK column)
+            # "1" near to_table (parent — is referenced)
+            cr.move_to(x1 + 8, y1 - 8)
             cr.show_text("N")
-        
-        else:  # reverse
-            # Arrow from target to source
+            cr.move_to(x2 - 20, y2 - 8)
+            cr.show_text("1")
+
+        else:  # reverse — arrow visually flipped, but semantics unchanged
+            # Arrow drawn from to_table (parent) → from_table (child)
             angle = math.atan2(y1 - y2, x1 - x2)
-            # Draw arrowhead at source
+            # Arrowhead at child (from_table)
             cr.move_to(x1, y1)
             cr.line_to(
                 x1 - arrow_size * math.cos(angle - 0.4),
@@ -830,13 +828,12 @@ class SchemaDesigner(Gtk.Box):
             )
             cr.close_path()
             cr.fill()
-        
-            # Labels: "1" near target, "N" near source
-            offset_x = 15 if x2 < x1 else -15
-            offset_y = -8
-            cr.move_to(x2 + offset_x, y2 + offset_y)
+
+            # "1" near to_table (parent), "N" near from_table (child)
+            # Semantics are the same as forward — only the arrow tip moved
+            cr.move_to(x2 - 20, y2 - 8)
             cr.show_text("1")
-            cr.move_to(x1 + 15 , y1 - 12)
+            cr.move_to(x1 + 8, y1 - 8)
             cr.show_text("N")
         
     def _draw_table(self, cr, table):
