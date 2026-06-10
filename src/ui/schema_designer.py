@@ -740,7 +740,7 @@ class SchemaDesigner(Gtk.Box):
                 + fk.from_col_index * source_table._row_height
                 + source_table._row_height / 2
             )
-            x1 = source_table.x + src_w  # Right edge of source table
+            x1 = source_table.x + src_w
             y1 = col_y
         else:
             x1 = source_table.x + src_w / 2
@@ -754,20 +754,11 @@ class SchemaDesigner(Gtk.Box):
                 + fk.to_col_index * target_table._row_height
                 + target_table._row_height / 2
             )
-            x2 = target_table.x  # Left edge of target table
+            x2 = target_table.x
             y2 = col_y
         else:
             x2 = target_table.x + tgt_w / 2
             y2 = target_table.y
-
-        # --- Bidirectional FK: swap ends if direction is "reverse" ---
-        arrow_x1, arrow_y1 = x1, y1  # Beginning of the arrow 
-        arrow_x2, arrow_y2 = x2, y2  # End of the arrow (target)
-    
-        if fk.direction == "reverse":
-            # Change — arrow comes from target do source
-            arrow_x1, arrow_y1 = x2, y2
-            arrow_x2, arrow_y2 = x1, y1
 
         # Draw line
         cr.set_source_rgb(*fk.color)
@@ -789,42 +780,61 @@ class SchemaDesigner(Gtk.Box):
 
         cr.stroke()
 
-        # Draw arrowhead — always at arrow_x2, arrow_y2
+        # Arrowhead and labels based on direction
         arrow_size = 10
-        angle = math.atan2(arrow_y2 - arrow_y1, arrow_x2 - arrow_x1)
-
-        cr.move_to(arrow_x2, arrow_y2)
-        cr.line_to(
-            arrow_x2 - arrow_size * math.cos(angle - 0.4),
-            arrow_y2 - arrow_size * math.sin(angle - 0.4),
-        )
-        cr.line_to(
-            arrow_x2 - arrow_size * math.cos(angle + 0.4),
-            arrow_y2 - arrow_size * math.sin(angle + 0.4),
-        )
-        cr.close_path()
-        cr.set_source_rgb(0.2, 0.4, 0.6)
-        cr.fill()
-
-        # Cardinality labels — depends on the direction
         cr.set_source_rgb(0.2, 0.4, 0.6)
         cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
         cr.set_font_size(10)
 
-        # Cardinality labels — use arrow coordinates so direction is correct
-        if fk.direction == "reverse":
-            # "N" at arrow start (target table), "1" at arrow end (source table)
-            cr.move_to(arrow_x1 - 20, arrow_y1 - 8)
-            cr.show_text("N")
-            cr.move_to(arrow_x2 + 8, arrow_y2 - 8)
+        if fk.direction == "forward":
+            # Arrow from source to target
+            angle = math.atan2(y2 - y1, x2 - x1)
+            # Draw arrowhead at target
+            cr.move_to(x2, y2)
+            cr.line_to(
+                x2 - arrow_size * math.cos(angle - 0.4),
+                y2 - arrow_size * math.sin(angle - 0.4),
+            )
+            cr.line_to(
+                x2 - arrow_size * math.cos(angle + 0.4),
+                y2 - arrow_size * math.sin(angle + 0.4),
+            )
+            cr.close_path()
+            cr.fill()
+        
+            # Labels: "1" near source, "N" near target
+            # Offset based on direction to avoid overlapping the line
+            offset_x = 8 if x1 < x2 else -8
+            offset_y = -8
+            cr.move_to(x1 + offset_x, y1 + offset_y)
             cr.show_text("1")
-        else:
-            # "1" at arrow start (source table), "N" at arrow end (target table)
-            cr.move_to(arrow_x1 + 8, arrow_y1 - 8)
-            cr.show_text("1")
-            cr.move_to(arrow_x2 - 20, arrow_y2 - 8)
+            cr.move_to(x2 - 25, y2 - 8)
             cr.show_text("N")
-
+        
+        else:  # reverse
+            # Arrow from target to source
+            angle = math.atan2(y1 - y2, x1 - x2)
+            # Draw arrowhead at source
+            cr.move_to(x1, y1)
+            cr.line_to(
+                x1 - arrow_size * math.cos(angle - 0.4),
+                y1 - arrow_size * math.sin(angle - 0.4),
+            )
+            cr.line_to(
+                x1 - arrow_size * math.cos(angle + 0.4),
+                y1 - arrow_size * math.sin(angle + 0.4),
+            )
+            cr.close_path()
+            cr.fill()
+        
+            # Labels: "1" near target, "N" near source
+            offset_x = 15 if x2 < x1 else -15
+            offset_y = -8
+            cr.move_to(x2 + offset_x, y2 + offset_y)
+            cr.show_text("1")
+            cr.move_to(x1 + 15 , y1 - 12)
+            cr.show_text("N")
+        
     def _draw_table(self, cr, table):
         """Draw a single table on the canvas."""
         # Calculate dimensions
