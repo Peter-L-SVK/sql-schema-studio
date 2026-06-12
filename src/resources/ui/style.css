@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------
- * SQL Schema Studio 0.8 - GTK4 CSS Styling (GPLv3)
+ * SQL Schema Studio 0.9 - GTK4 CSS Styling (GPLv3)
  * Copyright (C) 2026 Peter Leukanič
  * License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
  * This is free software with NO WARRANTY.
@@ -283,4 +283,127 @@ windowcontrols button image:not(:hover) {
 .window-frame {
     box-shadow: 0 0 0 black;
     border-style: none;
+}
+
+/* =====================================================================
+ * Tab Bar & Notebook Styling
+ * ===================================================================== */
+
+/* Tab bar container */
+.tab-bar-container {
+    background-color: alpha(currentColor, 0.05);
+    border-bottom: 1px solid alpha(currentColor, 0.1);
+}
+
+/* Notebook header area */
+notebook header {
+    padding: 0;
+    margin: 0;
+    min-height: 32px;
+    background: transparent;
+    border: none;
+}
+
+/* Individual tabs */
+notebook tab {
+    padding: 4px 10px;
+    margin: 2px 0;
+    min-height: 24px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    background: transparent;
+    transition: background-color 150ms ease;
+}
+
+notebook tab:checked {
+    background-color: alpha(currentColor, 0.08);
+    border-color: alpha(currentColor, 0.12);
+}
+
+notebook tab:hover:not(:checked) {
+    background-color: alpha(currentColor, 0.04);
+}
+
+/* Tab label */
+notebook tab label {
+    padding: 0 4px;
+    font-size: 0.9em;
+    color: @theme_fg_color;
+}
+
+/* Tab close button */
+notebook tab button {
+    padding: 0;
+    margin: 0 0 0 4px;
+    min-width: 16px;
+    min-height: 16px;
+    border-radius: 3px;
+    background: transparent;
+    border: none;
+}
+
+notebook tab button:hover {
+    background-color: alpha(@destructive_bg_color, 0.7);
+}
+
+notebook tab button:hover image {
+    color: @destructive_fg_color;
+}
+
+/* New tab button (+ in the header) */
+.new-tab-button {
+    padding: 4px 8px;
+    margin: 2px 4px;
+    min-height: 24px;
+    min-width: 28px;
+    border-radius: 4px;
+    color: alpha(currentColor, 0.6);
+    border: none;
+    background: none;
+}
+
+.new-tab-button:hover {
+    background-color: alpha(currentColor, 0.1);
+    color: currentColor;
+}
+
+/* Action widget area (where + button lives) */
+notebook > header > box {
+    background: transparent;
+    padding: 0;
+    margin: 0;
+}
+
+/* Stack switcher (if used instead of notebook) */
+stackswitcher button {
+    padding: 4px 12px;
+    margin: 2px 0;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    background: transparent;
+    font-size: 0.9em;
+}
+
+stackswitcher button:checked {
+    background-color: alpha(currentColor, 0.08);
+    border-color: alpha(currentColor, 0.12);
+}
+
+stackswitcher button:hover:not(:checked) {
+    background-color: alpha(currentColor, 0.04);
+}
+
+/* Search button overlay on editor */
+.editor-search-button {
+    padding: 4px;
+    min-width: 28px;
+    min-height: 28px;
+    border-radius: 4px;
+    color: alpha(currentColor, 0.4);
+    background: alpha(currentColor, 0.06);
+}
+
+.editor-search-button:hover {
+    color: alpha(currentColor, 0.8);
+    background: alpha(currentColor, 0.12);
 }

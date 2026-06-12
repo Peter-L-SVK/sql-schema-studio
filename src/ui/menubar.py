@@ -22,6 +22,8 @@ def build_menubar():
     # File
     file_menu = Gio.Menu()
     file_menu.append("New Connection...", "app.new_connection")
+    file_menu.append("New Tab", "app.new_tab")
+    file_menu.append("Close Tab", "app.close_tab")
     file_menu.append("Open SQL File...", "app.open_schema")
     file_menu.append("Save File", "app.save_schema")
     file_menu.append("Save SQL As...", "app.save_schema_as")

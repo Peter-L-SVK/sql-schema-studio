@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.8 - Toolbar (GPLv3)
+# SQL Schema Studio 0.9 - Toolbar (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -80,6 +80,14 @@ class Toolbar(Gtk.Box):
         spacer = Gtk.Box()
         spacer.set_hexpand(True)
         self.append(spacer)
+
+        # Search button
+        btn_search = Gtk.Button.new_from_icon_name("system-search-symbolic")
+        btn_search.set_has_frame(False)
+        btn_search.set_tooltip_text("Find & Replace (Ctrl+F)")
+        btn_search.add_css_class("flat")
+        btn_search.connect("clicked", lambda b: window.editor._on_find())
+        self.append(btn_search)
 
         # Connection status
         self._status_label = Gtk.Label(label="● Disconnected")

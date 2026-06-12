@@ -175,18 +175,26 @@ class PreferencesDialog(Gtk.Window):
 
         self._settings.save()
 
-        # Apply to live editor
+        # Apply to live editor (all tabs)
         if self._editor:
-            view = self._editor._view
-            view.set_tab_width(int(self._tab_spin.get_value()))
-            view.set_insert_spaces_instead_of_tabs(self._spaces_check.get_active())
-            view.set_show_line_numbers(self._line_numbers_check.get_active())
-            view.set_highlight_current_line(self._highlight_line_check.get_active())
-            if font_desc:
+            # Apply to all
+            font_family = font_desc.get_family() if font_desc else "Monospace"
+            font_size = (font_desc.get_size() // Pango.SCALE) if font_desc else 12
+        
+            for tab in self._editor._tabs:  # Prejdi všetky záložky
+                view = tab._view
+                buffer = view.get_buffer()
+            
+                view.set_tab_width(int(self._tab_spin.get_value()))
+                view.set_insert_spaces_instead_of_tabs(self._spaces_check.get_active())
+                view.set_show_line_numbers(self._line_numbers_check.get_active())
+                view.set_highlight_current_line(self._highlight_line_check.get_active())
+            
+                # Aplikuj font cez CSS
                 css = f"""
                 textview {{
-                font-family: {font_desc.get_family()};
-                font-size: {font_desc.get_size() / Pango.SCALE}pt;
+                    font-family: {font_family};
+                    font-size: {font_size}pt;
                 }}
                 """
                 provider = Gtk.CssProvider()
@@ -194,13 +202,14 @@ class PreferencesDialog(Gtk.Window):
                 view.get_style_context().add_provider(
                     provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
                 )
-
-            if scheme_id:
-                manager = GtkSource.StyleSchemeManager.get_default()
-                scheme = manager.get_scheme(scheme_id)
-                if scheme:
-                    view.get_buffer().set_style_scheme(scheme)
-
-            logger.info("Preferences applied to editor")
+            
+                # Aplikuj farebnú schému
+                if scheme_id:
+                    manager = GtkSource.StyleSchemeManager.get_default()
+                    scheme = manager.get_scheme(scheme_id)
+                    if scheme:
+                        buffer.set_style_scheme(scheme)
+        
+            logger.info(f"Preferences applied to {len(self._editor._tabs)} editor tabs")
 
         self.close()

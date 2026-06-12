@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.8 - Main Application Window (GPLv3)
+# SQL Schema Studio 0.9 - Main Application Window (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -26,7 +26,7 @@ from src.config import DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, REFRESH_TRIG
 from src.core.query_history import QueryHistory
 from src.ui.menubar import build_menubar
 from src.ui.toolbar import Toolbar
-from src.ui.editor import SQLEditor
+from src.ui.editor_tabs import EditorTabs
 from src.ui.results import ResultsPanel
 from src.ui.browser import DatabaseBrowser
 from src.ui.statusbar import StatusBar
@@ -50,7 +50,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self.menubar = build_menubar()
         self.toolbar = Toolbar(self)
         self.browser = DatabaseBrowser(self)
-        self.editor = SQLEditor(self)
+        self.editor = EditorTabs(self)
         self.results = ResultsPanel()
         self.statusbar = StatusBar()
         self._query_history = QueryHistory()
@@ -191,7 +191,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self.browser.clear()
 
     def _on_run_clicked(self):
-        query = self.editor.get_selected_text()
+        query = self.editor.get_text()
         if not query.strip():
             return
         logger.info(f"Executing query ({len(query)} chars)")
@@ -235,7 +235,7 @@ class MainWindow(Gtk.ApplicationWindow):
             else:
                 columns = list(result[0].keys())
                 rows = [list(r.values()) for r in result]
-                self._last_result = (columns, rows)  # Ulož pre export
+                self._last_result = (columns, rows)  # Save for export
                 self.results.show_query_result(columns, rows, elapsed)
                 self.statusbar.set_query_stats(len(rows), elapsed)
                 self._query_history.add(
@@ -259,9 +259,7 @@ class MainWindow(Gtk.ApplicationWindow):
     def _on_designer_clicked(self):
         """Open schema designer in the main content area."""
         logger.info("Opening schema designer")
-        # For now, show in results panel — later make it a tab
         self._designer = SchemaDesigner(self)
-        # Replace results panel temporarily, or make a dialog
         dialog = Gtk.Window(transient_for=self, modal=False, title="Schema Designer")
         dialog.set_default_size(800, 600)
         dialog.set_child(self._designer)
@@ -493,7 +491,6 @@ class MainWindow(Gtk.ApplicationWindow):
             if not columns or not rows:
                 return
 
-            # Show preview dialog
             self._show_import_preview(path, columns, rows, format_type)
 
         except Exception as e:
@@ -516,7 +513,6 @@ class MainWindow(Gtk.ApplicationWindow):
         main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         set_margin(main_box, 12)
 
-        # Info
         info = Gtk.Label(
             label=f"File: {os.path.basename(path)}\n"
             f"Columns: {len(columns)}\n"
@@ -526,7 +522,6 @@ class MainWindow(Gtk.ApplicationWindow):
         info.set_halign(Gtk.Align.START)
         main_box.append(info)
 
-        # Table name
         name_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         name_box.append(Gtk.Label(label="Table name:"))
         name_entry = Gtk.Entry()
@@ -535,7 +530,6 @@ class MainWindow(Gtk.ApplicationWindow):
         name_box.append(name_entry)
         main_box.append(name_box)
 
-        # Preview columns
         preview_label = Gtk.Label(label="Columns detected:", halign=Gtk.Align.START)
         main_box.append(preview_label)
 
@@ -550,7 +544,6 @@ class MainWindow(Gtk.ApplicationWindow):
         scroll.set_child(preview_text)
         main_box.append(scroll)
 
-        # Buttons
         button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         button_box.set_halign(Gtk.Align.END)
 
@@ -578,12 +571,10 @@ class MainWindow(Gtk.ApplicationWindow):
     def _execute_import(self, table_name, columns, rows):
         """Create table and insert data."""
         try:
-            # Create table
             col_defs = [f'"{c}" TEXT' for c in columns]
             create_sql = f'CREATE TABLE IF NOT EXISTS "{table_name}" ({", ".join(col_defs)})'
             self.db_connector.execute_sync(create_sql)
 
-            # Insert data in batches
             placeholders = ", ".join(["%s"] * len(columns))
             insert_sql = f'INSERT INTO "{table_name}" ({", ".join(f"\"{c}\"" for c in columns)}) VALUES ({placeholders})'
 
@@ -599,3 +590,13 @@ class MainWindow(Gtk.ApplicationWindow):
 
         except Exception as e:
             logger.error(f"Import execution failed: {e}")
+
+    def _on_new_tab(self):
+        """Create a new editor tab."""
+        self.editor.add_tab()
+
+    def _on_close_tab(self):
+        """Close the active editor tab."""
+        tab = self.editor.get_active_tab()
+        if tab:
+            self.editor.close_tab(tab)
