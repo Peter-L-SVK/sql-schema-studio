@@ -89,6 +89,13 @@ class DrawingMixin:
             x2, y2 = path[i + 1]
             segment_angle = math.atan2(y2 - y1, x2 - x1)
 
+            # First segment (i=0) connects source table to path — styled.
+            # Last segment (i=len-2) connects path to target table — styled.
+            # All middle segments are obstacle-avoidance detours — always straight.
+            # Applying curve/ortho to already-bent detour segments produces
+            # the "crazy line" artefact.
+            is_detour = (0 < i < len(path) - 2)
+
             seg_intersections = []
             for ix, iy, other_fk in intersections:
                 if self._point_on_segment(x1, y1, x2, y2, ix, iy):
@@ -98,20 +105,20 @@ class DrawingMixin:
             seg_intersections.sort(key=lambda item: item[0])
 
             if not seg_intersections:
-                self._draw_segment_styled(cr, x1, y1, x2, y2, fk.line_style)
+                self._draw_segment_styled(cr, x1, y1, x2, y2, fk.line_style, is_detour)
             else:
                 prev_x, prev_y = x1, y1
                 for _, ix, iy in seg_intersections:
                     pre_x = ix - 7 * math.cos(segment_angle)
                     pre_y = iy - 7 * math.sin(segment_angle)
 
-                    self._draw_segment_styled(cr, prev_x, prev_y, pre_x, pre_y, fk.line_style)
+                    self._draw_segment_styled(cr, prev_x, prev_y, pre_x, pre_y, fk.line_style, is_detour)
                     self._draw_line_jump(cr, ix, iy, segment_angle, fk.color)
 
                     prev_x = ix + 7 * math.cos(segment_angle)
                     prev_y = iy + 7 * math.sin(segment_angle)
 
-                self._draw_segment_styled(cr, prev_x, prev_y, x2, y2, fk.line_style)
+                self._draw_segment_styled(cr, prev_x, prev_y, x2, y2, fk.line_style, is_detour)
 
         if len(path) >= 2:
             self._draw_arrowhead_on_path(cr, fk)
@@ -124,21 +131,40 @@ class DrawingMixin:
             cr.arc(wx, wy, 2.5, 0, 2 * math.pi)
             cr.fill()
 
-    def _draw_segment_styled(self, cr, x1, y1, x2, y2, line_style):
-        """Draw a single path segment using the FK line style."""
-        seg_length = math.hypot(x2 - x1, y2 - y1)
+    def _draw_segment_styled(self, cr, x1, y1, x2, y2, line_style, is_detour=False):
+        """Draw a single path segment using the FK line style.
 
+        is_detour=True forces straight rendering regardless of line_style.
+        Detour segments are already orthogonally routed by the path worker —
+        applying curve/ortho on top doubles the bends and produces artefacts.
+
+        Styles are only applied to the first and last segment of a path,
+        which are the actual connection segments between tables.
+ 
+        Styles:
+          straight — direct line_to (always used for detour segments).
+          curve    — horizontal S-curve via cubic Bezier; control points
+                     extend along X so the curve stays horizontal even
+                     when source and target share a similar X position.
+          ortho    — two right-angle turns: horizontal → vertical → horizontal.
+        """
+        seg_length = math.hypot(x2 - x1, y2 - y1)
         cr.set_line_width(2.0)
         cr.move_to(x1, y1)
 
-        if line_style == "curve" and seg_length > 20:
+        if is_detour or seg_length <= 20:
+            cr.line_to(x2, y2)
+
+        elif line_style == "curve":
             ctrl = max(abs(x2 - x1) * 0.5, 40)
             cr.curve_to(x1 + ctrl, y1, x2 - ctrl, y2, x2, y2)
-        elif line_style == "ortho" and seg_length > 20:
+
+        elif line_style == "ortho":
             mid_x = (x1 + x2) / 2
             cr.line_to(mid_x, y1)
             cr.line_to(mid_x, y2)
             cr.line_to(x2, y2)
+
         else:
             cr.line_to(x2, y2)
 
@@ -209,20 +235,57 @@ class DrawingMixin:
     # Arrowheads
     # =====================================================================
 
+    def _visual_approach_angle(self, fk, at_end=True):
+        """Compute the visual approach angle at the arrowhead endpoint.
+
+        For curve and ortho styles, _draw_segment_styled changes the drawn
+        direction at the endpoint vs the geometric angle between the last two
+        path points:
+
+        - curve: cubic Bezier tangent at path[-1] is horizontal
+          (last control point is (x2-ctrl, y2) → direction to (x2,y2) is 0°)
+        - ortho: last drawn sub-segment goes horizontally into x2
+          (mid_x → x2 direction is 0° or 180°)
+        - straight/detour: geometric angle is correct
+
+        at_end=True  → arrowhead at path[-1] (forward direction)
+        at_end=False → arrowhead at path[0]  (reverse direction)
+        """
+        path = fk._cached_path
+        if at_end:
+            x1, y1 = path[-2]
+            x2, y2 = path[-1]
+        else:
+            x1, y1 = path[1]
+            x2, y2 = path[0]
+
+        if fk.line_style == "curve":
+            # Bezier tangent at endpoint is always horizontal
+            return 0.0 if x2 >= x1 else math.pi
+
+        elif fk.line_style == "ortho":
+            # Last ortho sub-segment: horizontal from mid_x to x2
+            mid_x = (x1 + x2) / 2
+            return 0.0 if x2 >= mid_x else math.pi
+
+        else:
+            # straight or detour — geometric angle is the visual angle
+            return math.atan2(y2 - y1, x2 - x1)
+
     def _draw_arrowhead_on_path(self, cr, fk):
-        """Draw arrowhead on the last segment and labels near the tables."""
+        """Draw arrowhead at the correct visual end of the routed path.
+
+        Uses _visual_approach_angle so the arrowhead aligns with the drawn
+        line even when curve or ortho styling changes the visual direction.
+        """
         if len(fk._cached_path) < 2:
             return
 
         source_table = self._table_index.get(fk.from_table)
         target_table = self._table_index.get(fk.to_table)
-    
+
         if not source_table or not target_table:
             return
-    
-        # Arrowhead on last segment
-        x1, y1 = fk._cached_path[-2]
-        x2, y2 = fk._cached_path[-1]
 
         arrow_size = 10
         cr.set_source_rgb(*fk.color)
@@ -230,7 +293,9 @@ class DrawingMixin:
         cr.set_font_size(10)
 
         if fk.direction == "forward":
-            angle = math.atan2(y2 - y1, x2 - x1)
+            # Arrowhead at the END of the path (target table side)
+            x2, y2 = fk._cached_path[-1]
+            angle = self._visual_approach_angle(fk, at_end=True)
             cr.move_to(x2, y2)
             cr.line_to(
                 x2 - arrow_size * math.cos(angle - 0.4),
@@ -243,7 +308,9 @@ class DrawingMixin:
             cr.close_path()
             cr.fill()
         else:
-            angle = math.atan2(y1 - y2, x1 - x2)
+            # Arrowhead at the START of the path (source table side, reversed)
+            x1, y1 = fk._cached_path[0]
+            angle = self._visual_approach_angle(fk, at_end=False)
             cr.move_to(x1, y1)
             cr.line_to(
                 x1 - arrow_size * math.cos(angle - 0.4),
@@ -256,7 +323,8 @@ class DrawingMixin:
             cr.close_path()
             cr.fill()
 
-        # Labels — always near the tables
+        # Labels — anchored to table edges, not to path points,
+        # so they stay readable regardless of routing complexity.
         src_w, src_h = source_table.get_size()
         tgt_w, tgt_h = target_table.get_size()
 
