@@ -45,7 +45,6 @@ class WorkerBridgeMixin:
     def _schedule_path_computation(self):
         """Offload path computation for all dirty FKs to the worker pool."""
         self._path_debounce_id = 0
-        print(f"[DEBUG] _schedule_path_computation called, pending={self._path_pending}", flush=True)
 
         if self._path_pending:
             return False
@@ -53,8 +52,6 @@ class WorkerBridgeMixin:
         dirty = [fk for fk in self._relationships if not fk._cached_path]
         if not dirty:
             return False
-
-        print(f"[DEBUG] Scheduling {len(dirty)} FK paths, serial={self._path_serial + 1}", flush=True)
     
         self._path_pending = True
         self._path_serial += 1
@@ -115,12 +112,6 @@ class WorkerBridgeMixin:
         return False
 
     def _on_path_ready(self, fk, future, serial):
-        """Write a computed path back to the FK."""
-        print(f"[DEBUG] _on_path_ready called for {fk.name}, serial={serial}, current={self._path_serial}", flush=True)
-    
-        if serial != self._path_serial:
-            print(f"[DEBUG] Stale result, ignoring", flush=True)
-            return
         """Write a computed path back to the FK. Always called on the GTK main thread."""
         if serial != self._path_serial:
             return
