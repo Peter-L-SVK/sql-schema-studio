@@ -480,7 +480,7 @@ class SchemaDesigner(WorkerBridgeMixin, RoutingMixin, DrawingMixin, Gtk.Box):
                 logger.warning("No target column clicked")
                 return
             fk_name = f"fk_{table.name}_{source_table.name}"
-            direction = "reverse" if self._direction_forward else "forward"
+            direction = "forward" if self._direction_forward else "reversed"
             fk = ForeignKey(
                 name=fk_name,
                 from_table=source_table.name,
