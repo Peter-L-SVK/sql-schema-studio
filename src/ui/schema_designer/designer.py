@@ -8,79 +8,31 @@
 
 """Visual schema designer with drag-and-drop table editing."""
 
-import gi
-
-gi.require_version("Gtk", "4.0")
-gi.require_version("Gdk", "4.0")
-from gi.repository import Gtk, Gdk, GObject, GLib
-import cairo
 import math
 import copy
 
+import gi
+gi.require_version("Gtk", "4.0")
+gi.require_version("Gdk", "4.0")
+from gi.repository import Gtk, Gdk, GObject, GLib
+
 from src.config import (
-    SCHEMA_TABLE_WIDTH,
-    SCHEMA_TABLE_HEADER_HEIGHT,
-    SCHEMA_TABLE_ROW_HEIGHT,
-    SCHEMA_TABLE_BODY_PADDING,
     SCHEMA_CANVAS_WIDTH,
     SCHEMA_CANVAS_HEIGHT,
     SCHEMA_COLORS,
-    SCHEMA_CANVAS_BG,
 )
 from src.utils.logging import get_logger
 from src.utils.gtk_helpers import set_margin
-from src.config import (
-    SCHEMA_TABLE_HEADER_HEIGHT,
-    SCHEMA_TABLE_ROW_HEIGHT,
-)
+from src.ui.schema_designer.models import ForeignKey, SchemaTable, TableColumn
+from src.ui.schema_designer.routing import RoutingMixin
+from src.ui.schema_designer.drawing import DrawingMixin
+from src.ui.schema_designer.worker_bridge import WorkerBridgeMixin
 
 logger = get_logger(__name__)
 GType = GObject.GType
 
 
-class ForeignKey:
-    """Represents a foreign key relationship between two tables."""
-
-    def __init__(
-        self,
-        name,
-        from_table,
-        from_column,
-        to_table,
-        to_column,
-        from_col_index=None,
-        to_col_index=None,
-        line_style="straight",
-        color=(0.2, 0.4, 0.6),
-        direction="forward",
-    ):
-        self.name = name
-        self.from_table = from_table
-        self.to_table = to_table
-        self.from_column = from_column
-        self.to_column = to_column
-        self.from_col_index = from_col_index
-        self.to_col_index = to_col_index
-        self.line_style = line_style
-        self.color = color
-        self.direction = direction
-        self.waypoints: list[tuple[float, float]] = []
-        self._cached_path: list[tuple[float, float]] = []
-
-    def __deepcopy__(self, memo):
-        """Custom deepcopy to handle waypoints and cached path."""
-        cls = self.__class__
-        result = cls.__new__(cls)
-        memo[id(self)] = result
-        for k, v in self.__dict__.items():
-            if k == "_cached_path":
-                setattr(result, k, [])
-            else:
-                setattr(result, k, copy.deepcopy(v, memo))
-        return result
-
-
-class SchemaDesigner(Gtk.Box):
+class SchemaDesigner(WorkerBridgeMixin, RoutingMixin, DrawingMixin, Gtk.Box):
     """Visual database schema designer."""
 
     def __init__(self, window):
@@ -132,8 +84,8 @@ class SchemaDesigner(Gtk.Box):
         toolbar.append(self._btn_color)
         self._update_color_button()
 
-        self._direction_forward = True
-        btn_dir = Gtk.Button(label="→")
+        self._direction_forward = False
+        btn_dir = Gtk.Button(label="←")
         btn_dir.set_tooltip_text("FK direction: forward (child → parent)")
         btn_dir.connect("clicked", self._on_toggle_direction)
         toolbar.append(btn_dir)
@@ -238,13 +190,9 @@ class SchemaDesigner(Gtk.Box):
         self._pan_prev_x = 0.0
         self._pan_prev_y = 0.0
 
-        # Path computation state:
-        # _path_serial increments on every invalidation so callbacks from
-        # older computation cycles are silently discarded.
+        # Path computation state
         self._path_serial = 0
-        # _path_pending blocks a second batch from starting while one is live.
         self._path_pending = False
-        # _path_debounce_id holds the GLib timeout handle for debouncing.
         self._path_debounce_id = 0
 
         self._tables: list[SchemaTable] = []
@@ -376,288 +324,6 @@ class SchemaDesigner(Gtk.Box):
                     return fk, i
         return None, -1
 
-    def _invalidate_all_paths(self):
-        """Clear all cached paths and schedule async recomputation with debounce.
-
-        Debouncing prevents flooding the worker pool during fast drag operations
-        (100+ calls/sec). We wait 150ms after the last change before computing.
-        """
-        for fk in self._relationships:
-            fk._cached_path = []
-        # Cancel any pending debounce timer and restart it.
-        if self._path_debounce_id:
-            GLib.source_remove(self._path_debounce_id)
-        self._path_debounce_id = GLib.timeout_add(150, self._schedule_path_computation)
-
-    # =====================================================================
-    # Geometry — line routing
-    # =====================================================================
-
-    def _segments_intersect(self, x1, y1, x2, y2, x3, y3, x4, y4):
-        def ccw(ax, ay, bx, by, cx, cy):
-            return (bx - ax) * (cy - ay) - (by - ay) * (cx - ax)
-        d1 = ccw(x3, y3, x4, y4, x1, y1)
-        d2 = ccw(x3, y3, x4, y4, x2, y2)
-        d3 = ccw(x1, y1, x2, y2, x3, y3)
-        d4 = ccw(x1, y1, x2, y2, x4, y4)
-        if ((d1 > 0 and d2 < 0) or (d1 < 0 and d2 > 0)) and (
-            (d3 > 0 and d4 < 0) or (d3 < 0 and d4 > 0)
-        ):
-            return True
-        if d1 == 0 and self._point_on_segment(x3, y3, x4, y4, x1, y1):
-            return True
-        if d2 == 0 and self._point_on_segment(x3, y3, x4, y4, x2, y2):
-            return True
-        if d3 == 0 and self._point_on_segment(x1, y1, x2, y2, x3, y3):
-            return True
-        if d4 == 0 and self._point_on_segment(x1, y1, x2, y2, x4, y4):
-            return True
-        return False
-
-    def _point_on_segment(self, x1, y1, x2, y2, px, py):
-        return (
-            min(x1, x2) <= px <= max(x1, x2)
-            and min(y1, y2) <= py <= max(y1, y2)
-        )
-
-    def _line_intersects_table(self, x1, y1, x2, y2, table, exclude_tables=None):
-        if exclude_tables and table in exclude_tables:
-            return False
-        w, h = table.get_size()
-        margin = 10
-        tx = table.x - margin
-        ty = table.y - margin
-        tw = w + 2 * margin
-        th = h + 2 * margin
-        if tx <= x1 <= tx + tw and ty <= y1 <= ty + th:
-            return True
-        if tx <= x2 <= tx + tw and ty <= y2 <= ty + th:
-            return True
-        edges = [
-            (tx, ty, tx + tw, ty),
-            (tx + tw, ty, tx + tw, ty + th),
-            (tx, ty + th, tx + tw, ty + th),
-            (tx, ty, tx, ty + th),
-        ]
-        for ex1, ey1, ex2, ey2 in edges:
-            if self._segments_intersect(x1, y1, x2, y2, ex1, ey1, ex2, ey2):
-                return True
-        return False
-
-    def _line_intersection(self, x1, y1, x2, y2, x3, y3, x4, y4):
-        denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
-        if abs(denom) < 1e-10:
-            return None
-        t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom
-        u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denom
-        if 0 <= t <= 1 and 0 <= u <= 1:
-            ix = x1 + t * (x2 - x1)
-            iy = y1 + t * (y2 - y1)
-            return (ix, iy)
-        return None
-
-    def _get_connection_point(self, table, col_index, is_source):
-        w, h = table.get_size()
-        if col_index is not None:
-            col_y = (
-                table.y
-                + table._header_height
-                + col_index * table._row_height
-                + table._row_height / 2
-            )
-            if is_source:
-                return (table.x + w, col_y)
-            else:
-                return (table.x, col_y)
-        else:
-            if is_source:
-                return (table.x + w, table.y + h / 2)
-            else:
-                return (table.x, table.y + h / 2)
-
-    def _find_entry_exit_points(self, x1, y1, x2, y2, table):
-        w, h = table.get_size()
-        margin = 8
-        tx = table.x - margin
-        ty = table.y - margin
-        tw = w + 2 * margin
-        th = h + 2 * margin
-        edges = [
-            (tx, ty, tx + tw, ty),
-            (tx + tw, ty, tx + tw, ty + th),
-            (tx, ty + th, tx + tw, ty + th),
-            (tx, ty, tx, ty + th),
-        ]
-        intersections = []
-        for ex1, ey1, ex2, ey2 in edges:
-            result = self._line_intersection(x1, y1, x2, y2, ex1, ey1, ex2, ey2)
-            if result is not None:
-                ix, iy = result
-                intersections.append((ix, iy))
-        if len(intersections) < 2:
-            if tx <= x1 <= tx + tw and ty <= y1 <= ty + th:
-                if intersections:
-                    return ((x1, y1), intersections[0])
-            if tx <= x2 <= tx + tw and ty <= y2 <= ty + th:
-                if intersections:
-                    return (intersections[-1], (x2, y2))
-            return (None, None)
-        intersections.sort(key=lambda p: (p[0] - x1) ** 2 + (p[1] - y1) ** 2)
-        return (intersections[0], intersections[-1])
-
-    def _get_rect_side(self, px, py, rx, ry, rw, rh):
-        dist_left = abs(px - rx)
-        dist_right = abs(px - (rx + rw))
-        dist_top = abs(py - ry)
-        dist_bottom = abs(py - (ry + rh))
-        min_dist = min(dist_left, dist_right, dist_top, dist_bottom)
-        if min_dist == dist_left:
-            return "left"
-        elif min_dist == dist_right:
-            return "right"
-        elif min_dist == dist_top:
-            return "top"
-        else:
-            return "bottom"
-
-    def _calculate_detour_around_table(self, x1, y1, x2, y2, table):
-        """Calculate minimal orthogonal detour around a table obstacle.
-    
-        Routes around the nearest corner based on the line direction,
-        producing clean L-shaped detours without figure-8 artifacts.
-        """
-        w, h = table.get_size()
-        margin = 25
-
-        # Expanded table bounds
-        tx = table.x - margin
-        ty = table.y - margin
-        tw = w + 2 * margin
-        th = h + 2 * margin
-
-        # Four corners of the expanded obstacle
-        corners = {
-            "tl": (tx, ty),
-            "tr": (tx + tw, ty),
-            "bl": (tx, ty + th),
-            "br": (tx + tw, ty + th),
-        }
-
-        # Determine line direction vector
-        dx = x2 - x1
-        dy = y2 - y1
-
-        # Choose corner based on which quadrant the line is heading toward.
-        # This avoids crossing the table to reach a "closer" corner on the
-        # wrong side, which was causing figure-8 paths.
-        if dx >= 0 and dy >= 0:
-            # Line goes right-down → route around top-right corner
-            corner = corners["tr"]
-        elif dx >= 0 and dy < 0:
-            # Line goes right-up → route around bottom-right corner
-            corner = corners["br"]
-        elif dx < 0 and dy >= 0:
-            # Line goes left-down → route around top-left corner
-            corner = corners["tl"]
-        else:
-            # Line goes left-up → route around bottom-left corner
-            corner = corners["bl"]
-
-        corner_x, corner_y = corner
-
-        # Determine routing order based on approach direction.
-        # If the line is more horizontal, go vertical first to clear the table.
-        # If more vertical, go horizontal first.
-        if abs(dx) > abs(dy):
-            # Horizontal-dominant: go vertical → horizontal → vertical
-            path = [
-                (x1, y1),
-                (x1, corner_y),
-                (corner_x, corner_y),
-                (x2, corner_y),
-                (x2, y2),
-            ]
-        else:
-            # Vertical-dominant: go horizontal → vertical → horizontal
-            path = [
-                (x1, y1),
-                (corner_x, y1),
-                (corner_x, corner_y),
-                (corner_x, y2),
-                (x2, y2),
-            ]
-
-        return path
-
-    def _calculate_line_path(self, fk, source_table, target_table):
-        """Calculate a clean path that avoids all obstacle tables iteratively."""
-        start_x, start_y = self._get_connection_point(
-            source_table, fk.from_col_index, is_source=True
-        )
-        end_x, end_y = self._get_connection_point(
-            target_table, fk.to_col_index, is_source=False
-        )
-
-        # Build initial point list: start + waypoints + end
-        points = [(start_x, start_y)]
-        points.extend(fk.waypoints)
-        points.append((end_x, end_y))
-
-        # Iteratively resolve collisions
-        max_iterations = 30
-        for iteration in range(max_iterations):
-            collision_found = False
-            new_points = []
-
-            for i in range(len(points) - 1):
-                x1, y1 = points[i]
-                x2, y2 = points[i + 1]
-
-                # Add start point of this segment (if not already added)
-                if not new_points:
-                    new_points.append((x1, y1))
-
-                # Check collision with all obstacle tables
-                collision_table = None
-                for table in self._tables:
-                    if table.name in (fk.from_table, fk.to_table):
-                        continue
-                    if self._line_intersects_table(x1, y1, x2, y2, table):
-                        collision_table = table
-                        break
-
-                if collision_table:
-                    # Calculate detour around the obstacle
-                    detour_points = self._calculate_detour_around_table(
-                        x1, y1, x2, y2, collision_table
-                    )
-                    if detour_points and len(detour_points) >= 2:
-                        # Add all detour points except the first (which is x1,y1)
-                        for px, py in detour_points[1:]:
-                            new_points.append((px, py))
-                        collision_found = True
-                    else:
-                        new_points.append((x2, y2))
-                else:
-                    new_points.append((x2, y2))
-
-            # Remove consecutive duplicates
-            deduped = []
-            for p in new_points:
-                if not deduped:
-                    deduped.append(p)
-                else:
-                    last = deduped[-1]
-                    if abs(p[0] - last[0]) > 2 or abs(p[1] - last[1]) > 2:
-                        deduped.append(p)
-
-            points = deduped
-
-            if not collision_found:
-                break
-
-        return points
-
     # =====================================================================
     # Drag & drop
     # =====================================================================
@@ -781,10 +447,10 @@ class SchemaDesigner(Gtk.Box):
     def _on_toggle_direction(self, button):
         self._direction_forward = not self._direction_forward
         if self._direction_forward:
-            button.set_label("→")
+            button.set_label("←")
             button.set_tooltip_text("FK direction: forward (child → parent)")
         else:
-            button.set_label("←")
+            button.set_label("→")
             button.set_tooltip_text("FK direction: reverse (parent → child)")
 
     def _on_right_click(self, gesture, n_press, x, y):
@@ -814,7 +480,7 @@ class SchemaDesigner(Gtk.Box):
                 logger.warning("No target column clicked")
                 return
             fk_name = f"fk_{table.name}_{source_table.name}"
-            direction = "forward" if self._direction_forward else "reverse"
+            direction = "reverse" if self._direction_forward else "forward"
             fk = ForeignKey(
                 name=fk_name,
                 from_table=source_table.name,
@@ -1024,512 +690,6 @@ class SchemaDesigner(Gtk.Box):
         dialog.present()
 
     # =====================================================================
-    # Drawing
-    # =====================================================================
-
-    def _on_draw(self, area, cr, width, height):
-        cr.save()
-        cr.translate(self._pan_offset_x, self._pan_offset_y)
-        cr.scale(self._zoom_level, self._zoom_level)
-        cr.set_source_rgb(*SCHEMA_CANVAS_BG)
-        cr.paint()
-        for fk in self._relationships:
-            self._draw_relationship(cr, fk)
-        if self._creating_relationship:
-            table, col = self._creating_relationship
-            src_x = table.x + table.get_size()[0] / 2
-            src_y = table.y + table.get_size()[1]
-            cr.set_source_rgb(0.8, 0.3, 0.3)
-            cr.set_dash([5, 5])
-            cr.set_line_width(1.5)
-            cr.move_to(src_x, src_y)
-            cr.line_to(src_x, src_y + 50)
-            cr.stroke()
-            cr.set_dash([])
-        for table in self._tables:
-            self._draw_table(cr, table)
-        cr.restore()
-
-    def _find_line_intersections(self, current_fk):
-        """Find all intersections between current_fk and other relationship lines.
-
-        Uses cached paths for all FKs — never calls _calculate_line_path here.
-        If another FK has no cached path yet it is skipped; it will be drawn
-        correctly once its path is computed by _schedule_path_computation.
-        """
-        intersections = []
-        if not current_fk._cached_path or len(current_fk._cached_path) < 2:
-            return intersections
-
-        current_segments = []
-        path = current_fk._cached_path
-        for i in range(len(path) - 1):
-            current_segments.append((path[i][0], path[i][1], path[i+1][0], path[i+1][1]))
-
-        for other_fk in self._relationships:
-            if other_fk is current_fk:
-                continue
-            # Use cached path only — recalculating here caused inconsistencies
-            # and was the main source of "crazy" rendering artefacts.
-            other_path = other_fk._cached_path
-            if not other_path or len(other_path) < 2:
-                continue
-            other_segments = []
-            for i in range(len(other_path) - 1):
-                other_segments.append((other_path[i][0], other_path[i][1],
-                                       other_path[i+1][0], other_path[i+1][1]))
-            for seg1 in current_segments:
-                for seg2 in other_segments:
-                    result = self._line_intersection(
-                        seg1[0], seg1[1], seg1[2], seg1[3],
-                        seg2[0], seg2[1], seg2[2], seg2[3]
-                    )
-                    if result is not None:
-                        ix, iy = result
-                        # Skip intersections that land very close to a table edge
-                        is_endpoint = False
-                        for table in self._tables:
-                            tw, th = table.get_size()
-                            if (abs(ix - table.x) < 15 or abs(ix - (table.x + tw)) < 15) and \
-                               (table.y - 15 <= iy <= table.y + th + 15):
-                                is_endpoint = True
-                                break
-                            if (abs(iy - table.y) < 15 or abs(iy - (table.y + th)) < 15) and \
-                               (table.x - 15 <= ix <= table.x + tw + 15):
-                                is_endpoint = True
-                                break
-                        if not is_endpoint:
-                            intersections.append((ix, iy, other_fk))
-        return intersections
-
-    def _draw_line_jump(self, cr, ix, iy, angle, line_color):
-        """Draw a bridge arc over an intersecting line.
-
-        The arch bulges upward (negative screen Y for horizontal lines) with
-        both endpoints pointing downward — classic wire-bridge / hop symbol.
-
-        jump_radius controls both the arc size and the gap cut in the line
-        (lines are cut at jump_radius px before and after the intersection).
-        """
-        jump_radius = 7  # 1px larger than the previous 6
-
-        # Clear a circle at the intersection so the line underneath is hidden.
-        cr.set_source_rgb(*SCHEMA_CANVAS_BG)
-        cr.arc(ix, iy, jump_radius + 1, 0, 2 * math.pi)
-        cr.fill()
-
-        # arc_negative goes counter-clockwise.
-        # From `angle` (forward direction) to `angle + π` (backward) CCW
-        # traces the upper semicircle → arch goes upward, ends point downward.
-        cr.set_source_rgb(*line_color)
-        cr.set_line_width(2.0)
-        cr.arc_negative(ix, iy, jump_radius, angle, angle + math.pi)
-        cr.stroke()
-
-    def _draw_relationship(self, cr, fk):
-        """Draw a relationship line with waypoint support and line jumps."""
-        source_table = self._table_index.get(fk.from_table)
-        target_table = self._table_index.get(fk.to_table)
-
-        if not source_table or not target_table:
-            return
-
-        # Use cached path — only recompute when _invalidate_all_paths() cleared it
-        if not fk._cached_path:
-            fk._cached_path = self._calculate_line_path(fk, source_table, target_table)
-
-        if not fk._cached_path or len(fk._cached_path) < 2:
-            src_w, src_h = source_table.get_size()
-            tgt_w, tgt_h = target_table.get_size()
-            x1 = source_table.x + src_w
-            y1 = source_table.y + src_h / 2
-            x2 = target_table.x
-            y2 = target_table.y + tgt_h / 2
-            cr.set_source_rgb(*fk.color)
-            cr.set_line_width(2)
-            self._draw_segment_styled(cr, x1, y1, x2, y2, fk.line_style)
-            self._draw_arrowhead_direct(cr, fk, x1, y1, x2, y2)
-            return
-
-        # Find all intersections with other lines
-        intersections = self._find_line_intersections(fk)
-
-        cr.set_source_rgb(*fk.color)
-        cr.set_line_width(2)
-
-        path = fk._cached_path
-
-        for i in range(len(path) - 1):
-            x1, y1 = path[i]
-            x2, y2 = path[i + 1]
-            segment_angle = math.atan2(y2 - y1, x2 - x1)
-
-            # Find intersections on this segment
-            seg_intersections = []
-            for ix, iy, other_fk in intersections:
-                if self._point_on_segment(x1, y1, x2, y2, ix, iy):
-                    dist = math.sqrt((ix - x1) ** 2 + (iy - y1) ** 2)
-                    seg_intersections.append((dist, ix, iy))
-
-            seg_intersections.sort(key=lambda item: item[0])
-
-            if not seg_intersections:
-                # No line jumps — draw entire segment with chosen style
-                self._draw_segment_styled(cr, x1, y1, x2, y2, fk.line_style)
-            else:
-                # Draw sub-segments between jumps, each with the chosen style
-                prev_x, prev_y = x1, y1
-                for _, ix, iy in seg_intersections:
-                    pre_x = ix - 7 * math.cos(segment_angle)
-                    pre_y = iy - 7 * math.sin(segment_angle)
-                
-                    # Draw sub-segment with style
-                    self._draw_segment_styled(cr, prev_x, prev_y, pre_x, pre_y, fk.line_style)
-                
-                    # Draw the line jump
-                    self._draw_line_jump(cr, ix, iy, segment_angle, fk.color)
-                
-                    prev_x = ix + 7 * math.cos(segment_angle)
-                    prev_y = iy + 7 * math.sin(segment_angle)
-
-                # Final sub-segment after last jump — also styled
-                self._draw_segment_styled(cr, prev_x, prev_y, x2, y2, fk.line_style)
-
-        if len(path) >= 2:
-            self._draw_arrowhead_on_path(cr, fk)
-
-        # Draw waypoint handles
-        for wx, wy in fk.waypoints:
-            cr.set_source_rgb(0.8, 0.2, 0.2)
-            cr.arc(wx, wy, 5, 0, 2 * math.pi)
-            cr.fill()
-            cr.set_source_rgb(1, 1, 1)
-            cr.arc(wx, wy, 2.5, 0, 2 * math.pi)
-            cr.fill()
-        
-    def _draw_segment_styled(self, cr, x1, y1, x2, y2, line_style):
-        """Draw a single path segment using the FK line style.
-    
-        For very short segments (< 20px), always falls back to straight line
-        to prevent visual artifacts like tiny zigzags.
-        """
-        seg_length = math.hypot(x2 - x1, y2 - y1)
-
-        cr.set_line_width(2.0)
-        cr.move_to(x1, y1)
-        
-        if line_style == "curve" and seg_length > 20:
-            # Control point offset scales with X distance but never below 40px
-            ctrl = max(abs(x2 - x1) * 0.5, 40)
-            cr.curve_to(x1 + ctrl, y1, x2 - ctrl, y2, x2, y2)
-
-        elif line_style == "ortho" and seg_length > 20:
-            mid_x = (x1 + x2) / 2
-            cr.line_to(mid_x, y1)
-            cr.line_to(mid_x, y2)
-            cr.line_to(x2, y2)
-
-        else:  # straight (default) or very short segments
-            cr.line_to(x2, y2)
-
-        cr.stroke()
-
-    def _schedule_path_computation(self):
-        """Offload path computation for all dirty FKs to the worker pool.
-
-        Guarded by _path_pending to prevent overlapping batches.
-        Uses _path_serial so stale callbacks from previous batches are ignored.
-        Falls back to synchronous computation if the pool is unavailable.
-        """
-        self._path_debounce_id = 0  # Timer has fired — clear the handle
-
-        if self._path_pending:
-            # A batch is already in flight — when it completes it will call
-            # queue_draw; any still-dirty FKs will be scheduled then.
-            return False  # GLib one-shot: don't repeat
-
-        dirty = [fk for fk in self._relationships if not fk._cached_path]
-        if not dirty:
-            return False
-
-        self._path_pending = True
-        self._path_serial += 1
-        current_serial = self._path_serial
-
-        # Serialise table geometry — no GTK objects cross the process boundary
-        tables_data = [
-            {
-                "name": name,
-                "x": t.x,
-                "y": t.y,
-                "w": t.get_size()[0],
-                "h": t.get_size()[1],
-            }
-            for name, t in self._table_index.items()
-        ]
-
-        try:
-            from src.core.worker_pool import get_pool, _compute_path_worker
-            pool = get_pool()
-        except Exception as e:
-            logger.warning(f"Worker pool unavailable, computing paths sync: {e}")
-            for fk in dirty:
-                src = self._table_index.get(fk.from_table)
-                tgt = self._table_index.get(fk.to_table)
-                if src and tgt:
-                    try:
-                        fk._cached_path = self._calculate_line_path(fk, src, tgt)
-                    except Exception as calc_err:
-                        logger.error(f"Path calc failed for {fk.name}: {calc_err}")
-                        src_w, src_h = src.get_size()
-                        tgt_w, tgt_h = tgt.get_size()
-                        fk._cached_path = [
-                            (src.x + src_w, src.y + src_h / 2),
-                            (tgt.x, tgt.y + tgt_h / 2),
-                        ]
-            self._path_pending = False
-            self._canvas.queue_draw()
-            return False
-
-        for fk in dirty:
-            fk_data = {
-                "from_table": fk.from_table,
-                "to_table": fk.to_table,
-                "from_col_index": fk.from_col_index,
-                "to_col_index": fk.to_col_index,
-                "waypoints": list(fk.waypoints),
-                "name": fk.name,
-            }
-            future = pool.submit(
-                _compute_path_worker,
-                fk_data,
-                tables_data,
-                SCHEMA_TABLE_HEADER_HEIGHT,
-                SCHEMA_TABLE_ROW_HEIGHT,
-            )
-            # Callback fires on the thread monitoring futures — use idle_add
-            # to touch GTK/FK objects safely on the GTK main thread.
-            future.add_done_callback(
-                lambda f, _fk=fk, serial=current_serial: GLib.idle_add(
-                    self._on_path_ready, _fk, f, serial
-                )
-            )
-
-        # Safety net: if callbacks never arrive (process crash etc.), unblock
-        # _path_pending after 2 seconds so the next drag is not frozen forever.
-        GLib.timeout_add(2000, self._check_path_completion, current_serial)
-        return False  # GLib one-shot
-
-    def _check_path_completion(self, serial):
-        """Safety-net timer: unblock _path_pending if all paths are done or timed out."""
-        if serial != self._path_serial:
-            return False  # Stale serial — a newer batch is running
-        # Always unblock on timeout to avoid permanent deadlock
-        self._path_pending = False
-        self._canvas.queue_draw()
-        return False  # One-shot
-
-    def _on_path_ready(self, fk, future, serial):
-        """Write a computed path back to the FK. Always called on the GTK main thread.
-
-        Ignores results from stale computation batches (serial mismatch).
-        Falls back to a straight line if the worker returned empty or crashed.
-        """
-        if serial != self._path_serial:
-            return  # Stale result from a previous drag — discard
-
-        src = self._table_index.get(fk.from_table)
-        tgt = self._table_index.get(fk.to_table)
-
-        def _straight_line():
-            if src and tgt:
-                src_w, src_h = src.get_size()
-                tgt_w, tgt_h = tgt.get_size()
-                fk._cached_path = [
-                    (src.x + src_w, src.y + src_h / 2),
-                    (tgt.x, tgt.y + tgt_h / 2),
-                ]
-
-        try:
-            path = future.result(timeout=0.1)
-            if path and len(path) >= 2:
-                fk._cached_path = path
-            else:
-                _straight_line()
-        except Exception as e:
-            logger.error(f"Path computation failed for FK '{fk.name}': {e}")
-            _straight_line()
-
-        # Unblock _path_pending when this was the last dirty FK
-        if not any(not f._cached_path for f in self._relationships):
-            self._path_pending = False
-
-        self._canvas.queue_draw()
-
-    def _draw_arrowhead_on_path(self, cr, fk):
-        """Draw arrowhead on the last segment of the computed path."""
-        if len(fk._cached_path) < 2:
-            return
-    
-        x1, y1 = fk._cached_path[-2]
-        x2, y2 = fk._cached_path[-1]
-    
-        arrow_size = 10
-        cr.set_source_rgb(*fk.color)
-        cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
-        cr.set_font_size(10)
-
-        if fk.direction == "forward":
-            angle = math.atan2(y2 - y1, x2 - x1)
-            cr.move_to(x2, y2)
-            cr.line_to(
-                x2 - arrow_size * math.cos(angle - 0.4),
-                y2 - arrow_size * math.sin(angle - 0.4),
-            )
-            cr.line_to(
-                x2 - arrow_size * math.cos(angle + 0.4),
-                y2 - arrow_size * math.sin(angle + 0.4),
-            )
-            cr.close_path()
-            cr.fill()
-            cr.move_to(x1 + 8, y1 - 8)
-            cr.show_text("N")
-            cr.move_to(x2 - 20, y2 - 8)
-            cr.show_text("1")
-        else:
-            angle = math.atan2(y1 - y2, x1 - x2)
-            cr.move_to(x1, y1)
-            cr.line_to(
-                x1 - arrow_size * math.cos(angle - 0.4),
-                y1 - arrow_size * math.sin(angle - 0.4),
-            )
-            cr.line_to(
-                x1 - arrow_size * math.cos(angle + 0.4),
-                y1 - arrow_size * math.sin(angle + 0.4),
-            )
-            cr.close_path()
-            cr.fill()
-            cr.move_to(x2 - 20, y2 - 8)
-            cr.show_text("1")
-            cr.move_to(x1 + 8, y1 - 8)
-            cr.show_text("N")
-
-    def _draw_arrowhead_direct(self, cr, fk, x1, y1, x2, y2):
-        """Draw arrowhead directly between two points (fallback)."""
-        arrow_size = 10
-        cr.set_source_rgb(*fk.color)
-        cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
-        cr.set_font_size(10)
-
-        if fk.direction == "forward":
-            angle = math.atan2(y2 - y1, x2 - x1)
-            cr.move_to(x2, y2)
-            cr.line_to(
-                x2 - arrow_size * math.cos(angle - 0.4),
-                y2 - arrow_size * math.sin(angle - 0.4),
-            )
-            cr.line_to(
-                x2 - arrow_size * math.cos(angle + 0.4),
-                y2 - arrow_size * math.sin(angle + 0.4),
-            )
-            cr.close_path()
-            cr.fill()
-            cr.move_to(x1 + 8, y1 - 8)
-            cr.show_text("1")
-            cr.move_to(x2 - 20, y2 - 8)
-            cr.show_text("N")
-        else:
-            angle = math.atan2(y1 - y2, x1 - x2)
-            cr.move_to(x1, y1)
-            cr.line_to(
-                x1 - arrow_size * math.cos(angle - 0.4),
-                y1 - arrow_size * math.sin(angle - 0.4),
-            )
-            cr.line_to(
-                x1 - arrow_size * math.cos(angle + 0.4),
-                y1 - arrow_size * math.sin(angle + 0.4),
-            )
-            cr.close_path()
-            cr.fill()
-            cr.move_to(x2 - 20, y2 - 8)
-            cr.show_text("N")
-            cr.move_to(x1 + 8, y1 - 8)
-            cr.show_text("1")
-
-    def _draw_table(self, cr, table):
-        title = f" {table.name} "
-        col_lines = []
-        for col in table.columns:
-            pk = "PK" if col.is_primary else ""
-            dtype = col.data_type
-            if col.length:
-                dtype = f"{dtype}({col.length})"
-            col_lines.append(f" {col.name}: {dtype} {pk} ")
-        if col_lines:
-            max_line = max(len(title), max(len(c) for c in col_lines))
-        else:
-            max_line = len(title)
-        line_height = table._row_height
-        header_height = table._header_height
-        body_padding = table._body_padding
-        body_height = len(col_lines) * line_height + body_padding
-        total_height = header_height + body_height
-        total_width = max(max_line * 8, table._width)
-        cr.set_source_rgba(0, 0, 0, 0.15)
-        cr.rectangle(table.x + 3, table.y + 3, total_width, total_height)
-        cr.fill()
-        cr.set_source_rgb(1, 1, 1)
-        cr.rectangle(table.x, table.y, total_width, total_height)
-        cr.fill()
-        cr.set_source_rgb(*table.color)
-        cr.rectangle(table.x, table.y, total_width, header_height)
-        cr.fill()
-        cr.set_source_rgb(0.2, 0.3, 0.5)
-        cr.rectangle(table.x, table.y, total_width, header_height)
-        cr.set_line_width(1)
-        cr.stroke()
-        cr.set_source_rgb(
-            table.color[0] * 0.5, table.color[1] * 0.5, table.color[2] * 0.5
-        )
-        cr.rectangle(table.x, table.y, total_width, total_height)
-        cr.set_line_width(1)
-        cr.stroke()
-        cr.set_source_rgb(0.4, 0.5, 0.6)
-        cr.move_to(table.x, table.y + header_height)
-        cr.line_to(table.x + total_width, table.y + header_height)
-        cr.stroke()
-        cr.set_source_rgb(1, 1, 1)
-        cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
-        cr.set_font_size(13)
-        cr.move_to(table.x + 6, table.y + header_height - 6)
-        cr.show_text(table.name)
-        cr.set_source_rgba(0.7, 0.7, 0.7, 0.4)
-        cr.set_line_width(0.5)
-        for i in range(1, len(col_lines)):
-            sep_y = table.y + header_height + i * line_height
-            cr.move_to(table.x + 4, sep_y)
-            cr.line_to(table.x + total_width - 4, sep_y)
-            cr.stroke()
-        cr.set_source_rgb(0.1, 0.1, 0.1)
-        cr.select_font_face(
-            "Monospace", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL
-        )
-        cr.set_font_size(11)
-        y_pos = table.y + header_height + line_height - 4
-        for i, line in enumerate(col_lines):
-            text = col_lines[i].strip()
-            cr.move_to(table.x + 8, y_pos)
-            cr.show_text(text)
-            y_pos += line_height
-        if table == self._selected_table:
-            cr.set_source_rgb(*table.color)
-            cr.set_line_width(2)
-            cr.rectangle(
-                table.x - 2, table.y - 2, total_width + 4, total_height + 4
-            )
-            cr.stroke()
-
-    # =====================================================================
     # Drop handlers
     # =====================================================================
 
@@ -1646,6 +806,7 @@ class SchemaDesigner(Gtk.Box):
                 to_column=fk_data["to_column"],
                 from_col_index=from_idx,
                 to_col_index=to_idx,
+                direction="reverse",
             )
             self._relationships.append(fk)
             logger.info(
@@ -1742,10 +903,10 @@ class SchemaDesigner(Gtk.Box):
     # =====================================================================
     # Clean up
     # =====================================================================
-    
+        
     def _on_close(self):
         """Clean up before the designer is destroyed.
-
+    
         Increment _path_serial so any in-flight worker callbacks
         from the old instance are silently discarded instead of
         crashing on a destroyed canvas.
@@ -1755,73 +916,3 @@ class SchemaDesigner(Gtk.Box):
         if self._path_debounce_id:
             GLib.source_remove(self._path_debounce_id)
             self._path_debounce_id = 0
-
-
-class SchemaTable:
-    """Represents a table on the designer canvas."""
-
-    def __init__(self, name: str, x: float = 50, y: float = 50, color=(0.3, 0.5, 0.8)):
-        self.name = name
-        self.x = x
-        self.y = y
-        self.columns: list[TableColumn] = []
-        self.schema = "public"
-        self._width = SCHEMA_TABLE_WIDTH
-        self._header_height = SCHEMA_TABLE_HEADER_HEIGHT
-        self._row_height = SCHEMA_TABLE_ROW_HEIGHT
-        self._body_padding = SCHEMA_TABLE_BODY_PADDING
-        self.color = color
-
-    def contains(self, px: float, py: float) -> bool:
-        w, h = self.get_size()
-        return self.x <= px <= self.x + w and self.y <= py <= self.y + h
-
-    def get_size(self) -> tuple[float, float]:
-        rows = max(len(self.columns), 1)
-        return (
-            self._width,
-            self._header_height + rows * self._row_height + self._body_padding,
-        )
-
-    def to_sql(self) -> str:
-        def quote(name):
-            return f'"{name}"'
-        lines = [f"CREATE TABLE {self.schema}.{quote(self.name)} ("]
-        col_defs = []
-        for col in self.columns:
-            col_defs.append(f"    {col.to_sql()}")
-        pks = [c.name for c in self.columns if c.is_primary]
-        if pks:
-            col_defs.append(
-                f"    PRIMARY KEY ({', '.join(quote(c) for c in pks)})"
-            )
-        lines.append(",\n".join(col_defs))
-        lines.append(");")
-        return "\n".join(lines)
-
-
-class TableColumn:
-    """Column in the schema designer."""
-
-    def __init__(
-        self,
-        name: str,
-        data_type: str = "integer",
-        is_primary: bool = False,
-        nullable: bool = True,
-        length: int | None = None,
-    ):
-        self.name = name
-        self.data_type = data_type
-        self.is_primary = is_primary
-        self.nullable = nullable
-        self.length = length
-
-    def to_sql(self) -> str:
-        dtype = self.data_type
-        if self.length:
-            dtype = f"{dtype}({self.length})"
-        parts = [f'"{self.name}"', dtype]
-        if not self.nullable:
-            parts.append("NOT NULL")
-        return " ".join(parts)

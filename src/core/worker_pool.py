@@ -117,24 +117,54 @@ def _compute_path_worker(
                         return True
             return False
 
-        def _detour(px1, py1, px2, py2, obs, margin=20):
-            """Pick the table corner that minimises total detour length."""
+        def _detour(px1, py1, px2, py2, obs, margin=25):
+            """Create orthogonal detour around a table obstacle.
+    
+            Returns a list of points forming an L-shaped path around the obstacle.
+            """
             ox, oy, ow, oh = obs["x"], obs["y"], obs["w"], obs["h"]
-            corners = [
-                (ox - margin,      oy - margin),
-                (ox + ow + margin, oy - margin),
-                (ox + ow + margin, oy + oh + margin),
-                (ox - margin,      oy + oh + margin),
-            ]
-            return min(corners, key=lambda c: (
-                math.hypot(c[0] - px1, c[1] - py1) +
-                math.hypot(c[0] - px2, c[1] - py2)
-            ))
+    
+            tx = ox - margin
+            ty = oy - margin
+            tw = ow + 2 * margin
+            th = oh + 2 * margin
+    
+            dx = px2 - px1
+            dy = py2 - py1
+    
+            # Choose corner based on direction
+            if dx >= 0 and dy >= 0:
+                corner_x, corner_y = tx, ty + th  # bottom-left of expanded rect
+            elif dx >= 0 and dy < 0:
+                corner_x, corner_y = tx, ty  # top-left
+            elif dx < 0 and dy >= 0:
+                corner_x, corner_y = tx + tw, ty + th  # bottom-right
+            else:
+                corner_x, corner_y = tx + tw, ty  # top-right
+    
+            # Return FULL path (all points) — caller will skip the first one
+            if abs(dx) > abs(dy):
+                return [
+                    (px1, py1),
+                    (px1, corner_y),
+                    (corner_x, corner_y),
+                    (px2, corner_y),
+                    (px2, py2),
+                ]
+            else:
+                return [
+                    (px1, py1),
+                    (corner_x, py1),
+                    (corner_x, corner_y),
+                    (corner_x, py2),
+                    (px2, py2),
+                ]
 
         # Iterative collision resolution — max 30 passes
         for _ in range(30):
             collision_found = False
             new_points = [points[0]]
+    
             for i in range(len(points) - 1):
                 sx1, sy1 = points[i]
                 sx2, sy2 = points[i + 1]
@@ -145,17 +175,31 @@ def _compute_path_worker(
                     None,
                 )
                 if hit:
-                    new_points.append(_detour(sx1, sy1, sx2, sy2, hit))
-                    collision_found = True
-                new_points.append((sx2, sy2))
+                    detour_pts = _detour(sx1, sy1, sx2, sy2, hit)
+                    if detour_pts and len(detour_pts) >= 2:
+                        # Add all points EXCEPT the first (which is sx1,sy1 already in new_points)
+                        for pt in detour_pts[1:]:
+                            new_points.append(tuple(pt))
+                        collision_found = True
+                    else:
+                        new_points.append((sx2, sy2))
+                else:
+                    new_points.append((sx2, sy2))
 
             # Remove consecutive near-duplicates
-            deduped = [new_points[0]]
-            for p in new_points[1:]:
-                last = deduped[-1]
-                if abs(p[0] - last[0]) > 2 or abs(p[1] - last[1]) > 2:
-                    deduped.append(p)
+            deduped = []
+            for p in new_points:
+                if isinstance(p, (list, tuple)) and len(p) == 2:
+                    px, py = float(p[0]), float(p[1])
+                    if not deduped:
+                        deduped.append((px, py))
+                    else:
+                        last_x, last_y = deduped[-1]
+                        if abs(px - last_x) > 2 or abs(py - last_y) > 2:
+                            deduped.append((px, py))
+    
             points = deduped
+    
             if not collision_found:
                 break
 
