@@ -263,6 +263,8 @@ class MainWindow(Gtk.ApplicationWindow):
         dialog = Gtk.Window(transient_for=self, modal=False, title="Schema Designer")
         dialog.set_default_size(800, 600)
         dialog.set_child(self._designer)
+        # Clean up worker callbacks when dialog closes
+        dialog.connect("close-request", lambda d: self._designer._on_close())
         dialog.present()
 
     def _on_hooks_clicked(self):

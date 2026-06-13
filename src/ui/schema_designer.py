@@ -1739,6 +1739,23 @@ class SchemaDesigner(Gtk.Box):
         self._update_canvas_size()
         self._canvas.queue_draw()
 
+    # =====================================================================
+    # Clean up
+    # =====================================================================
+    
+    def _on_close(self):
+        """Clean up before the designer is destroyed.
+
+        Increment _path_serial so any in-flight worker callbacks
+        from the old instance are silently discarded instead of
+        crashing on a destroyed canvas.
+        """
+        self._path_serial += 1000  # Invalidate all pending callbacks
+        self._path_pending = False
+        if self._path_debounce_id:
+            GLib.source_remove(self._path_debounce_id)
+            self._path_debounce_id = 0
+
 
 class SchemaTable:
     """Represents a table on the designer canvas."""
