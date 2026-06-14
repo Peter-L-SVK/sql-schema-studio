@@ -4,7 +4,7 @@ build-backend = "setuptools.backends._legacy:_Backend"
 
 [project]
 name = "sql-schema-studio"
-version = "0.8.0"
+version = "0.9.0"
 description = "Intelligent PostgreSQL Management Platform with Python/Perl hooks and AI analytics"
 readme = "README.md"
 license = {text = "GPL-3.0-or-later"}
@@ -72,6 +72,7 @@ packages = [
     "src.core",
     "src.ui",
     "src.ui.dialogs",
+    "src.ui.schema_designer",
     "src.models",
     "src.utils",
     "src.plugins",
