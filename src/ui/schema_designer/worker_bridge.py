@@ -10,7 +10,6 @@
 for asynchronous path computation."""
 
 import logging
-import sys
 
 from gi.repository import GLib
 
@@ -52,7 +51,7 @@ class WorkerBridgeMixin:
         dirty = [fk for fk in self._relationships if not fk._cached_path]
         if not dirty:
             return False
-    
+
         self._path_pending = True
         self._path_serial += 1
         current_serial = self._path_serial
@@ -72,11 +71,9 @@ class WorkerBridgeMixin:
             from src.core.worker_pool import get_pool, _compute_path_worker
             pool = get_pool()
         except Exception as e:
-            logger.warning(f"Worker pool unavailable, computing paths sync: {e}")
+            logger.warning(f"Worker pool unavailable: {e}")
             self._path_pending = False
             return False
-        
-        logger.info(f"Submitting {len(dirty)} FK paths to worker pool (serial={current_serial})")
 
         for fk in dirty:
             fk_data = {
@@ -104,10 +101,11 @@ class WorkerBridgeMixin:
         return False
 
     def _check_path_completion(self, serial):
-        """Safety-net timer: unblock _path_pending if all paths are done or timed out."""
+        """Safety-net timer: unblock and restart pool if paths are done or timed out."""
         if serial != self._path_serial:
             return False
         self._path_pending = False
+        self._restart_pool()
         self._canvas.queue_draw()
         return False
 
@@ -138,9 +136,31 @@ class WorkerBridgeMixin:
             logger.error(f"Path computation failed for FK '{fk.name}': {e}")
             _straight_line()
 
+        # Clean up future reference to prevent memory leaks
+        try:
+            future.cancel()
+        except Exception:
+            pass
+
         remaining = sum(1 for f in self._relationships if not f._cached_path)
         if remaining == 0:
             self._path_pending = False
-            logger.debug("All FK paths computed, unblocking _path_pending")
+            self._restart_pool()
 
         self._canvas.queue_draw()
+
+    def _restart_pool(self):
+        """Restart worker pool to free memory from completed workers."""
+        try:
+            from src.core.worker_pool import get_pool
+            get_pool().restart()
+        except Exception:
+            pass
+
+    def _shutdown_pool(self):
+        """Shutdown worker pool completely (on designer close)."""
+        try:
+            from src.core.worker_pool import get_pool
+            get_pool().shutdown()
+        except Exception:
+            pass

@@ -199,6 +199,11 @@ def _compute_path_worker(
                             deduped.append((px, py))
     
             points = deduped
+            
+            # Limit path complexity to prevent memory issues with huge schemas
+            MAX_PATH_POINTS = 50
+            if len(points) > MAX_PATH_POINTS:
+                points = _straight(src, tgt)
     
             if not collision_found:
                 break
@@ -213,6 +218,13 @@ def _compute_path_worker(
         )
         traceback.print_exc(file=sys.stderr)
         return _straight(src, tgt)
+
+def restart(self):
+    """Shutdown old workers and force fresh pool creation."""
+    if self._pool:
+        self._pool.shutdown(wait=False)
+        self._pool = None
+    logger.debug("Worker pool restarted")
 
 
 class WorkerPool:

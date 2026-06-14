@@ -906,7 +906,7 @@ class SchemaDesigner(WorkerBridgeMixin, RoutingMixin, DrawingMixin, Gtk.Box):
         
     def _on_close(self):
         """Clean up before the designer is destroyed.
-    
+        
         Increment _path_serial so any in-flight worker callbacks
         from the old instance are silently discarded instead of
         crashing on a destroyed canvas.
@@ -916,3 +916,4 @@ class SchemaDesigner(WorkerBridgeMixin, RoutingMixin, DrawingMixin, Gtk.Box):
         if self._path_debounce_id:
             GLib.source_remove(self._path_debounce_id)
             self._path_debounce_id = 0
+        self._shutdown_pool()  # Kill all worker processes
