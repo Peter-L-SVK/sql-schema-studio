@@ -15,6 +15,7 @@ import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk
 
+from src.ui.ai_tools import AIToolsPopover
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -64,11 +65,13 @@ class Toolbar(Gtk.Box):
         btn_designer.connect("clicked", lambda b: window._on_designer_clicked())
         self.append(btn_designer)
 
-        # AI Tools button
-        btn_ai = Gtk.Button(label="AI Tools")
-        btn_ai.set_tooltip_text("AI-powered analysis tools")
-        btn_ai.connect("clicked", lambda b: logger.info("AI tools clicked (not implemented)"))
-        self.append(btn_ai)
+        # AI Tools button with popover menu
+        self._btn_ai = Gtk.MenuButton()
+        self._btn_ai.set_label("AI Tools")
+        self._btn_ai.set_tooltip_text("AI-powered analysis tools")
+        self._btn_ai.set_direction(Gtk.ArrowType.DOWN)
+        self._btn_ai.set_popover(AIToolsPopover(window).create())
+        self.append(self._btn_ai)
 
         # Hooks button
         btn_hooks = Gtk.Button(label="Hooks")

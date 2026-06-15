@@ -5,3 +5,9 @@
 # This is free software with NO WARRANTY.
 # Feel free to distribute and modify.
 # ----------------------------------------------------------------------
+
+from src.analytics.engine import AnalyticsEngine
+from src.analytics.index_advisor import IndexAdvisor
+
+__all__ = ["AnalyticsEngine", "IndexAdvisor"]
+
