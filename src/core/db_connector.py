@@ -38,6 +38,16 @@ class ConnectionProfile:
     password: str = field(default="", repr=False)
     ssl_mode: str = "prefer"
 
+    # SSH settings
+    use_ssh: bool = False
+    ssh_host: str = ""
+    ssh_port: int = 22
+    ssh_user: str = ""
+    ssh_password: str = ""
+    ssh_key_path: str = ""
+    ssh_remote_host: str = "localhost"
+    ssh_remote_port: int = 5432
+
     def __post_init__(self):
         if self.password:
             self.save_password(self.password)
@@ -79,6 +89,22 @@ class ConnectionProfile:
             "ssl_mode": self.ssl_mode,
         }
 
+    def save_ssh_password(self, password: str) -> None:
+        """Save SSH password to system keyring."""
+        try:
+            import keyring
+            keyring.set_password("sql-schema-studio", f"{self.name}/ssh", password)
+        except Exception as e:
+            logger.warning(f"Could not save SSH password: {e}")
+
+    def get_ssh_password(self) -> str:
+        """Get SSH password from system keyring."""
+        try:
+            import keyring
+            saved = keyring.get_password("sql-schema-studio", f"{self.name}/ssh")
+            return saved or ""
+        except Exception:
+            return ""
 
 class DatabaseConnector:
     """Manages PostgreSQL connections with keyring-backed credentials."""
@@ -135,7 +161,10 @@ class DatabaseConnector:
             return False
 
     def disconnect(self, profile_name: str | None = None) -> None:
-        """Clear the active connection state."""
+        """Close database connection and SSH tunnel."""
+        if hasattr(self, '_active_tunnel') and self._active_tunnel:
+            self._active_tunnel.stop()
+            self._active_tunnel = None
         name = profile_name or self._active_profile
         if name and self._active_profile == name:
             self._active_profile = None
@@ -149,10 +178,51 @@ class DatabaseConnector:
         )
 
     def _get_conn_string(self) -> str:
-        """Build connection string for the active profile."""
+        """Build connection string, optionally via SSH tunnel."""
         if not self._active_profile_obj:
             raise RuntimeError("No active connection")
-        return self._build_conn_string(self._active_profile_obj)
+
+        profile = self._active_profile_obj
+
+        if not profile.use_ssh:
+            return self._build_conn_string(profile)
+
+        # If we have alredy SSH tunnel, use it
+        if hasattr(self, '_active_tunnel') and self._active_tunnel and self._active_tunnel.is_active:
+            return (
+                f"host=127.0.0.1 port={self._active_tunnel.local_port} "
+                f"dbname={profile.database} user={profile.username} "
+                f"password={profile.get_password()}"
+            )
+
+        from src.core.ssh_tunnel import SSHTunnelConfig, get_postgres_conn_string_with_ssh
+
+        ssh_config = SSHTunnelConfig(
+            enabled=True,
+            ssh_host=profile.ssh_host,
+            ssh_port=profile.ssh_port,
+            ssh_user=profile.ssh_user,
+            ssh_password=profile.get_ssh_password(),
+            ssh_key_path=profile.ssh_key_path,
+            remote_host=profile.ssh_remote_host,
+            remote_port=profile.ssh_remote_port,
+        )
+
+        db_config = {
+            "host": profile.host,
+            "port": profile.port,
+            "database": profile.database,
+            "username": profile.username,
+            "password": profile.get_password(),
+        }
+
+        conn_string, tunnel, error = get_postgres_conn_string_with_ssh(ssh_config, db_config)
+
+        if error:
+            raise RuntimeError(f"SSH tunnel failed: {error}")
+
+        self._active_tunnel = tunnel
+        return conn_string
 
     def execute_sync(self, query: str, params: tuple | None = None) -> list[dict[str, Any]]:
         """Execute a query from a background thread using a direct sync connection"""
