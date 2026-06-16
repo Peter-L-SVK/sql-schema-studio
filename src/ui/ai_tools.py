@@ -311,11 +311,7 @@ class AIToolsPopover:
     # =====================================================================
 
     def _run_table_growth_analysis(self):
-        """Analyze table sizes, dead rows, and vacuum status.
-        
-        Shows total size, data size, index size, row counts,
-        dead row ratio, and last vacuum/analyze timestamps.
-        """
+        """Analyze table sizes, dead rows, and vacuum status."""
         if not self._check_connected():
             return
         window = self._window
@@ -324,22 +320,22 @@ class AIToolsPopover:
             engine = AnalyticsEngine(window.db_connector)
 
             results = engine.query_to_df("""
-                SELECT 
-                    schemaname || '.' || tablename AS table_name,
-                    pg_total_relation_size(schemaname||'.'||tablename) AS total_bytes,
-                    pg_relation_size(schemaname||'.'||tablename) AS data_bytes,
-                    pg_indexes_size(schemaname||'.'||tablename) AS index_bytes,
-                    n_live_tup AS row_count,
-                    n_dead_tup AS dead_rows,
-                    CASE WHEN n_live_tup > 0 
-                        THEN round(n_dead_tup::numeric / n_live_tup * 100, 1)
-                        ELSE 0 END AS dead_ratio,
-                    last_vacuum,
-                    last_autovacuum,
-                    last_analyze
-                FROM pg_stat_user_tables
-                ORDER BY total_bytes DESC
-                LIMIT 20
+            SELECT 
+                schemaname || '.' || relname AS table_name,
+                pg_total_relation_size(schemaname||'.'||relname) AS total_bytes,
+                pg_relation_size(schemaname||'.'||relname) AS data_bytes,
+                pg_indexes_size(schemaname||'.'||relname) AS index_bytes,
+                n_live_tup AS row_count,
+                n_dead_tup AS dead_rows,
+                CASE WHEN n_live_tup > 0 
+                    THEN round(n_dead_tup::numeric / n_live_tup * 100, 1)
+                    ELSE 0 END AS dead_ratio,
+                last_vacuum,
+                last_autovacuum,
+                last_analyze
+            FROM pg_stat_user_tables
+            ORDER BY total_bytes DESC
+            LIMIT 20
             """)
 
             if not results.is_empty():
@@ -350,9 +346,9 @@ class AIToolsPopover:
                     last_vac = r[8] or r[7] or r[9]
                     rows.append([
                         r[0],
-                        f"{r[1]/1024/1024:.1f} MB" if r[1] else "0",
-                        f"{r[2]/1024/1024:.1f} MB" if r[2] else "0",
-                        f"{r[3]/1024/1024:.1f} MB" if r[3] else "0",
+                        f"{r[1]/1024/1024:.1f} MB" if r[1] else "0.0 MB",
+                        f"{r[2]/1024/1024:.1f} MB" if r[2] else "0.0 MB",
+                        f"{r[3]/1024/1024:.1f} MB" if r[3] else "0.0 MB",
                         str(r[4] or 0),
                         f"{r[6]}%" if r[6] else "0%",
                         str(last_vac) if last_vac else "Never",

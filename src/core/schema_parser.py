@@ -1,16 +1,16 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.8 - Schema Parser (GPLv3)
+# SQL Schema Studio 0.9 - Schema Parser (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
 # Feel free to distribute and modify.
 # ----------------------------------------------------------------------
 
-"""Parse SQL schemas using sqlparse with regex fallback."""
+"""Parse SQL schemas using sqlparse with robust regex fallback."""
 
 import re
 import sqlparse
-from sqlparse.tokens import Keyword
+from sqlparse.tokens import Keyword, Name, Punctuation, Comment
 
 from src.utils.logging import get_logger
 
@@ -18,7 +18,17 @@ logger = get_logger(__name__)
 
 
 class SchemaParser:
-    """Parse CREATE TABLE and ALTER TABLE statements from SQL text."""
+    """Parse CREATE TABLE and ALTER TABLE statements from SQL text.
+    
+    Handles real-world production schemas including:
+    - Inline comments (-- and /* */)
+    - DEFAULT values with parentheses
+    - CHECK constraints with complex expressions
+    - Self-referencing tables
+    - Composite primary and foreign keys
+    - NUMERIC(precision, scale) without spaces
+    - SERIAL types
+    """
 
     def parse_sql(self, sql_text: str) -> tuple[list[dict], list[dict]]:
         """Parse SQL text and return (tables, foreign_keys).
@@ -26,128 +36,160 @@ class SchemaParser:
         Each table dict: {name, schema, columns: [{name, type, nullable, default, is_pk}]}
         Each FK dict: {name, from_table, from_column, to_table, to_column}
         """
-        # Remove quotes for easier parsing, but keep original for display
-        clean_text = sql_text.replace('"', "")
+        # Step 1: Remove inline comments to prevent parser confusion
+        clean_text = self._remove_comments(sql_text)
+        
+        # Step 2: Normalize whitespace and quotes
+        clean_text = self._normalize_sql(clean_text)
 
         tables = []
         foreign_keys = []
+        table_bodies = {}
 
-        statements = sqlparse.split(clean_text)
-        for stmt in statements:
-            if not stmt.strip():
-                continue
+        # Step 3: Extract all CREATE TABLE statements with their bodies
+        for match in self._find_create_tables(clean_text):
+            table_info = self._parse_create_table_robust(match)
+            if table_info:
+                tables.append(table_info)
+                # match is tuple (schema, table_name, body) — store only body
+                table_bodies[table_info["name"]] = match[2] 
 
-            parsed = sqlparse.parse(stmt)[0]
+        # Step 4: Extract ALTER TABLE foreign keys
+        for match in self._find_alter_tables(clean_text):
+            fk = self._parse_alter_table_fk(match)
+            if fk:
+                foreign_keys.append(fk)
 
-            if self._is_create_table(parsed):
-                table = self._parse_create_table(parsed)
-                if table:
-                    tables.append(table)
+        # Step 5: Extract inline REFERENCES from CREATE TABLE bodies
+        for table_name, body in table_bodies.items():
+            inline_fks = self._parse_inline_references_robust(table_name, body)
+            foreign_keys.extend(inline_fks)
 
-            elif self._is_alter_table_fk(parsed):
-                fk = self._parse_alter_table_fk(parsed)
-                if fk:
-                    foreign_keys.append(fk)
+        # Deduplicate FKs by name
+        seen = set()
+        unique_fks = []
+        for fk in foreign_keys:
+            key = f"{fk['from_table']}.{fk['from_column']}->{fk['to_table']}.{fk['to_column']}"
+            if key not in seen:
+                seen.add(key)
+                unique_fks.append(fk)
 
-        # Also try regex for inline REFERENCES in CREATE TABLE
-        fks_from_inline = self._parse_inline_references(sql_text)
-        foreign_keys.extend(fks_from_inline)
+        logger.info(f"Parsed {len(tables)} tables and {len(unique_fks)} FKs")
+        return tables, unique_fks
 
-        logger.info(f"Parsed {len(tables)} tables and {len(foreign_keys)} FKs")
-        return tables, foreign_keys
+    # =====================================================================
+    # Text cleaning
+    # =====================================================================
 
-    def _is_create_table(self, parsed) -> bool:
-        """Check if statement is CREATE TABLE."""
-        if not parsed.get_type() == "CREATE":
-            return False
-        return True
+    def _remove_comments(self, sql: str) -> str:
+        """Remove SQL comments (both -- and /* */ style)."""
+        # Remove block comments /* ... */
+        sql = re.sub(r'/\*.*?\*/', '', sql, flags=re.DOTALL)
+        # Remove line comments -- ... (but not inside strings)
+        sql = re.sub(r'--[^\n]*', '', sql)
+        return sql
 
-    def _is_alter_table_fk(self, parsed) -> bool:
-        """Check if statement is ALTER TABLE ... ADD CONSTRAINT ... FOREIGN KEY."""
-        text = str(parsed).upper()
-        return "ALTER TABLE" in text and "FOREIGN KEY" in text
+    def _normalize_sql(self, sql: str) -> str:
+        """Normalize SQL for easier parsing.
+        
+        - Remove double quotes around identifiers
+        - Collapse multiple spaces
+        - Normalize parentheses spacing for NUMERIC(x,y)
+        """
+        # Remove quotes (keep original if needed via separate map)
+        sql = sql.replace('"', "")
+        # Collapse whitespace
+        sql = re.sub(r'\s+', ' ', sql)
+        # Fix NUMERIC(10, 2) -> NUMERIC(10,2) for consistent parsing
+        sql = re.sub(r'(\w+)\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)', r'\1(\2,\3)', sql)
+        return sql.strip()
 
-    def _parse_create_table(self, parsed) -> dict | None:
-        """Extract table info from CREATE TABLE statement."""
+    # =====================================================================
+    # CREATE TABLE parsing
+    # =====================================================================
+
+    def _find_create_tables(self, sql: str) -> list[str]:
+        """Find all CREATE TABLE statement bodies."""
+        # Match CREATE TABLE ... ( ... );
+        pattern = re.compile(
+            r'CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?'
+            r'(?:(\w+)\.)?(\w+)\s*\((.*?)\)\s*;',
+            re.IGNORECASE | re.DOTALL
+        )
+        return pattern.findall(sql)
+
+    def _parse_create_table_robust(self, match: tuple) -> dict | None:
+        """Parse a CREATE TABLE match robustly.
+        
+        Args:
+            match: Tuple of (schema, table_name, body) from regex.
+        """
         try:
-            # Get table name from tokens
-            tokens = [t for t in parsed.tokens if not t.is_whitespace]
-            table_name = None
-            table_schema = "public"
+            schema = match[0] or "public"
+            table_name = match[1]
+            body = match[2]
 
-            for i, token in enumerate(tokens):
-                if token.match(Keyword, "TABLE"):
-                    # Next non-whitespace token should be the name
-                    for j in range(i + 1, len(tokens)):
-                        if tokens[j].is_whitespace:
-                            continue
-                        name_token = str(tokens[j])
-                        if "." in name_token:
-                            parts = name_token.split(".")
-                            table_schema = parts[0]
-                            table_name = parts[1]
-                        else:
-                            table_name = name_token.strip("()")
-                        break
-                    break
+            columns = self._parse_columns_robust(body)
 
-            if not table_name:
-                return None
-
-            # Extract columns from the body
-            body = self._extract_create_body(str(parsed))
-            columns = self._parse_columns(body)
-
-            pk_match = re.search(r"PRIMARY\s+KEY\s*\(([^)]+)\)", body, re.IGNORECASE)
+            # Find primary key
+            pk_match = re.search(
+                r'PRIMARY\s+KEY\s*\(([^)]+)\)', body, re.IGNORECASE
+            )
             if pk_match:
-                pk_cols = [c.strip().strip('"') for c in pk_match.group(1).split(",")]
+                pk_cols = [
+                    c.strip().strip('"') 
+                    for c in pk_match.group(1).split(",")
+                ]
                 for col in columns:
                     if col["name"] in pk_cols:
                         col["is_pk"] = True
 
             return {
                 "name": table_name,
-                "schema": table_schema,
+                "schema": schema,
                 "columns": columns,
             }
         except Exception as e:
-            logger.warning(f"Failed to parse CREATE TABLE: {e}")
+            logger.warning(f"Failed to parse CREATE TABLE {match[1] if len(match) > 1 else '?'}: {e}")
             return None
 
-    def _extract_create_body(self, sql: str) -> str:
-        """Extract the column definitions from CREATE TABLE."""
-        match = re.search(r"\((.*)\)", sql, re.DOTALL)
-        if match:
-            return match.group(1)
-        return ""
-
-    def _parse_columns(self, body: str) -> list[dict]:
-        """Parse column definitions from table body."""
+    def _parse_columns_robust(self, body: str) -> list[dict]:
+        """Parse column definitions handling complex constraints."""
         columns = []
 
-        for line in self._split_columns(body):
-            col = self._parse_column_line(line)
+        for line in self._split_columns_robust(body):
+            col = self._parse_column_line_robust(line)
             if col:
                 columns.append(col)
 
         return columns
 
-    def _split_columns(self, body: str) -> list[str]:
-        """Split table body into individual column/constraint lines."""
-        # Handle nested parentheses in DEFAULT values and CHECK constraints
+    def _split_columns_robust(self, body: str) -> list[str]:
+        """Split table body into individual column/constraint lines.
+        
+        Handles nested parentheses in DEFAULT, CHECK, and function calls.
+        """
         lines = []
         current: list[str] = []
         depth = 0
+        in_string = False
 
         for char in body:
-            if char == "(":
-                depth += 1
-            elif char == ")":
-                depth -= 1
-            elif char == "," and depth == 0:
-                lines.append("".join(current).strip())
-                current = []
-                continue
+            if char == "'" and not in_string:
+                in_string = True
+            elif char == "'" and in_string:
+                in_string = False
+            
+            if not in_string:
+                if char == '(':
+                    depth += 1
+                elif char == ')':
+                    depth -= 1
+                elif char == ',' and depth == 0:
+                    lines.append("".join(current).strip())
+                    current = []
+                    continue
+            
             current.append(char)
 
         if current:
@@ -155,39 +197,61 @@ class SchemaParser:
 
         return lines
 
-    def _parse_column_line(self, line: str) -> dict | None:
-        """Parse a single column definition."""
+    def _parse_column_line_robust(self, line: str) -> dict | None:
+        """Parse a single column definition handling complex types."""
         line = line.strip()
         if not line:
             return None
 
-        # Skip constraint lines
+        # Skip pure constraint lines
         upper = line.upper().strip()
-        if upper.startswith(
-            ("PRIMARY KEY", "FOREIGN KEY", "CONSTRAINT", "UNIQUE", "CHECK", "EXCLUDE")
-        ):
+        skip_patterns = (
+            'PRIMARY KEY', 'FOREIGN KEY', 'CONSTRAINT',
+            'UNIQUE', 'CHECK', 'EXCLUDE',
+        )
+        if upper.startswith(skip_patterns) and '(' in upper:
             return None
 
-        parts = line.split()
-        if len(parts) < 2:
+        # Try to extract column name and type
+        # Pattern: column_name TYPE[(params)] [constraints...]
+        match = re.match(
+            r'(\w+)\s+'
+            r'(\w+(?:\(\d+(?:,\d+)?\))?)'  # TYPE or TYPE(N) or TYPE(N,M)
+            r'(.*)', 
+            line, re.IGNORECASE
+        )
+
+        if not match:
             return None
 
-        col_name = parts[0].strip('"')
-        col_type = parts[1].strip('"').strip(",")
+        col_name = match.group(1)
+        col_type_raw = match.group(2)
+        rest = match.group(3).upper()
 
-        # Extract length from type like varchar(255)
+        # Parse type and length
+        col_type = col_type_raw
         length = None
-        type_match = re.match(r"(\w+)\s*\((\d+)\)", col_type)
+        type_match = re.match(r'(\w+)\s*\((\d+)(?:,(\d+))?\)', col_type_raw, re.IGNORECASE)
         if type_match:
             col_type = type_match.group(1)
             length = int(type_match.group(2))
 
         # Detect constraints
-        is_pk = "PRIMARY KEY" in upper
-        nullable = "NOT NULL" not in upper
-        default = None
+        is_pk = 'PRIMARY KEY' in rest
+        nullable = 'NOT NULL' not in rest
+        is_serial = col_type.upper() in ('SERIAL', 'BIGSERIAL', 'SMALLSERIAL')
 
-        default_match = re.search(r"DEFAULT\s+(.+?)(?:\s*,\s*|\s*$)", line, re.IGNORECASE)
+        # Auto-set PK properties for SERIAL
+        if is_serial:
+            nullable = False
+            # SERIAL columns are often PKs
+
+        # Extract DEFAULT value
+        default = None
+        default_match = re.search(
+            r"DEFAULT\s+(.+?)(?:\s*,\s*|\s*$)",
+            line, re.IGNORECASE
+        )
         if default_match:
             default = default_match.group(1).strip()
 
@@ -200,54 +264,77 @@ class SchemaParser:
             "length": length,
         }
 
-    def _parse_alter_table_fk(self, parsed) -> dict | None:
-        """Parse ALTER TABLE ... ADD CONSTRAINT ... FOREIGN KEY."""
-        text = str(parsed)
+    # =====================================================================
+    # ALTER TABLE FOREIGN KEY parsing
+    # =====================================================================
 
-        match = re.search(
-            r"ALTER\s+TABLE\s+(\w+)\.?(\w+)?\s+"
-            r"ADD\s+CONSTRAINT\s+(\w+)\s+"
-            r"FOREIGN\s+KEY\s*\((\w+)\)\s+"
-            r"REFERENCES\s+(\w+)\.?(\w+)?\s*\((\w+)\)",
-            text,
-            re.IGNORECASE,
-        )
-
-        if match:
-            return {
-                "name": match.group(3),
-                "from_table": match.group(2) or match.group(1),
-                "from_column": match.group(4),
-                "to_table": match.group(6) or match.group(5),
-                "to_column": match.group(7),
-            }
-        return None
-
-    def _parse_inline_references(self, sql_text: str) -> list[dict]:
-        """Parse inline REFERENCES in CREATE TABLE bodies."""
-        fks = []
+    def _find_alter_tables(self, sql: str) -> list[str]:
+        """Find all ALTER TABLE ... FOREIGN KEY statements."""
         pattern = re.compile(
-            r"CREATE\s+TABLE\s+(?:\w+\.)?(\w+)\s*\((.*?)\);", re.IGNORECASE | re.DOTALL
+            r'ALTER\s+TABLE\s+(?:ONLY\s+)?'
+            r'(?:(\w+)\.)?(\w+)\s+'
+            r'ADD\s+CONSTRAINT\s+(\w+)\s+'
+            r'FOREIGN\s+KEY\s*\(([^)]+)\)\s*'
+            r'REFERENCES\s+(?:(\w+)\.)?(\w+)\s*\(([^)]+)\)'
+            r'(?:\s*ON\s+DELETE\s+\w+)?'
+            r'(?:\s*ON\s+UPDATE\s+\w+)?',
+            re.IGNORECASE
+        )
+        return pattern.findall(sql)
+
+    def _parse_alter_table_fk(self, match: tuple) -> dict | None:
+        """Parse ALTER TABLE FOREIGN KEY match.
+        
+        Args:
+            match: Tuple of (schema, table, constraint_name, fk_columns,
+                   ref_schema, ref_table, ref_columns) from regex.
+        """
+        try:
+            schema = match[0] or "public"
+            table = match[1]
+            constraint_name = match[2]
+            fk_column = match[3].strip().strip('"')
+            ref_schema = match[4] or "public"
+            ref_table = match[5]
+            ref_column = match[6].strip().strip('"')
+
+            return {
+                "name": constraint_name,
+                "from_table": table,
+                "from_column": fk_column,
+                "to_table": ref_table,
+                "to_column": ref_column,
+            }
+        except Exception as e:
+            logger.warning(f"Failed to parse ALTER TABLE FK: {e}")
+            return None
+
+    # =====================================================================
+    # Inline REFERENCES parsing
+    # =====================================================================
+
+    def _parse_inline_references_robust(self, table_name: str, body: str) -> list[dict]:
+        """Parse inline REFERENCES from CREATE TABLE body.
+        
+        Handles: column_name TYPE REFERENCES table(column)
+        """
+        fks = []
+        
+        # Pattern: column_name TYPE [NOT NULL] REFERENCES table(column)
+        pattern = re.compile(
+            r'(\w+)\s+\w+(?:\(\d+(?:,\d+)?\))?\s*'
+            r'(?:NOT\s+NULL\s+)?'
+            r'REFERENCES\s+(\w+)\s*\((\w+)\)',
+            re.IGNORECASE
         )
 
-        for match in pattern.finditer(sql_text):
-            table_name = match.group(1)
-            body = match.group(2)
-
-            ref_pattern = re.compile(
-                r"(\w+)\s+\w+(?:\(\d+(?:,\d+)?\))?\s+NOT\s+NULL\s+REFERENCES\s+(\w+)\s*\((\w+)\)",
-                re.IGNORECASE,
-            )
-
-            for ref_match in ref_pattern.finditer(body):
-                fks.append(
-                    {
-                        "name": f"fk_{table_name}_{ref_match.group(2)}",
-                        "from_table": table_name,
-                        "from_column": ref_match.group(1),
-                        "to_table": ref_match.group(2),
-                        "to_column": ref_match.group(3),
-                    }
-                )
+        for ref_match in pattern.finditer(body):
+            fks.append({
+                "name": f"fk_{table_name}_{ref_match.group(2)}",
+                "from_table": table_name,
+                "from_column": ref_match.group(1),
+                "to_table": ref_match.group(2),
+                "to_column": ref_match.group(3),
+            })
 
         return fks
