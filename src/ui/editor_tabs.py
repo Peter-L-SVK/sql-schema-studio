@@ -18,38 +18,62 @@ from gi.repository import Gtk, GtkSource, Gdk, Pango, GLib
 
 
 SQL_KEYWORDS = [
-    "SELECT", "FROM", "WHERE", "INSERT", "UPDATE", "DELETE", "CREATE",
-    "ALTER", "DROP", "TABLE", "INDEX", "VIEW", "INTO", "VALUES", "SET",
-    "JOIN", "LEFT", "RIGHT", "INNER", "OUTER", "ON", "AND", "OR", "NOT",
-    "NULL", "IS", "IN", "BETWEEN", "LIKE", "ORDER", "BY", "ASC", "DESC",
-    "GROUP", "HAVING", "LIMIT", "OFFSET", "UNION", "ALL", "AS", "DISTINCT",
-    "COUNT", "SUM", "AVG", "MIN", "MAX", "CASE", "WHEN", "THEN", "ELSE",
-    "END", "EXISTS", "ANY", "SOME", "PRIMARY", "KEY", "FOREIGN", "REFERENCES",
-    "CONSTRAINT", "DEFAULT", "CHECK", "UNIQUE", "CASCADE", "RESTRICT",
-    "SERIAL", "INTEGER", "VARCHAR", "TEXT", "BOOLEAN", "TIMESTAMP",
-    "NUMERIC", "DATE", "FLOAT", "DOUBLE", "PRECISION", "BIGINT", "SMALLINT",
-    "BEGIN", "COMMIT", "ROLLBACK", "TRANSACTION", "EXPLAIN", "ANALYZE",
-    "VACUUM", "TRUNCATE", "GRANT", "REVOKE", "SCHEMA", "DATABASE",
-    "IF", "EXISTS", "RETURNS", "LANGUAGE", "FUNCTION", "TRIGGER",
-    "BEFORE", "AFTER", "INSTEAD", "OF", "FOR", "EACH", "ROW", "EXECUTE",
-    "PROCEDURE", "DECLARE", "CURSOR", "OPEN", "CLOSE", "FETCH", "RETURN",
-    "NEXT", "RECORD", "TYPE", "DOMAIN", "ENUM", "CAST", "COALESCE",
-    "NULLIF", "GREATEST", "LEAST", "ARRAY", "JSON", "JSONB", "UUID",
-    "RETURNING", "ADD", "COLUMN", "SEQUENCE", "EXTENSION",
-    "FULL", "CROSS", "NATURAL", "ILIKE", "WITH", "INTERSECT", "EXCEPT",
-    "SAVEPOINT", "REINDEX", "CLUSTER", "CHAR", "REAL", "BIGSERIAL",
-    "TIMESTAMPTZ", "TIME", "INTERVAL", "BYTEA", "TRUE", "FALSE", "OVER",
-    "EXTRACT", "NOW", "UNNEST", "RANK", "LAG", "LEAD",
+    # DML
+    "SELECT", "FROM", "WHERE", "INSERT", "INTO", "VALUES",
+    "UPDATE", "SET", "DELETE", "RETURNING",
+    # DDL
+    "CREATE", "TABLE", "DROP", "ALTER", "ADD", "COLUMN",
+    "INDEX", "VIEW", "SEQUENCE", "SCHEMA", "DATABASE", "EXTENSION",
+    # Joins
+    "JOIN", "LEFT", "RIGHT", "INNER", "OUTER", "FULL", "CROSS", "NATURAL",
+    # Filtering / ordering
+    "ON", "AND", "OR", "NOT", "IN", "EXISTS", "BETWEEN", "LIKE", "ILIKE",
+    "HAVING", "LIMIT", "OFFSET", "DISTINCT", "ALL", "AS",
+    "UNION", "INTERSECT", "EXCEPT",
+    # Multi-word phrases
+    "GROUP BY", "ORDER BY", "ON CONFLICT", "DO NOTHING",
+    "IF NOT EXISTS", "IF EXISTS", "OR REPLACE",
+    "PRIMARY KEY", "FOREIGN KEY", "REFERENCES",
+    "NOT NULL", "NO ACTION", "SET NULL",
+    "IS NULL", "IS NOT NULL", "NULLS FIRST", "NULLS LAST",
+    "PARTITION BY", "DO UPDATE",
+    # Constraints
+    "CONSTRAINT", "UNIQUE", "DEFAULT", "NULL", "CHECK",
+    "CASCADE", "RESTRICT",
+    # Transactions
+    "BEGIN", "COMMIT", "ROLLBACK", "TRANSACTION", "SAVEPOINT",
+    # Maintenance
+    "GRANT", "REVOKE", "TRUNCATE", "EXPLAIN", "ANALYZE",
+    "VACUUM", "REINDEX", "CLUSTER",
+    # Types
+    "INTEGER", "BIGINT", "SMALLINT", "TEXT", "VARCHAR", "CHAR",
+    "BOOLEAN", "NUMERIC", "REAL", "FLOAT", "SERIAL", "BIGSERIAL",
+    "TIMESTAMP", "TIMESTAMPTZ", "DATE", "TIME",
+    "INTERVAL", "JSON", "JSONB", "UUID", "ARRAY", "BYTEA",
+    "DOUBLE PRECISION",
+    # Logic / values
+    "TRUE", "FALSE", "CASE", "WHEN", "THEN", "ELSE", "END",
+    "ASC", "DESC",
+    # Window functions
+    "OVER", "WINDOW", "ROWS", "RANGE",
+    # Aggregate / scalar functions
+    "COUNT", "SUM", "AVG", "MIN", "MAX",
+    "COALESCE", "NULLIF", "CAST", "EXTRACT",
+    "NOW", "CURRENT_TIMESTAMP", "CURRENT_DATE", "CURRENT_TIME",
+    "GENERATE_SERIES", "UNNEST", "STRING_AGG", "ARRAY_AGG",
+    "ROW_NUMBER", "RANK", "DENSE_RANK", "LAG", "LEAD",
+    # PostgreSQL specific
     "COPY", "LISTEN", "NOTIFY", "LOCK", "INHERITS",
     "TABLESPACE", "OWNER", "TO", "PUBLIC",
-    "ONLY", "RECURSIVE", "MATERIALIZED", "TEMPORARY", "TEMP",
-    "UNLOGGED", "CONCURRENTLY", "USING", "IMMUTABLE", "STABLE",
-    "VOLATILE", "STRICT", "SECURITY", "DEFINER", "INVOKER",
-    "SETOF", "COST", "ROWS",
-    "WINDOW", "ROWS", "RANGE",
-    "CURRENT_TIMESTAMP", "CURRENT_DATE", "CURRENT_TIME",
-    "STRING_AGG", "ARRAY_AGG", "ROW_NUMBER", "GENERATE_SERIES",
-    "DENSE_RANK",
+    "MATERIALIZED", "TEMPORARY", "TEMP", "UNLOGGED",
+    "CONCURRENTLY", "USING", "IMMUTABLE", "STABLE", "VOLATILE",
+    "STRICT", "SECURITY", "DEFINER", "INVOKER",
+    "SETOF", "COST", "ROWS", "RETURNS",
+    "LANGUAGE", "FUNCTION", "TRIGGER", "PROCEDURE",
+    "BEFORE", "AFTER", "INSTEAD", "OF", "FOR", "EACH", "ROW", "EXECUTE",
+    "DECLARE", "CURSOR", "OPEN", "CLOSE", "FETCH", "RETURN",
+    "NEXT", "RECORD", "TYPE", "DOMAIN", "ENUM",
+    "GREATEST", "LEAST",
 ]
 
 
@@ -459,6 +483,14 @@ class EditorTabs(Gtk.Box):
 class EditorTab(Gtk.Box):
     """Single editor tab with GtkSourceView and custom Popover autocomplete."""
 
+    # Class-level setting shared across all tabs
+    _autocomplete_enabled: bool = True
+
+    @classmethod
+    def set_autocomplete_enabled(cls, enabled: bool):
+        """Enable or disable autocomplete for all tabs."""
+        cls._autocomplete_enabled = enabled
+    
     def __init__(self, parent_editor, title: str = "Query", content: str = ""):
         super().__init__(orientation=Gtk.Orientation.VERTICAL)
         self._parent_editor = parent_editor
@@ -539,9 +571,16 @@ class EditorTab(Gtk.Box):
         self._completion_popover.set_child(self._completion_list)
 
     def _get_word_at_cursor(self) -> tuple[str, Gtk.TextIter, Gtk.TextIter]:
+        """Get the current word (possibly multi-word) at cursor position.
+    
+        For multi-word matches, looks back up to 3 words.
+        Returns (word, start_iter, end_iter).
+        """
         buffer = self._view.get_buffer()
         cursor = buffer.get_iter_at_mark(buffer.get_insert())
         end = cursor.copy()
+    
+        # Get current word
         start = cursor.copy()
         while not start.starts_line():
             prev = start.copy()
@@ -551,27 +590,85 @@ class EditorTab(Gtk.Box):
             if ch in " \t\n\r()[]{},;.=<>!+-*/%|&^~@#:;\"'`":
                 break
             start = prev
+    
         word = buffer.get_text(start, end, False)
+    
+        # Try to expand to multi-word (up to 3 words back)
+        expanded_start = start.copy()
+        for _ in range(3):
+            # Skip whitespace backwards
+            while not expanded_start.starts_line():
+                prev = expanded_start.copy()
+                if not prev.backward_char():
+                    break
+                ch = prev.get_char()
+                if ch not in " \t\n\r":
+                    expanded_start = prev
+                    break
+                expanded_start = prev
+            else:
+                break
+        
+            # Get previous word
+            prev_word_start = expanded_start.copy()
+            while not prev_word_start.starts_line():
+                prev = prev_word_start.copy()
+                if not prev.backward_char():
+                    break
+                ch = prev.get_char()
+                if ch in " \t\n\r()[]{},;.=<>!+-*/%|&^~@#:;\"'`":
+                    break
+                prev_word_start = prev
+        
+            # Check if this multi-word combination exists in keywords
+            candidate = buffer.get_text(prev_word_start, end, False)
+            candidate_upper = candidate.upper()
+        
+            # Only expand if it matches at least one keyword
+            if any(kw.startswith(candidate_upper) for kw in SQL_KEYWORDS):
+                start = prev_word_start
+                word = candidate
+    
         return word, start, end
 
     def _on_buffer_changed(self, buffer):
         if self._completing:
+            return
+        if not EditorTab._autocomplete_enabled:
+            self._hide_completion()
             return
         if self._popover_debounce_id:
             GLib.source_remove(self._popover_debounce_id)
         self._popover_debounce_id = GLib.timeout_add(100, self._do_update_popover, buffer)
 
     def _do_update_popover(self, buffer):
+        """Update completion popover with matching keywords."""
         self._popover_debounce_id = 0
         word, start, end = self._get_word_at_cursor()
+    
         if len(word) < 2:
             self._hide_completion()
             return False
+    
         word_upper = word.upper()
+    
+        # Find matches - exact and starts-with
         matches = [kw for kw in SQL_KEYWORDS if kw.startswith(word_upper)]
+    
+        # Also include case-insensitive matches
+        if not matches:
+            matches = [kw for kw in SQL_KEYWORDS 
+                       if kw.upper().startswith(word_upper)]
+    
         if not matches:
             self._hide_completion()
             return False
+    
+        # Sort: exact matches first, then alphabetically
+        exact = [m for m in matches if m.upper() == word_upper]
+        starts = [m for m in matches if m.upper() != word_upper]
+        matches = exact + sorted(starts)
+    
         self._completion_matches = matches
         self._selected_index = -1
         self._populate_completion_list(matches)

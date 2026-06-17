@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.8 - Preferences Dialog (GPLv3)
+# SQL Schema Studio 0.9 - Preferences Dialog (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -32,7 +32,7 @@ class PreferencesDialog(Gtk.Window):
         )
         self._editor = editor
         self._settings = Settings()
-        self.set_default_size(500, 420)
+        self.set_default_size(520, 460)
 
         self._build_ui()
         self._load_settings()
@@ -73,6 +73,16 @@ class PreferencesDialog(Gtk.Window):
         self._highlight_line_check = Gtk.CheckButton(label="Highlight current line")
         editor_page.append(self._highlight_line_check)
 
+        # Autocomplete
+        autocomplete_label = Gtk.Label(label="Autocomplete", halign=Gtk.Align.START)
+        autocomplete_label.add_css_class("heading")
+        autocomplete_label.set_margin_top(8)
+        editor_page.append(autocomplete_label)
+        self._autocomplete_check = Gtk.CheckButton(
+            label="Enable SQL keyword autocomplete"
+        )
+        editor_page.append(self._autocomplete_check)
+
         # Color scheme
         scheme_label = Gtk.Label(label="Color Scheme", halign=Gtk.Align.START)
         scheme_label.add_css_class("heading")
@@ -93,10 +103,14 @@ class PreferencesDialog(Gtk.Window):
         general_page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
         set_margin(general_page, 16)
 
-        self._confirm_close_check = Gtk.CheckButton(label="Warn when closing with unsaved changes")
+        self._confirm_close_check = Gtk.CheckButton(
+            label="Warn when closing with unsaved changes"
+        )
         general_page.append(self._confirm_close_check)
 
-        self._restore_session_check = Gtk.CheckButton(label="Restore last session on startup")
+        self._restore_session_check = Gtk.CheckButton(
+            label="Restore last session on startup"
+        )
         general_page.append(self._restore_session_check)
 
         notebook.append_page(general_page, Gtk.Label(label="General"))
@@ -138,6 +152,9 @@ class PreferencesDialog(Gtk.Window):
         self._line_numbers_check.set_active(editor.get("show_line_numbers", True))
         self._highlight_line_check.set_active(editor.get("highlight_current_line", True))
 
+        # Autocomplete
+        self._autocomplete_check.set_active(editor.get("autocomplete_enabled", True))
+
         # Color scheme
         scheme_id = editor.get("color_scheme", "classic")
         model = self._scheme_combo.get_model()
@@ -165,6 +182,10 @@ class PreferencesDialog(Gtk.Window):
             "editor", "highlight_current_line", self._highlight_line_check.get_active()
         )
 
+        # Save autocomplete
+        autocomplete_enabled = self._autocomplete_check.get_active()
+        self._settings.set("editor", "autocomplete_enabled", autocomplete_enabled)
+
         scheme_id = self._scheme_combo.get_active_id()
         if scheme_id:
             self._settings.set("editor", "color_scheme", scheme_id)
@@ -177,20 +198,19 @@ class PreferencesDialog(Gtk.Window):
 
         # Apply to live editor (all tabs)
         if self._editor:
-            # Apply to all
             font_family = font_desc.get_family() if font_desc else "Monospace"
             font_size = (font_desc.get_size() // Pango.SCALE) if font_desc else 12
-        
-            for tab in self._editor._tabs:  # Prejdi všetky záložky
+
+            for tab in self._editor._tabs:
                 view = tab._view
                 buffer = view.get_buffer()
-            
+
                 view.set_tab_width(int(self._tab_spin.get_value()))
                 view.set_insert_spaces_instead_of_tabs(self._spaces_check.get_active())
                 view.set_show_line_numbers(self._line_numbers_check.get_active())
                 view.set_highlight_current_line(self._highlight_line_check.get_active())
-            
-                # Aplikuj font cez CSS
+
+                # Apply font via CSS
                 css = f"""
                 textview {{
                     font-family: {font_family};
@@ -202,14 +222,18 @@ class PreferencesDialog(Gtk.Window):
                 view.get_style_context().add_provider(
                     provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
                 )
-            
-                # Aplikuj farebnú schému
+
+                # Apply color scheme
                 if scheme_id:
                     manager = GtkSource.StyleSchemeManager.get_default()
                     scheme = manager.get_scheme(scheme_id)
                     if scheme:
                         buffer.set_style_scheme(scheme)
-        
+
+            # Apply autocomplete setting globally
+            from src.ui.editor_tabs import EditorTab
+            EditorTab.set_autocomplete_enabled(autocomplete_enabled)
+
             logger.info(f"Preferences applied to {len(self._editor._tabs)} editor tabs")
 
         self.close()
