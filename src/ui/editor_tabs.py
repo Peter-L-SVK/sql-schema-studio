@@ -17,6 +17,42 @@ gi.require_version("GtkSource", "5")
 from gi.repository import Gtk, GtkSource, Gdk, Pango, GLib
 
 
+SQL_KEYWORDS = [
+    "SELECT", "FROM", "WHERE", "INSERT", "UPDATE", "DELETE", "CREATE",
+    "ALTER", "DROP", "TABLE", "INDEX", "VIEW", "INTO", "VALUES", "SET",
+    "JOIN", "LEFT", "RIGHT", "INNER", "OUTER", "ON", "AND", "OR", "NOT",
+    "NULL", "IS", "IN", "BETWEEN", "LIKE", "ORDER", "BY", "ASC", "DESC",
+    "GROUP", "HAVING", "LIMIT", "OFFSET", "UNION", "ALL", "AS", "DISTINCT",
+    "COUNT", "SUM", "AVG", "MIN", "MAX", "CASE", "WHEN", "THEN", "ELSE",
+    "END", "EXISTS", "ANY", "SOME", "PRIMARY", "KEY", "FOREIGN", "REFERENCES",
+    "CONSTRAINT", "DEFAULT", "CHECK", "UNIQUE", "CASCADE", "RESTRICT",
+    "SERIAL", "INTEGER", "VARCHAR", "TEXT", "BOOLEAN", "TIMESTAMP",
+    "NUMERIC", "DATE", "FLOAT", "DOUBLE", "PRECISION", "BIGINT", "SMALLINT",
+    "BEGIN", "COMMIT", "ROLLBACK", "TRANSACTION", "EXPLAIN", "ANALYZE",
+    "VACUUM", "TRUNCATE", "GRANT", "REVOKE", "SCHEMA", "DATABASE",
+    "IF", "EXISTS", "RETURNS", "LANGUAGE", "FUNCTION", "TRIGGER",
+    "BEFORE", "AFTER", "INSTEAD", "OF", "FOR", "EACH", "ROW", "EXECUTE",
+    "PROCEDURE", "DECLARE", "CURSOR", "OPEN", "CLOSE", "FETCH", "RETURN",
+    "NEXT", "RECORD", "TYPE", "DOMAIN", "ENUM", "CAST", "COALESCE",
+    "NULLIF", "GREATEST", "LEAST", "ARRAY", "JSON", "JSONB", "UUID",
+    "RETURNING", "ADD", "COLUMN", "SEQUENCE", "EXTENSION",
+    "FULL", "CROSS", "NATURAL", "ILIKE", "WITH", "INTERSECT", "EXCEPT",
+    "SAVEPOINT", "REINDEX", "CLUSTER", "CHAR", "REAL", "BIGSERIAL",
+    "TIMESTAMPTZ", "TIME", "INTERVAL", "BYTEA", "TRUE", "FALSE", "OVER",
+    "EXTRACT", "NOW", "UNNEST", "RANK", "LAG", "LEAD",
+    "COPY", "LISTEN", "NOTIFY", "LOCK", "INHERITS",
+    "TABLESPACE", "OWNER", "TO", "PUBLIC",
+    "ONLY", "RECURSIVE", "MATERIALIZED", "TEMPORARY", "TEMP",
+    "UNLOGGED", "CONCURRENTLY", "USING", "IMMUTABLE", "STABLE",
+    "VOLATILE", "STRICT", "SECURITY", "DEFINER", "INVOKER",
+    "SETOF", "COST", "ROWS",
+    "WINDOW", "ROWS", "RANGE",
+    "CURRENT_TIMESTAMP", "CURRENT_DATE", "CURRENT_TIME",
+    "STRING_AGG", "ARRAY_AGG", "ROW_NUMBER", "GENERATE_SERIES",
+    "DENSE_RANK",
+]
+
+
 class EditorTabs(Gtk.Box):
     """SQL editor panel with tabs and search/replace."""
 
@@ -24,7 +60,7 @@ class EditorTabs(Gtk.Box):
         super().__init__(orientation=Gtk.Orientation.VERTICAL)
         self.set_vexpand(True)
         self.set_hexpand(True)
-    
+
         self._window = window
         self._tabs: list[EditorTab] = []
         self._tab_labels: list[Gtk.Label] = []
@@ -33,18 +69,16 @@ class EditorTabs(Gtk.Box):
         self._search_debounce_id = 0
         self._tab_counter = 0
 
-        # Tab bar container with CSS class
         tab_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
         tab_bar.add_css_class("tab-bar-container")
-    
+
         self._notebook = Gtk.Notebook()
         self._notebook.set_scrollable(True)
         self._notebook.set_hexpand(True)
         self._notebook.set_vexpand(True)
         self._notebook.connect("switch-page", self._on_tab_switched)
         tab_bar.append(self._notebook)
-    
-        # + button as action widget in the notebook header
+
         self._new_tab_btn = Gtk.Button.new_from_icon_name("list-add-symbolic")
         self._new_tab_btn.set_has_frame(False)
         self._new_tab_btn.set_tooltip_text("New tab (Ctrl+T)")
@@ -52,27 +86,23 @@ class EditorTabs(Gtk.Box):
         self._new_tab_btn.add_css_class("flat")
         self._new_tab_btn.connect("clicked", lambda b: self.add_tab())
         self._notebook.set_action_widget(self._new_tab_btn, Gtk.PackType.END)
-    
+
         self.append(tab_bar)
 
-        # Search bar
         self._search_revealer = Gtk.Revealer()
         self._search_revealer.set_transition_type(Gtk.RevealerTransitionType.SLIDE_DOWN)
         self._search_revealer.set_reveal_child(False)
         self._build_search_bar()
         self.append(self._search_revealer)
 
-        # First tab
         self.add_tab()
         self._load_settings()
 
     def _generate_tab_title(self) -> str:
-        """Generate a unique tab title with incremental numbering."""
         self._tab_counter += 1
         return f"Query {self._tab_counter}"
 
     def _apply_settings_to_tab(self, tab: EditorTab):
-        """Apply global editor settings to a specific tab."""
         from src.utils.settings import Settings
         settings = Settings()
         editor = settings.get_section("editor")
@@ -103,17 +133,10 @@ class EditorTabs(Gtk.Box):
         view.get_style_context().add_provider(provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
     def _load_settings(self):
-        """Apply saved editor settings to all tabs."""
         for tab in self._tabs:
             self._apply_settings_to_tab(tab)
 
     def add_tab(self, title: str = None, content: str = "") -> EditorTab:
-        """Add a new editor tab.
-        
-        Args:
-            title: Tab title. If None, auto-generated as 'Query N'.
-            content: Initial SQL content.
-        """
         if title is None:
             title = self._generate_tab_title()
         else:
@@ -122,7 +145,6 @@ class EditorTabs(Gtk.Box):
         tab = EditorTab(self, title, content)
         tab._search_highlight_tag = self._create_highlight_tag(tab._view.get_buffer())
 
-        # Tab label with close button
         label_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=2)
         label = Gtk.Label(label=title)
         btn_close = Gtk.Button.new_from_icon_name("window-close-symbolic")
@@ -145,10 +167,8 @@ class EditorTabs(Gtk.Box):
         return tab
 
     def close_tab(self, tab: EditorTab):
-        """Close a specific tab."""
         if len(self._tabs) <= 1:
             return
-
         idx = self._tabs.index(tab)
         self._notebook.remove_page(idx)
         self._tabs.remove(tab)
@@ -157,41 +177,30 @@ class EditorTabs(Gtk.Box):
             self._active_tab_index = len(self._tabs) - 1
 
     def rename_tab(self, tab: EditorTab, new_title: str):
-        """Rename a specific tab.
-        
-        Args:
-            tab: The EditorTab to rename.
-            new_title: New title for the tab.
-        """
         idx = self._tabs.index(tab)
         if 0 <= idx < len(self._tab_labels):
             self._tab_labels[idx].set_text(new_title)
 
     def get_active_tab(self) -> EditorTab | None:
-        """Get the currently active tab."""
         page_num = self._notebook.get_current_page()
         if 0 <= page_num < len(self._tabs):
             return self._tabs[page_num]
         return None
 
     def get_text(self) -> str:
-        """Get text from active tab."""
         tab = self.get_active_tab()
         return tab.get_text() if tab else ""
 
     def set_text(self, text: str):
-        """Set text in active tab."""
         tab = self.get_active_tab()
         if tab:
             tab.set_text(text)
 
     def get_selected_text(self) -> str:
-        """Get selected text from active tab."""
         tab = self.get_active_tab()
         return tab.get_selected_text() if tab else ""
 
     def _on_tab_switched(self, notebook, page, page_num):
-        """Handle tab switch."""
         self._active_tab_index = page_num
         self._clear_search_highlights()
         if self._search_revealer.get_reveal_child():
@@ -200,17 +209,13 @@ class EditorTabs(Gtk.Box):
                 self._highlight_all_matches(search_text)
 
     def _create_highlight_tag(self, buffer):
-        """Create search highlight tag for a buffer."""
         return buffer.create_tag(
             "search_highlight",
             background="yellow",
             background_rgba=Gdk.RGBA(red=1.0, green=1.0, blue=0.0, alpha=0.5),
         )
 
-    # --- Search & Replace ---
-
     def _clear_search_highlights(self):
-        """Clear search highlights in active tab."""
         tab = self.get_active_tab()
         if tab and tab._search_highlight_tag:
             buffer = tab._view.get_buffer()
@@ -219,44 +224,33 @@ class EditorTabs(Gtk.Box):
             buffer.remove_tag(tab._search_highlight_tag, start, end)
 
     def _do_highlight(self, search_text):
-        """Execute highlighting in active tab."""
         self._current_search_text = search_text
         self._highlight_all_matches(search_text)
         return False
 
     def _highlight_all_matches(self, search_text: str):
-        """Highlight all occurrences in active tab."""
         tab = self.get_active_tab()
         if not tab or not tab._search_highlight_tag:
             return
-
         buffer = tab._view.get_buffer()
         self._clear_search_highlights()
-
         if not search_text or len(search_text) > 200:
             return
-
         start = buffer.get_start_iter()
         end = buffer.get_end_iter()
-
         if buffer.get_char_count() > 500_000:
             return
-
         flags = re.IGNORECASE if not self._case_check.get_active() else 0
-
         if self._whole_word_check.get_active():
             pattern = r'\b' + re.escape(search_text) + r'\b'
         else:
             pattern = re.escape(search_text)
-
         try:
             regex = re.compile(pattern, flags)
         except re.error:
             return
-
         text = buffer.get_text(start, end, False)
         match_count = 0
-
         for match in regex.finditer(text):
             if match_count >= 5000:
                 break
@@ -266,11 +260,9 @@ class EditorTabs(Gtk.Box):
             match_count += 1
 
     def _on_find(self):
-        """Open search bar."""
         self._search_revealer.set_reveal_child(True)
         self._search_entry.grab_focus()
         self._search_entry.select_region(0, -1)
-
         tab = self.get_active_tab()
         if tab:
             selected = tab.get_selected_text()
@@ -280,51 +272,41 @@ class EditorTabs(Gtk.Box):
                 self._highlight_all_matches(selected)
 
     def _on_find_next(self):
-        """Find next occurrence in active tab."""
         search_text = self._search_entry.get_text()
         if not search_text:
             return
         self._search_text(search_text, forward=True)
 
     def _on_find_prev(self):
-        """Find previous occurrence in active tab."""
         search_text = self._search_entry.get_text()
         if not search_text:
             return
         self._search_text(search_text, forward=False)
 
     def _on_search_changed(self, entry):
-        """Highlight matches with debounce."""
         if hasattr(self, '_search_debounce_id') and self._search_debounce_id:
             GLib.source_remove(self._search_debounce_id)
         self._search_debounce_id = GLib.timeout_add(300, self._do_highlight, entry.get_text())
 
     def _get_search_flags(self):
-        """Get search flags for Gtk.TextSearchFlags."""
         flags = Gtk.TextSearchFlags.VISIBLE_ONLY | Gtk.TextSearchFlags.TEXT_ONLY
         if not self._case_check.get_active():
             flags |= Gtk.TextSearchFlags.CASE_INSENSITIVE
         return flags
 
     def _search_text(self, search_text: str, forward: bool = True):
-        """Search for text in active tab buffer."""
         tab = self.get_active_tab()
         if not tab or not search_text:
             return
-
         buffer = tab._view.get_buffer()
         cursor_iter = buffer.get_iter_at_mark(buffer.get_insert())
-
         if forward and buffer.get_has_selection():
             cursor_iter = buffer.get_iter_at_mark(buffer.get_selection_bound())
-
         flags = self._get_search_flags()
-
         if forward:
             found = cursor_iter.forward_search(search_text, flags, None)
         else:
             found = cursor_iter.backward_search(search_text, flags, None)
-
         if found:
             match_start, match_end = found
             buffer.select_range(match_start, match_end)
@@ -336,7 +318,6 @@ class EditorTabs(Gtk.Box):
             else:
                 wrap_iter = buffer.get_end_iter()
                 found = wrap_iter.backward_search(search_text, flags, None)
-
             if found:
                 match_start, match_end = found
                 buffer.select_range(match_start, match_end)
@@ -346,22 +327,18 @@ class EditorTabs(Gtk.Box):
                 self._window.statusbar.set_message(f"Text '{search_text}' not found")
 
     def _on_replace(self):
-        """Replace current selection in active tab."""
         tab = self.get_active_tab()
         if not tab:
             return
-
         buffer = tab._view.get_buffer()
         if buffer.get_has_selection():
             start, end = buffer.get_selection_bounds()
             selected = buffer.get_text(start, end, False)
             search_text = self._search_entry.get_text()
-
             if self._case_check.get_active():
                 matches = selected == search_text
             else:
                 matches = selected.lower() == search_text.lower()
-
             if matches:
                 buffer.delete_selection(True, True)
                 buffer.insert_at_cursor(self._replace_entry.get_text())
@@ -369,22 +346,17 @@ class EditorTabs(Gtk.Box):
                 self._search_text(search_text, forward=True)
 
     def _on_replace_all(self):
-        """Replace all occurrences in active tab."""
         tab = self.get_active_tab()
         if not tab:
             return
-
         buffer = tab._view.get_buffer()
         search = self._search_entry.get_text()
         replace = self._replace_entry.get_text()
-
         if not search:
             return
-
         start = buffer.get_start_iter()
         end = buffer.get_end_iter()
         text = buffer.get_text(start, end, False)
-
         if self._case_check.get_active():
             pattern = re.escape(search)
             count = text.count(search)
@@ -393,7 +365,6 @@ class EditorTabs(Gtk.Box):
             pattern = re.escape(search)
             count = len(re.findall(pattern, text, re.IGNORECASE))
             new_text = re.sub(pattern, replace, text, flags=re.IGNORECASE)
-
         if count > 0:
             buffer.set_text(new_text)
             self._window.statusbar.set_message(f"Replaced {count} occurrences")
@@ -403,7 +374,6 @@ class EditorTabs(Gtk.Box):
             self._window.statusbar.set_message(f"Text '{search}' not found")
 
     def _build_search_bar(self):
-        """Build search and replace bar."""
         search_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         search_box.set_margin_start(6)
         search_box.set_margin_end(6)
@@ -474,18 +444,20 @@ class EditorTabs(Gtk.Box):
         self._search_revealer.set_child(search_box)
 
     def get_active_buffer(self):
-        """Get the text buffer of the active tab."""
         tab = self.get_active_tab()
         return tab._view.get_buffer() if tab else None
 
     def get_active_view(self):
-        """Get the source view of the active tab."""
         tab = self.get_active_tab()
         return tab._view if tab else None
 
 
+# ======================================================================
+# Single Editor Tab
+# ======================================================================
+
 class EditorTab(Gtk.Box):
-    """Single editor tab with GtkSourceView."""
+    """Single editor tab with GtkSourceView and custom Popover autocomplete."""
 
     def __init__(self, parent_editor, title: str = "Query", content: str = ""):
         super().__init__(orientation=Gtk.Orientation.VERTICAL)
@@ -493,6 +465,13 @@ class EditorTab(Gtk.Box):
         self._window = parent_editor._window
         self._title = title
         self._search_highlight_tag = None
+
+        self._completion_popover: Gtk.Popover | None = None
+        self._completion_list: Gtk.ListBox | None = None
+        self._completion_matches: list[str] = []
+        self._selected_index: int = -1
+        self._completing: bool = False
+        self._popover_debounce_id: int = 0
 
         scroll = Gtk.ScrolledWindow()
         scroll.set_vexpand(True)
@@ -514,6 +493,7 @@ class EditorTab(Gtk.Box):
             self._view.get_buffer().set_text(content)
 
         self._setup_sql_language()
+        self._setup_autocomplete()
 
         key_controller = Gtk.EventControllerKey()
         key_controller.connect("key-pressed", self._on_key_pressed)
@@ -523,7 +503,6 @@ class EditorTab(Gtk.Box):
         self.append(scroll)
 
     def _setup_sql_language(self):
-        """Configure SQL syntax highlighting."""
         manager = GtkSource.LanguageManager.get_default()
         lang = manager.get_language("sql")
         if not lang:
@@ -531,7 +510,6 @@ class EditorTab(Gtk.Box):
                 if "sql" in lang_id.lower():
                     lang = manager.get_language(lang_id)
                     break
-
         if lang:
             buffer = self._view.get_buffer()
             buffer.set_language(lang)
@@ -542,57 +520,191 @@ class EditorTab(Gtk.Box):
                     buffer.set_style_scheme(scheme)
                     break
 
+    def _setup_autocomplete(self):
+        self._build_completion_popover()
+        buffer = self._view.get_buffer()
+        buffer.connect("changed", self._on_buffer_changed)
+
+    def _build_completion_popover(self):
+        """Create the popover and its listbox – bez ScrolledWindow, nech sa veľkosť prispôsobí."""
+        self._completion_popover = Gtk.Popover()
+        self._completion_popover.set_autohide(True)
+        self._completion_popover.set_has_arrow(False)
+        self._completion_popover.set_parent(self._view)
+        self._completion_popover.add_css_class("completion-popover")
+
+        self._completion_list = Gtk.ListBox()
+        self._completion_list.add_css_class("completion-list")
+        self._completion_list.connect("row-activated", self._on_completion_activated)
+        self._completion_popover.set_child(self._completion_list)
+
+    def _get_word_at_cursor(self) -> tuple[str, Gtk.TextIter, Gtk.TextIter]:
+        buffer = self._view.get_buffer()
+        cursor = buffer.get_iter_at_mark(buffer.get_insert())
+        end = cursor.copy()
+        start = cursor.copy()
+        while not start.starts_line():
+            prev = start.copy()
+            if not prev.backward_char():
+                break
+            ch = prev.get_char()
+            if ch in " \t\n\r()[]{},;.=<>!+-*/%|&^~@#:;\"'`":
+                break
+            start = prev
+        word = buffer.get_text(start, end, False)
+        return word, start, end
+
+    def _on_buffer_changed(self, buffer):
+        if self._completing:
+            return
+        if self._popover_debounce_id:
+            GLib.source_remove(self._popover_debounce_id)
+        self._popover_debounce_id = GLib.timeout_add(100, self._do_update_popover, buffer)
+
+    def _do_update_popover(self, buffer):
+        self._popover_debounce_id = 0
+        word, start, end = self._get_word_at_cursor()
+        if len(word) < 2:
+            self._hide_completion()
+            return False
+        word_upper = word.upper()
+        matches = [kw for kw in SQL_KEYWORDS if kw.startswith(word_upper)]
+        if not matches:
+            self._hide_completion()
+            return False
+        self._completion_matches = matches
+        self._selected_index = -1
+        self._populate_completion_list(matches)
+        self._show_completion_at_iter(start)
+        return False
+
+    def _populate_completion_list(self, matches: list[str]):
+        self._completion_list.remove_all()
+        for i, kw in enumerate(matches):
+            row = Gtk.ListBoxRow()
+            lbl = Gtk.Label(label=kw)
+            lbl.set_xalign(0.0)
+            lbl.set_margin_start(8)
+            lbl.set_margin_end(8)
+            lbl.set_margin_top(3)
+            lbl.set_margin_bottom(3)
+            row.set_child(lbl)
+            self._completion_list.append(row)
+
+    def _show_completion_at_iter(self, text_iter: Gtk.TextIter):
+        rect = self._view.get_iter_location(text_iter)
+        wx, wy = self._view.buffer_to_window_coords(
+            Gtk.TextWindowType.WIDGET, rect.x, rect.y
+        )
+        point = Gdk.Rectangle()
+        point.x = wx
+        point.y = wy
+        point.width = max(rect.width, 4)
+        point.height = rect.height
+        self._completion_popover.set_pointing_to(point)
+        self._completion_popover.popup()
+
+    def _hide_completion(self):
+        if self._completion_popover and self._completion_popover.is_visible():
+            self._completion_popover.popdown()
+
+    def _apply_completion(self, keyword: str):
+        buffer = self._view.get_buffer()
+        word, start, end = self._get_word_at_cursor()
+        self._completing = True
+        buffer.begin_user_action()
+        buffer.delete(start, end)
+        buffer.insert(start, keyword)
+        buffer.end_user_action()
+        self._completing = False
+        self._hide_completion()
+        self._view.grab_focus()
+
+    def _on_completion_activated(self, listbox, row):
+        idx = row.get_index()
+        if 0 <= idx < len(self._completion_matches):
+            self._apply_completion(self._completion_matches[idx])
+
+    def _select_next_in_popover(self):
+        if not self._completion_matches:
+            return
+        self._selected_index += 1
+        if self._selected_index >= len(self._completion_matches):
+            self._selected_index = 0
+        row = self._completion_list.get_row_at_index(self._selected_index)
+        if row:
+            self._completion_list.select_row(row)
+            row.grab_focus()
+
+    def _select_prev_in_popover(self):
+        if not self._completion_matches:
+            return
+        self._selected_index -= 1
+        if self._selected_index < 0:
+            self._selected_index = len(self._completion_matches) - 1
+        row = self._completion_list.get_row_at_index(self._selected_index)
+        if row:
+            self._completion_list.select_row(row)
+            row.grab_focus()
+
     def _on_key_pressed(self, controller, keyval, keycode, state):
-        """Handle keyboard shortcuts."""
+        if self._completion_popover and self._completion_popover.is_visible():
+            if keyval in (Gdk.KEY_Down, Gdk.KEY_KP_Down):
+                self._select_next_in_popover()
+                return True
+            if keyval in (Gdk.KEY_Up, Gdk.KEY_KP_Up):
+                self._select_prev_in_popover()
+                return True
+            if keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter, Gdk.KEY_Tab):
+                if 0 <= self._selected_index < len(self._completion_matches):
+                    self._apply_completion(self._completion_matches[self._selected_index])
+                elif self._completion_matches:
+                    self._apply_completion(self._completion_matches[0])
+                return True
+            if keyval == Gdk.KEY_Escape:
+                self._hide_completion()
+                return True
+
         if keyval == Gdk.KEY_F5:
             self._window._on_run_clicked()
             return True
         if keyval == Gdk.KEY_Return and (state & Gdk.ModifierType.CONTROL_MASK):
             self._window._on_run_clicked()
             return True
-
         if keyval == Gdk.KEY_f and (state & Gdk.ModifierType.CONTROL_MASK):
             self._parent_editor._on_find()
             return True
-
         if keyval == Gdk.KEY_h and (state & Gdk.ModifierType.CONTROL_MASK):
             self._parent_editor._on_find()
             GLib.idle_add(self._parent_editor._replace_entry.grab_focus)
             return True
-
         if keyval == Gdk.KEY_Escape and self._parent_editor._search_revealer.get_reveal_child():
             self._parent_editor._search_revealer.set_reveal_child(False)
             self._parent_editor._clear_search_highlights()
             self._view.grab_focus()
             return True
-
         if keyval == Gdk.KEY_F3:
             if state & Gdk.ModifierType.SHIFT_MASK:
                 self._parent_editor._on_find_prev()
             else:
                 self._parent_editor._on_find_next()
             return True
-
         if keyval == Gdk.KEY_t and (state & Gdk.ModifierType.CONTROL_MASK):
             self._parent_editor.add_tab()
             return True
-
         return False
 
     def get_text(self) -> str:
-        """Get all text from the editor."""
         buffer = self._view.get_buffer()
         start = buffer.get_start_iter()
         end = buffer.get_end_iter()
         return str(buffer.get_text(start, end, False))
 
     def set_text(self, text: str):
-        """Set editor content."""
         buffer = self._view.get_buffer()
         buffer.set_text(text)
 
     def get_selected_text(self) -> str:
-        """Get selected text, or all text if no selection."""
         buffer = self._view.get_buffer()
         if buffer.get_has_selection():
             start, end = buffer.get_selection_bounds()
