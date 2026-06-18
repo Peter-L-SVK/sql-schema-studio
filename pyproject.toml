@@ -90,12 +90,14 @@ packages = [
 src = ["resources/ui/*.css"]
 
 [tool.flake8]
-max-line-length = 100
-extend-ignore = "E402,W503,E226"
+max-line-length = 120
+extend-ignore = "E402,E501,W503,E226"
 exclude = [
     ".git",
     "__pycache__",
-    "buld_dist"
+    "buld_dist",
+    "src/plugins/perl",
+    "src/hooks/perl_hooks",
 ]
 ignore = "E501,E302"
 per-file-ignores = """
