@@ -244,18 +244,19 @@ class DrawingMixin:
 
         For curve and ortho styles, _draw_segment_styled changes the drawn
         direction at the endpoint vs the geometric angle between the last two
-        path points:
+        path points.
 
-        - curve: cubic Bezier tangent at path[-1] is horizontal
-          (last control point is (x2-ctrl, y2) → direction to (x2,y2) is 0°)
-        - ortho: last drawn sub-segment goes horizontally into x2
-          (mid_x → x2 direction is 0° or 180°)
+        - curve: cubic Bezier tangent at endpoint is horizontal
+        - ortho: last drawn sub-segment goes horizontally into endpoint
         - straight/detour: geometric angle is correct
 
-        at_end=True  → arrowhead at path[-1] (forward direction)
-        at_end=False → arrowhead at path[0]  (reverse direction)
+        Fixed: computes angle relative to the last two path points using
+        the visual style assumptions, correcting for target tables on the left.
         """
         path = fk._cached_path
+        if len(path) < 2:
+            return 0.0
+
         if at_end:
             x1, y1 = path[-2]
             x2, y2 = path[-1]
@@ -263,14 +264,12 @@ class DrawingMixin:
             x1, y1 = path[1]
             x2, y2 = path[0]
 
-        if fk.line_style == "curve":
-            # Bezier tangent at endpoint is always horizontal
+        # For curve and ortho, the final visual segment is horizontal.
+        # We determine if it moves right (0°) or left (π) based on coordinates.
+        if fk.line_style in ("curve", "ortho"):
+            # The last segment is drawn horizontally into the table.
+            # Determine direction based on whether we approach from the right.
             return 0.0 if x2 >= x1 else math.pi
-
-        elif fk.line_style == "ortho":
-            # Last ortho sub-segment: horizontal from mid_x to x2
-            mid_x = (x1 + x2) / 2
-            return 0.0 if x2 >= mid_x else math.pi
 
         else:
             # straight or detour — geometric angle is the visual angle
