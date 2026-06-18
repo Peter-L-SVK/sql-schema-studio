@@ -11,6 +11,7 @@
 from __future__ import annotations
 import gi
 import re
+from typing import Optional, cast
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("GtkSource", "5")
@@ -313,7 +314,7 @@ class EditorTabs(Gtk.Box):
         for tab in self._tabs:
             self._apply_settings_to_tab(tab)
 
-    def add_tab(self, title: str = None, content: str = "") -> EditorTab:
+    def add_tab(self, title: Optional[str] = None, content: str = "") -> EditorTab:
         if title is None:
             title = self._generate_tab_title()
         else:
@@ -361,7 +362,7 @@ class EditorTabs(Gtk.Box):
     def get_active_tab(self) -> EditorTab | None:
         page_num = self._notebook.get_current_page()
         if 0 <= page_num < len(self._tabs):
-            return self._tabs[page_num]
+            return cast(EditorTab, self._tabs[page_num])
         return None
 
     def get_text(self) -> str:
@@ -827,6 +828,8 @@ class EditorTab(Gtk.Box):
         return False
 
     def _populate_completion_list(self, matches: list[str]):
+        if self._completion_list is None:
+            return
         self._completion_list.remove_all()
         for i, kw in enumerate(matches):
             row = Gtk.ListBoxRow()
@@ -840,6 +843,9 @@ class EditorTab(Gtk.Box):
             self._completion_list.append(row)
 
     def _show_completion_at_iter(self, text_iter: Gtk.TextIter):
+        """Position and show the popover at the given text position."""
+        if self._completion_popover is None:
+            return
         rect = self._view.get_iter_location(text_iter)
         wx, wy = self._view.buffer_to_window_coords(Gtk.TextWindowType.WIDGET, rect.x, rect.y)
         point = Gdk.Rectangle()
@@ -851,7 +857,7 @@ class EditorTab(Gtk.Box):
         self._completion_popover.popup()
 
     def _hide_completion(self):
-        if self._completion_popover and self._completion_popover.is_visible():
+        if self._completion_popover is not None and self._completion_popover.is_visible():
             self._completion_popover.popdown()
 
     def _apply_completion(self, keyword: str):
@@ -867,6 +873,8 @@ class EditorTab(Gtk.Box):
         self._view.grab_focus()
 
     def _on_completion_activated(self, listbox, row):
+        if self._completion_matches is None:
+            return
         idx = row.get_index()
         if 0 <= idx < len(self._completion_matches):
             self._apply_completion(self._completion_matches[idx])

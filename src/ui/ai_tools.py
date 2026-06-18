@@ -223,7 +223,9 @@ class AIToolsPopover:
                 total = len(df)
                 dup_count = df.is_duplicated().sum()
                 if dup_count > 0:
-                    rows.append([name, str(total), str(dup_count), f"{dup_count/total*100:.1f}%"])
+                    rows.append(
+                        [name, str(total), str(dup_count), f"{dup_count / total * 100:.1f}%"]
+                    )
             if rows:
                 window.results.show_query_result(cols, rows, 0)
                 window.statusbar.set_message(f"Found duplicates in {len(rows)} tables")
@@ -365,14 +367,14 @@ class AIToolsPopover:
             engine = AnalyticsEngine(window.db_connector)
 
             results = engine.query_to_df("""
-            SELECT 
+            SELECT
                 schemaname || '.' || relname AS table_name,
                 pg_total_relation_size(schemaname||'.'||relname) AS total_bytes,
                 pg_relation_size(schemaname||'.'||relname) AS data_bytes,
                 pg_indexes_size(schemaname||'.'||relname) AS index_bytes,
                 n_live_tup AS row_count,
                 n_dead_tup AS dead_rows,
-                CASE WHEN n_live_tup > 0 
+                CASE WHEN n_live_tup > 0
                     THEN round(n_dead_tup::numeric / n_live_tup * 100, 1)
                     ELSE 0 END AS dead_ratio,
                 last_vacuum,
@@ -391,9 +393,9 @@ class AIToolsPopover:
                     rows.append(
                         [
                             r[0],
-                            f"{r[1]/1024/1024:.1f} MB" if r[1] else "0.0 MB",
-                            f"{r[2]/1024/1024:.1f} MB" if r[2] else "0.0 MB",
-                            f"{r[3]/1024/1024:.1f} MB" if r[3] else "0.0 MB",
+                            f"{r[1] / 1024 / 1024:.1f} MB" if r[1] else "0.0 MB",
+                            f"{r[2] / 1024 / 1024:.1f} MB" if r[2] else "0.0 MB",
+                            f"{r[3] / 1024 / 1024:.1f} MB" if r[3] else "0.0 MB",
                             str(r[4] or 0),
                             f"{r[6]}%" if r[6] else "0%",
                             str(last_vac) if last_vac else "Never",
@@ -556,7 +558,7 @@ class AIToolsPopover:
                 summary_rows.append(["", ""])
                 summary_rows.append(["--- Top Tables ---", ""])
                 for r in table_sizes.iter_rows():
-                    summary_rows.append([r[0], f"{r[1]/1024/1024:.1f} MB"])
+                    summary_rows.append([r[0], f"{r[1] / 1024 / 1024:.1f} MB"])
 
             window.results.show_query_result(summary_cols, summary_rows, 0)
             window.statusbar.set_message("Performance insights generated")

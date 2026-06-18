@@ -6,11 +6,9 @@
 # Feel free to distribute and modify.
 # ----------------------------------------------------------------------
 
-"""Parse SQL schemas using sqlparse with robust regex fallback."""
+"""Parse SQL schemas."""
 
 import re
-import sqlparse
-from sqlparse.tokens import Keyword, Name, Punctuation, Comment
 
 from src.utils.logging import get_logger
 
@@ -31,41 +29,33 @@ class SchemaParser:
     """
 
     def parse_sql(self, sql_text: str) -> tuple[list[dict], list[dict]]:
-        """Parse SQL text and return (tables, foreign_keys).
-
-        Each table dict: {name, schema, columns: [{name, type, nullable, default, is_pk}]}
-        Each FK dict: {name, from_table, from_column, to_table, to_column}
-        """
-        # Step 1: Remove inline comments to prevent parser confusion
+        """Parse SQL text and return (tables, foreign_keys)."""
         clean_text = self._remove_comments(sql_text)
-
-        # Step 2: Normalize whitespace and quotes
         clean_text = self._normalize_sql(clean_text)
 
         tables = []
         foreign_keys = []
         table_bodies = {}
 
-        # Step 3: Extract all CREATE TABLE statements with their bodies
+        # Extract CREATE TABLE statements
         for match in self._find_create_tables(clean_text):
             table_info = self._parse_create_table_robust(match)
             if table_info:
                 tables.append(table_info)
-                # match is tuple (schema, table_name, body) — store only body
                 table_bodies[table_info["name"]] = match[2]
 
-        # Step 4: Extract ALTER TABLE foreign keys
+        # Extract ALTER TABLE foreign keys
         for match in self._find_alter_tables(clean_text):
             fk = self._parse_alter_table_fk(match)
             if fk:
                 foreign_keys.append(fk)
 
-        # Step 5: Extract inline REFERENCES from CREATE TABLE bodies
+        # Extract inline REFERENCES
         for table_name, body in table_bodies.items():
             inline_fks = self._parse_inline_references_robust(table_name, body)
             foreign_keys.extend(inline_fks)
 
-        # Deduplicate FKs by name
+        # Deduplicate FKs
         seen = set()
         unique_fks = []
         for fk in foreign_keys:
@@ -108,20 +98,22 @@ class SchemaParser:
     # CREATE TABLE parsing
     # =====================================================================
 
-    def _find_create_tables(self, sql: str) -> list[str]:
-        """Find all CREATE TABLE statement bodies."""
-        # Match CREATE TABLE ... ( ... );
+    def _find_create_tables(self, sql: str) -> list[tuple[str, ...]]:
+        """Find all CREATE TABLE statement bodies.
+
+        Returns list of (schema, table_name, body) tuples.
+        """
         pattern = re.compile(
             r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?" r"(?:(\w+)\.)?(\w+)\s*\((.*?)\)\s*;",
             re.IGNORECASE | re.DOTALL,
         )
         return pattern.findall(sql)
 
-    def _parse_create_table_robust(self, match: tuple) -> dict | None:
+    def _parse_create_table_robust(self, match: tuple[str, ...]) -> dict | None:
         """Parse a CREATE TABLE match robustly.
 
         Args:
-            match: Tuple of (schema, table_name, body) from regex.
+        match: Tuple of (schema, table_name, body) from regex.
         """
         try:
             schema = match[0] or "public"
@@ -266,7 +258,7 @@ class SchemaParser:
     # ALTER TABLE FOREIGN KEY parsing
     # =====================================================================
 
-    def _find_alter_tables(self, sql: str) -> list[str]:
+    def _find_alter_tables(self, sql: str) -> list[tuple[str, ...]]:
         """Find all ALTER TABLE ... FOREIGN KEY statements."""
         pattern = re.compile(
             r"ALTER\s+TABLE\s+(?:ONLY\s+)?"
@@ -280,25 +272,18 @@ class SchemaParser:
         )
         return pattern.findall(sql)
 
-    def _parse_alter_table_fk(self, match: tuple) -> dict | None:
-        """Parse ALTER TABLE FOREIGN KEY match.
-
-        Args:
-            match: Tuple of (schema, table, constraint_name, fk_columns,
-                   ref_schema, ref_table, ref_columns) from regex.
-        """
+    def _parse_alter_table_fk(self, match: tuple[str, ...]) -> dict | None:
+        """Parse ALTER TABLE FOREIGN KEY match."""
         try:
-            schema = match[0] or "public"
-            table = match[1]
+            _table = match[1]
             constraint_name = match[2]
             fk_column = match[3].strip().strip('"')
-            ref_schema = match[4] or "public"
             ref_table = match[5]
             ref_column = match[6].strip().strip('"')
 
             return {
                 "name": constraint_name,
-                "from_table": table,
+                "from_table": _table,
                 "from_column": fk_column,
                 "to_table": ref_table,
                 "to_column": ref_column,

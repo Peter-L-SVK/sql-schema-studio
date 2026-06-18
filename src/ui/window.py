@@ -582,7 +582,7 @@ class MainWindow(Gtk.ApplicationWindow):
 
             batch_size = 100
             for i in range(0, len(rows), batch_size):
-                batch = rows[i : i + batch_size]
+                batch = rows[i: i + batch_size]
                 for row in batch:
                     self.db_connector.execute_sync(insert_sql, tuple(row))
 

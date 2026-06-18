@@ -10,7 +10,7 @@
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, Any, cast
 
 import polars as pl
 
@@ -29,45 +29,6 @@ class AnalyticsEngine:
 
     def __init__(self, db_connector):
         self._db = db_connector
-
-    def table_stats_safe(self, schema: str, table: str) -> dict:
-        """Get table statistics with safe defaults for all keys.
-
-        Use this when calling from UI code that doesn't want to handle
-        missing keys. Always returns all expected keys with defaults.
-        """
-        try:
-            df = self.query_to_df(f'SELECT * FROM {schema}."{table}"')
-
-            if df.is_empty():
-                return {
-                    "row_count": 0,
-                    "column_count": 0,
-                    "columns": [],
-                    "estimated_size_mb": 0,
-                    "null_percentages": {},
-                }
-
-            return {
-                "row_count": len(df),
-                "column_count": len(df.columns),
-                "columns": df.columns,
-                "estimated_size_mb": round(df.estimated_size() / (1024 * 1024), 2),
-                "null_percentages": {
-                    c: round(df[c].null_count() / len(df) * 100, 2) if len(df) > 0 else 0
-                    for c in df.columns
-                },
-            }
-        except Exception as e:
-            logger.error(f"table_stats_safe failed for {schema}.{table}: {e}")
-            return {
-                "row_count": 0,
-                "column_count": 0,
-                "columns": [],
-                "estimated_size_mb": 0,
-                "null_percentages": {},
-                "error": str(e),
-            }
 
     def query_to_df(self, query: str, params: tuple | None = None) -> pl.DataFrame:
         """Execute SQL query and return Polars DataFrame.
@@ -96,6 +57,10 @@ class AnalyticsEngine:
         if df.is_empty():
             return {"row_count": 0, "columns": [], "empty": True}
 
+        # Safe conversion for estimated_size which may return None
+        estimated_size = df.estimated_size()
+        size_mb = round(estimated_size / (1024 * 1024), 2) if estimated_size else 0
+
         return {
             "row_count": len(df),
             "column_count": len(df.columns),
@@ -106,9 +71,51 @@ class AnalyticsEngine:
                 c: round(df[c].null_count() / len(df) * 100, 2) if len(df) > 0 else 0
                 for c in df.columns
             },
-            "estimated_size_bytes": df.estimated_size(),
-            "estimated_size_mb": round(df.estimated_size() / (1024 * 1024), 2),
+            "estimated_size_bytes": estimated_size,
+            "estimated_size_mb": size_mb,
         }
+
+    def table_stats_safe(self, schema: str, table: str) -> dict:
+        """Get table statistics with safe defaults for all keys.
+
+        Use this when calling from UI code that doesn't want to handle
+        missing keys. Always returns all expected keys with defaults.
+        """
+        try:
+            df = self.query_to_df(f'SELECT * FROM {schema}."{table}"')
+
+            if df.is_empty():
+                return {
+                    "row_count": 0,
+                    "column_count": 0,
+                    "columns": [],
+                    "estimated_size_mb": 0,
+                    "null_percentages": {},
+                }
+
+            estimated_size = df.estimated_size()
+            size_mb = round(estimated_size / (1024 * 1024), 2) if estimated_size else 0
+
+            return {
+                "row_count": len(df),
+                "column_count": len(df.columns),
+                "columns": df.columns,
+                "estimated_size_mb": size_mb,
+                "null_percentages": {
+                    c: round(df[c].null_count() / len(df) * 100, 2) if len(df) > 0 else 0
+                    for c in df.columns
+                },
+            }
+        except Exception as e:
+            logger.error(f"table_stats_safe failed for {schema}.{table}: {e}")
+            return {
+                "row_count": 0,
+                "column_count": 0,
+                "columns": [],
+                "estimated_size_mb": 0,
+                "null_percentages": {},
+                "error": str(e),
+            }
 
     def column_profile(self, schema: str, table: str, column: str) -> dict:
         """Get detailed profile for a single column.
@@ -132,28 +139,37 @@ class AnalyticsEngine:
             "unique_count": col.n_unique(),
         }
 
-        # Numeric statistics
+        # Numeric statistics - safe conversion to Python types
         if col.dtype in (pl.Int64, pl.Float64, pl.Int32, pl.Float32):
+            min_val = col.min()
+            max_val = col.max()
+            mean_val = col.mean()
+            median_val = col.median()
+            std_val = col.std()
+            sum_val = col.sum()
+
+            # Convert Polars values to Python types safely
             profile.update(
                 {
-                    "min": col.min(),
-                    "max": col.max(),
-                    "mean": round(col.mean(), 2) if col.mean() is not None else None,
-                    "median": col.median(),
-                    "std": round(col.std(), 2) if col.std() is not None else None,
-                    "sum": col.sum(),
+                    "min": self._to_python_value(min_val),
+                    "max": self._to_python_value(max_val),
+                    "mean": self._to_python_value(mean_val, default=None),
+                    "median": self._to_python_value(median_val),
+                    "std": self._to_python_value(std_val, default=None),
+                    "sum": self._to_python_value(sum_val),
                 }
             )
 
         # String statistics
         if col.dtype == pl.Utf8:
             lengths = col.str.len_chars()
+            mean_len = lengths.mean()
             profile.update(
                 {
-                    "min_length": lengths.min(),
-                    "max_length": lengths.max(),
-                    "mean_length": round(lengths.mean(), 1) if lengths.mean() is not None else None,
-                    "empty_count": col.str.len_chars().eq(0).sum(),
+                    "min_length": self._to_python_value(lengths.min()),
+                    "max_length": self._to_python_value(lengths.max()),
+                    "mean_length": self._to_python_value(mean_len, default=None),
+                    "empty_count": self._to_python_value(col.str.len_chars().eq(0).sum()),
                 }
             )
 
@@ -163,6 +179,21 @@ class AnalyticsEngine:
             profile["top_values"] = value_counts.to_dict(as_series=False)
 
         return profile
+
+    def _to_python_value(self, value: Any, default: Any = 0) -> Any:
+        """Convert Polars/numpy values to Python native types safely."""
+        if value is None:
+            return default
+        try:
+            # Handle numpy types
+            if hasattr(value, "item"):
+                return value.item()
+            # Handle Polars Series with single value
+            if hasattr(value, "__len__") and len(value) == 1:
+                return value[0]
+            return value
+        except (AttributeError, TypeError, ValueError):
+            return default
 
     def compare_tables(self, schema: str, table1: str, table2: str) -> dict:
         """Compare two tables for schema and data differences.
@@ -224,12 +255,16 @@ class AnalyticsEngine:
     # Helpers
     # =====================================================================
 
-    def _get_columns(self, schema: str, table: str) -> list[dict]:
+    def _get_columns(self, schema: str, table: str) -> list[dict[str, Any]]:
         """Get column information for a table."""
-        return self._db.execute_sync(
+        result = self._db.execute_sync(
             """SELECT column_name, data_type, is_nullable
             FROM information_schema.columns
             WHERE table_schema = %s AND table_name = %s
             ORDER BY ordinal_position""",
             (schema, table),
         )
+        if not result:
+            return []
+        # Ensure we return a list of dicts
+        return cast(list[dict[str, Any]], result)

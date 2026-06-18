@@ -9,10 +9,9 @@
 from __future__ import annotations
 
 import gi
-import os
 
 gi.require_version("Gtk", "4.0")
-from gi.repository import Gtk, GLib
+from gi.repository import Gtk
 from src.core.db_connector import ConnectionProfile
 from src.utils.gtk_helpers import set_margin, make_labeled_field, make_button_box, run_async
 
@@ -262,7 +261,8 @@ class ConnectionDialog(Gtk.Dialog):
 
         def test():
             try:
-                # Build connection string (with SSH if enabled)
+                tunnel = None
+
                 if profile.use_ssh:
                     from src.core.ssh_tunnel import (
                         SSHTunnelConfig,
@@ -290,16 +290,15 @@ class ConnectionDialog(Gtk.Dialog):
                         ssh_config, db_config
                     )
                     if error:
+                        if tunnel:
+                            tunnel.stop()
                         return False, f"SSH: {error}"
                 else:
                     conn_string = (
-                        f"host=127.0.0.1 port={local_port} "
-                        f"port={profile.port} "
-                        f"dbname={profile.database} "
-                        f"user={profile.username} "
+                        f"host={profile.host} port={profile.port} "
+                        f"dbname={profile.database} user={profile.username} "
                         f"password={profile.password}"
                     )
-                    tunnel = None
 
                 conn = psycopg.connect(conn_string)
                 conn.execute("SELECT 1")

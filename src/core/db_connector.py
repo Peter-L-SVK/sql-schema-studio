@@ -21,6 +21,7 @@ from src.config import (
     DEFAULT_USER,
     EXCLUDED_SCHEMAS,
 )
+from src.core.ssh_tunnel import SSHTunnel
 
 logger = get_logger(__name__)
 SERVICE_NAME = "sql-schema-studio"
@@ -116,6 +117,7 @@ class DatabaseConnector:
         self._profiles: Dict[str, ConnectionProfile] = {}
         self._active_profile: Optional[str] = None
         self._active_profile_obj: Optional[ConnectionProfile] = None
+        self._active_tunnel: Optional[SSHTunnel] = None
 
     @property
     def is_connected(self) -> bool:

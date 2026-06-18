@@ -9,8 +9,6 @@
 """Line routing geometry for the schema designer — collision detection,
 detour calculation, and iterative path finding."""
 
-import math
-
 
 class RoutingMixin:
     """Mixin providing line-routing geometry methods for SchemaDesigner."""
@@ -230,7 +228,6 @@ class RoutingMixin:
 
         max_iterations = 30
         for _ in range(max_iterations):
-            collision_found = False
             new_points = [points[0]]
 
             for i in range(len(points) - 1):
@@ -252,7 +249,6 @@ class RoutingMixin:
                     if detour_points and len(detour_points) >= 2:
                         for px, py in detour_points[1:]:
                             new_points.append((px, py))
-                        collision_found = True
                     else:
                         new_points.append((x2, y2))
                 else:

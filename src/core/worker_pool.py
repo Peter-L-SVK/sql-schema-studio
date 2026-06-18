@@ -30,7 +30,7 @@ def _compute_path_worker(
     tables: list,
     header_height: float,
     row_height: float,
-) -> list:
+) -> list[tuple[float, float]]:
     """Compute an obstacle-avoiding path for a single FK relationship.
 
     Module-level function so ProcessPoolExecutor can pickle it.
@@ -48,7 +48,6 @@ def _compute_path_worker(
         Returns a straight two-point path on any error so the caller always
         gets a renderable result and never sees an empty path crash.
     """
-    import math
     import sys
     import traceback
 
@@ -56,7 +55,7 @@ def _compute_path_worker(
     src = table_map.get(fk_data["from_table"])
     tgt = table_map.get(fk_data["to_table"])
 
-    def _straight(s, t):
+    def _straight(s, t) -> list[tuple[float, float]]:
         """Straight-line fallback between table midpoints."""
         return [
             (s["x"] + s["w"], s["y"] + s["h"] / 2),
@@ -198,7 +197,7 @@ def _compute_path_worker(
                     new_points.append((sx2, sy2))
 
             # Remove consecutive near-duplicates
-            deduped = []
+            deduped: list[tuple[float, float]] = []
             for p in new_points:
                 if isinstance(p, (list, tuple)) and len(p) == 2:
                     px, py = float(p[0]), float(p[1])
@@ -219,7 +218,8 @@ def _compute_path_worker(
             if not collision_found:
                 break
 
-        return points
+        result: list[tuple[float, float]] = points
+        return result
 
     except Exception as e:
         # Print full traceback to stderr so it's visible in terminal output
@@ -229,14 +229,6 @@ def _compute_path_worker(
         )
         traceback.print_exc(file=sys.stderr)
         return _straight(src, tgt)
-
-
-def restart(self):
-    """Shutdown old workers and force fresh pool creation."""
-    if self._pool:
-        self._pool.shutdown(wait=False)
-        self._pool = None
-    logger.debug("Worker pool restarted")
 
 
 class WorkerPool:
@@ -256,6 +248,13 @@ class WorkerPool:
                 mp_context=_SPAWN_CTX,  # Critical: prevents GTK re-import in workers
             )
         return self._pool
+
+    def restart(self):
+        """Shutdown old workers and force fresh pool creation."""
+        if self._pool:
+            self._pool.shutdown(wait=False)
+            self._pool = None
+        logger.debug("Worker pool restarted")
 
     def submit(self, func: Callable, *args, **kwargs) -> Future:
         """Submit a task to the process pool.

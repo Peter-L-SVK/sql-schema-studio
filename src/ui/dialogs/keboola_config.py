@@ -13,7 +13,7 @@ import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk, GLib
 
-from src.utils.gtk_helpers import set_margin, make_labeled_field, make_button_box
+from src.utils.gtk_helpers import set_margin, make_labeled_field
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)

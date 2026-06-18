@@ -6,7 +6,20 @@
 # Feel free to distribute and modify.
 # ----------------------------------------------------------------------
 
-"""Keboola Normalizer Hook - Data normalization via Keboola platform."""
+"""Keboola Normalizer Hook - Data normalization via Keboola platform.
+
+This hook validates CSV files locally and optionally uploads them to
+Keboola Storage for advanced ETL/ELT processing.
+
+The hook detects data quality issues such as:
+- Missing values
+- Invalid email formats
+- Invalid date formats
+- Invalid payment methods
+- Invalid order statuses
+- Invalid categories
+- Invalid price/quantity values
+"""
 
 import json
 import os
@@ -14,7 +27,7 @@ import csv
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TypedDict, List, Dict, Any, Optional, Set
 
 from src.hooks.base_plugin import BaseHook, HookContext, HookTrigger
 from src.utils.logging import get_logger
@@ -32,28 +45,41 @@ except ImportError:
     logger.warning("Keboola client not installed. Run: pip install kbcstorage")
 
 
+class CSVValidationResult(TypedDict, total=False):
+    """Result of CSV validation."""
+
+    total_rows: int
+    rows_with_issues: List[int]
+    issues: List[Dict[str, Any]]
+    error_samples: List[str]
+    issue_count: int
+
+
 class KeboolaNormalizerHook(BaseHook):
     """Data normalization hook using Keboola platform.
 
     Performs local CSV validation and can optionally upload to Keboola
     for advanced ETL/ELT processing.
+
+    Configuration is stored in ~/.config/sql-schema-studio/keboola_config.json
     """
 
     def __init__(self):
+        """Initialize the hook and load configuration."""
         super().__init__()
-        self._client: Optional[Client] = None
-        self._config = self._load_config()
+        self._client: Optional[Any] = None  # kbcstorage.client.Client
+        self._config: Dict[str, Any] = self._load_config()
 
     # ======================================================================
     # Config management
     # ======================================================================
 
     def _get_config_path(self) -> Path:
-        """Get path to config file."""
+        """Get path to configuration file."""
         return Path.home() / ".config" / "sql-schema-studio" / "keboola_config.json"
 
     def _load_config(self) -> Dict[str, Any]:
-        """Load configuration from file."""
+        """Load configuration from file or return defaults."""
         config_path = self._get_config_path()
         default_config = {
             "api_url": "https://connection.keboola.com/",
@@ -75,7 +101,7 @@ class KeboolaNormalizerHook(BaseHook):
 
         return default_config
 
-    def _save_config(self):
+    def _save_config(self) -> None:
         """Save configuration to file."""
         config_path = self._get_config_path()
         config_path.parent.mkdir(parents=True, exist_ok=True)
@@ -90,7 +116,7 @@ class KeboolaNormalizerHook(BaseHook):
     # Keboola client
     # ======================================================================
 
-    def _get_client(self) -> Optional[Client]:
+    def _get_client(self) -> Optional[Any]:
         """Get or create Keboola client using kbcstorage."""
         if not KEBOOLA_AVAILABLE:
             logger.error("Keboola client not installed")
@@ -114,7 +140,7 @@ class KeboolaNormalizerHook(BaseHook):
     # BaseHook implementation
     # ======================================================================
 
-    def get_metadata(self) -> Dict[str, str]:
+    def get_metadata(self) -> Dict[str, Any]:
         """Return hook metadata."""
         return {
             "name": "Keboola Normalizer",
@@ -122,13 +148,13 @@ class KeboolaNormalizerHook(BaseHook):
             "author": "Peter Leukanič",
             "description": "Data normalization using Keboola platform (cloud ETL/ELT)",
             "triggers": [
-                HookTrigger.SCHEMA_CHANGED.value,
-                HookTrigger.SCHEDULED_INTERVAL.value,
+                str(HookTrigger.SCHEMA_CHANGED.value),
+                str(HookTrigger.SCHEDULED_INTERVAL.value),
             ],
         }
 
     def validate(self) -> bool:
-        """Validate configuration."""
+        """Validate configuration and connection."""
         if not KEBOOLA_AVAILABLE:
             logger.error("Keboola client not available")
             return False
@@ -154,8 +180,11 @@ class KeboolaNormalizerHook(BaseHook):
         Expected context.data:
             - file_path: str - path to CSV file
             - local_only: bool - if True, only local validation
+
+        Returns:
+            Dict with status, message, recommendations, error_samples, etc.
         """
-        result = {
+        result: Dict[str, Any] = {
             "status": "ok",
             "message": "",
             "recommendations": [],
@@ -194,11 +223,11 @@ class KeboolaNormalizerHook(BaseHook):
     # Local CSV validation
     # ======================================================================
 
-    def _validate_csv(self, file_path: str) -> Dict[str, Any]:
+    def _validate_csv(self, file_path: str) -> CSVValidationResult:
         """Validate CSV file and detect data quality issues."""
-        issues = []
-        rows_with_issues = set()
-        error_samples = []
+        issues: List[Dict[str, Any]] = []
+        rows_with_issues: Set[int] = set()
+        error_samples: List[str] = []
         total_rows = 0
 
         try:
@@ -238,7 +267,7 @@ class KeboolaNormalizerHook(BaseHook):
                 "issue_count": 0,
             }
 
-    def _validate_column(self, col: str, value: str, row_num: int) -> List[Dict]:
+    def _validate_column(self, col: str, value: str, row_num: int) -> List[Dict[str, Any]]:
         """Validate a single column value."""
         if not value:
             return [{"row": row_num, "column": col, "issue": "Empty value", "severity": "MEDIUM"}]
@@ -259,7 +288,7 @@ class KeboolaNormalizerHook(BaseHook):
 
         return []
 
-    def _validate_email(self, value: str, row_num: int, col: str) -> Optional[Dict]:
+    def _validate_email(self, value: str, row_num: int, col: str) -> Optional[Dict[str, Any]]:
         """Validate email format."""
         if value.lower() in ("invalid_email", "not_an_email"):
             return {
@@ -278,7 +307,7 @@ class KeboolaNormalizerHook(BaseHook):
             }
         return None
 
-    def _validate_date(self, value: str, row_num: int, col: str) -> Optional[Dict]:
+    def _validate_date(self, value: str, row_num: int, col: str) -> Optional[Dict[str, Any]]:
         """Validate date format."""
         formats = ["%Y-%m-%d", "%d-%m-%Y", "%d.%m.%Y", "%m/%d/%Y"]
         for fmt in formats:
@@ -294,7 +323,9 @@ class KeboolaNormalizerHook(BaseHook):
             "severity": "MEDIUM",
         }
 
-    def _validate_payment_method(self, value: str, row_num: int, col: str) -> Optional[Dict]:
+    def _validate_payment_method(
+        self, value: str, row_num: int, col: str
+    ) -> Optional[Dict[str, Any]]:
         """Validate payment method."""
         valid = {"Credit Card", "PayPal", "Bank Transfer"}
         if value not in valid:
@@ -306,7 +337,9 @@ class KeboolaNormalizerHook(BaseHook):
             }
         return None
 
-    def _validate_order_status(self, value: str, row_num: int, col: str) -> Optional[Dict]:
+    def _validate_order_status(
+        self, value: str, row_num: int, col: str
+    ) -> Optional[Dict[str, Any]]:
         """Validate order status."""
         valid = {"Pending", "Completed", "Refunded", "Shipped", "Delivered"}
         if value not in valid:
@@ -318,7 +351,7 @@ class KeboolaNormalizerHook(BaseHook):
             }
         return None
 
-    def _validate_category(self, value: str, row_num: int, col: str) -> Optional[Dict]:
+    def _validate_category(self, value: str, row_num: int, col: str) -> Optional[Dict[str, Any]]:
         """Validate product category."""
         valid = {
             "Electronics",
@@ -339,7 +372,7 @@ class KeboolaNormalizerHook(BaseHook):
             }
         return None
 
-    def _validate_price(self, value: str, row_num: int, col: str) -> Optional[Dict]:
+    def _validate_price(self, value: str, row_num: int, col: str) -> Optional[Dict[str, Any]]:
         """Validate price value."""
         try:
             float(value)
@@ -352,7 +385,7 @@ class KeboolaNormalizerHook(BaseHook):
                 "severity": "HIGH",
             }
 
-    def _validate_quantity(self, value: str, row_num: int, col: str) -> Optional[Dict]:
+    def _validate_quantity(self, value: str, row_num: int, col: str) -> Optional[Dict[str, Any]]:
         """Validate quantity value."""
         try:
             qty = int(value)
@@ -376,13 +409,15 @@ class KeboolaNormalizerHook(BaseHook):
     # Recommendation generation
     # ======================================================================
 
-    def _generate_recommendations(self, validation_result: Dict) -> List[Dict]:
+    def _generate_recommendations(
+        self, validation_result: CSVValidationResult
+    ) -> List[Dict[str, Any]]:
         """Generate recommendations based on validation results."""
-        recommendations = []
-        issue_counts = {}
+        recommendations: List[Dict[str, Any]] = []
+        issue_counts: Dict[str, int] = {}
 
-        for issue in validation_result["issues"]:
-            col = issue["column"]
+        for issue in validation_result.get("issues", []):
+            col = issue.get("column", "unknown")
             issue_counts[col] = issue_counts.get(col, 0) + 1
 
         for col, count in issue_counts.items():
@@ -405,13 +440,15 @@ class KeboolaNormalizerHook(BaseHook):
                     }
                 )
 
-        if validation_result["issue_count"] > 0:
+        if validation_result.get("issue_count", 0) > 0:
             recommendations.append(
                 {
                     "table": "CSV Data",
-                    "priority": "HIGH" if validation_result["issue_count"] > 20 else "MEDIUM",
+                    "priority": (
+                        "HIGH" if validation_result.get("issue_count", 0) > 20 else "MEDIUM"
+                    ),
                     "action": "Run Keboola normalization",
-                    "reason": f"Found {validation_result['issue_count']} data quality issues",
+                    "reason": f"Found {validation_result.get('issue_count', 0)} data quality issues",
                 }
             )
 
@@ -423,7 +460,7 @@ class KeboolaNormalizerHook(BaseHook):
 
     async def _upload_to_keboola(self, file_path: str) -> Dict[str, Any]:
         """Upload CSV to Keboola Storage using kbcstorage."""
-        result = {"status": "error", "message": ""}
+        result: Dict[str, Any] = {"status": "error", "message": ""}
 
         client = self._get_client()
         if client is None:
@@ -434,13 +471,12 @@ class KeboolaNormalizerHook(BaseHook):
             bucket = self._config.get("bucket", "in.c-sql-schema-studio")
             table_name = self._config.get("source_table", "raw_orders")
 
-            # kbcstorage uses tables.create for upload
             with open(file_path, "rb") as f:
                 table = client.tables.create(
                     bucket_id=bucket,
                     name=table_name,
                     data=f,
-                    primary_key=["TransactionID"],  # Set primary key
+                    primary_key=["TransactionID"],
                 )
 
             result["status"] = "ok"
