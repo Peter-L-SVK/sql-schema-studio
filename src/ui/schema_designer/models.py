@@ -89,15 +89,14 @@ class SchemaTable:
     def to_sql(self) -> str:
         def quote(name):
             return f'"{name}"'
+
         lines = [f"CREATE TABLE {self.schema}.{quote(self.name)} ("]
         col_defs = []
         for col in self.columns:
             col_defs.append(f"    {col.to_sql()}")
         pks = [c.name for c in self.columns if c.is_primary]
         if pks:
-            col_defs.append(
-                f"    PRIMARY KEY ({', '.join(quote(c) for c in pks)})"
-            )
+            col_defs.append(f"    PRIMARY KEY ({', '.join(quote(c) for c in pks)})")
         lines.append(",\n".join(col_defs))
         lines.append(");")
         return "\n".join(lines)

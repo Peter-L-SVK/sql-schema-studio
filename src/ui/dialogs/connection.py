@@ -195,7 +195,7 @@ class ConnectionDialog(Gtk.Dialog):
         self._btn_browse_ssh.set_sensitive(enabled and self._combo_ssh_auth.get_active() == 1)
         self._entry_ssh_remote_host.set_sensitive(enabled)
         self._entry_ssh_remote_port.set_sensitive(enabled)
-        
+
     def _on_ssh_auth_changed(self, combo):
         """Show/hide password vs key fields."""
         if not self._cb_ssh.get_active():
@@ -264,7 +264,10 @@ class ConnectionDialog(Gtk.Dialog):
             try:
                 # Build connection string (with SSH if enabled)
                 if profile.use_ssh:
-                    from src.core.ssh_tunnel import SSHTunnelConfig, get_postgres_conn_string_with_ssh
+                    from src.core.ssh_tunnel import (
+                        SSHTunnelConfig,
+                        get_postgres_conn_string_with_ssh,
+                    )
 
                     ssh_config = SSHTunnelConfig(
                         enabled=True,
@@ -283,7 +286,9 @@ class ConnectionDialog(Gtk.Dialog):
                         "username": profile.username,
                         "password": profile.password,
                     }
-                    conn_string, tunnel, error = get_postgres_conn_string_with_ssh(ssh_config, db_config)
+                    conn_string, tunnel, error = get_postgres_conn_string_with_ssh(
+                        ssh_config, db_config
+                    )
                     if error:
                         return False, f"SSH: {error}"
                 else:

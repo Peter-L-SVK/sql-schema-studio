@@ -10,4 +10,3 @@ from src.analytics.engine import AnalyticsEngine
 from src.analytics.index_advisor import IndexAdvisor
 
 __all__ = ["AnalyticsEngine", "IndexAdvisor"]
-

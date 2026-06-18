@@ -12,6 +12,7 @@ import math
 import copy
 
 import gi
+
 gi.require_version("Gtk", "4.0")
 gi.require_version("Gdk", "4.0")
 from gi.repository import Gtk, Gdk, GObject, GLib
@@ -391,9 +392,7 @@ class SchemaDesigner(WorkerBridgeMixin, RoutingMixin, DrawingMixin, Gtk.Box):
                 del fk.waypoints[idx]
                 fk._cached_path = []
                 self._canvas.queue_draw()
-                logger.info(
-                    f"Deleted waypoint {idx} from FK {fk.from_table}->{fk.to_table}"
-                )
+                logger.info(f"Deleted waypoint {idx} from FK {fk.from_table}->{fk.to_table}")
             return
         table = self._find_table_at(x, y)
         if table:
@@ -434,9 +433,9 @@ class SchemaDesigner(WorkerBridgeMixin, RoutingMixin, DrawingMixin, Gtk.Box):
             for i in range(len(path) - 1):
                 x1, y1 = path[i]
                 x2, y2 = path[i + 1]
-                dist = abs(
-                    (y2 - y1) * x - (x2 - x1) * y + x2 * y1 - y2 * x1
-                ) / math.sqrt((y2 - y1) ** 2 + (x2 - x1) ** 2)
+                dist = abs((y2 - y1) * x - (x2 - x1) * y + x2 * y1 - y2 * x1) / math.sqrt(
+                    (y2 - y1) ** 2 + (x2 - x1) ** 2
+                )
                 if dist < closest_dist:
                     closest_dist = dist
                     closest_fk = fk
@@ -468,9 +467,7 @@ class SchemaDesigner(WorkerBridgeMixin, RoutingMixin, DrawingMixin, Gtk.Box):
                 logger.warning("No column clicked")
                 return
             self._creating_relationship = (table, clicked_column)
-            logger.info(
-                f"Creating relationship from {table.name}.{clicked_column.name}"
-            )
+            logger.info(f"Creating relationship from {table.name}.{clicked_column.name}")
         else:
             source_table, source_col = self._creating_relationship
             if source_table == table:
@@ -553,11 +550,7 @@ class SchemaDesigner(WorkerBridgeMixin, RoutingMixin, DrawingMixin, Gtk.Box):
     # =====================================================================
 
     def _update_color_button(self):
-        color = (
-            self._selected_table.color
-            if self._selected_table
-            else self._selected_color
-        )
+        color = self._selected_table.color if self._selected_table else self._selected_color
         color_box = Gtk.DrawingArea()
         color_box.set_size_request(20, 20)
         color_box.set_can_target(False)
@@ -750,6 +743,7 @@ class SchemaDesigner(WorkerBridgeMixin, RoutingMixin, DrawingMixin, Gtk.Box):
 
     def _import_sql_file(self, path, x, y):
         from src.core.schema_parser import SchemaParser
+
         logger.info(f"Importing SQL file: {path}")
         try:
             with open(path, "r") as f:
@@ -780,9 +774,7 @@ class SchemaDesigner(WorkerBridgeMixin, RoutingMixin, DrawingMixin, Gtk.Box):
             if offset_x > 600:
                 offset_x = x
                 offset_y += 200
-            logger.info(
-                f"Imported table: {table.name} with {len(table.columns)} columns"
-            )
+            logger.info(f"Imported table: {table.name} with {len(table.columns)} columns")
         for fk_data in foreign_keys:
             source_table_obj = self._table_index.get(fk_data["from_table"])
             target_table_obj = self._table_index.get(fk_data["to_table"])
@@ -810,8 +802,7 @@ class SchemaDesigner(WorkerBridgeMixin, RoutingMixin, DrawingMixin, Gtk.Box):
             )
             self._relationships.append(fk)
             logger.info(
-                f"Imported FK: {fk.from_table}.{fk.from_column} "
-                f"-> {fk.to_table}.{fk.to_column}"
+                f"Imported FK: {fk.from_table}.{fk.from_column} " f"-> {fk.to_table}.{fk.to_column}"
             )
         self._invalidate_all_paths()
         self._update_canvas_size()
@@ -903,10 +894,10 @@ class SchemaDesigner(WorkerBridgeMixin, RoutingMixin, DrawingMixin, Gtk.Box):
     # =====================================================================
     # Clean up
     # =====================================================================
-        
+
     def _on_close(self):
         """Clean up before the designer is destroyed.
-        
+
         Increment _path_serial so any in-flight worker callbacks
         from the old instance are silently discarded instead of
         crashing on a destroyed canvas.

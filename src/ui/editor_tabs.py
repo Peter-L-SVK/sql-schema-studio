@@ -16,64 +16,216 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("GtkSource", "5")
 from gi.repository import Gtk, GtkSource, Gdk, Pango, GLib
 
-
 SQL_KEYWORDS = [
     # DML
-    "SELECT", "FROM", "WHERE", "INSERT", "INTO", "VALUES",
-    "UPDATE", "SET", "DELETE", "RETURNING",
+    "SELECT",
+    "FROM",
+    "WHERE",
+    "INSERT",
+    "INTO",
+    "VALUES",
+    "UPDATE",
+    "SET",
+    "DELETE",
+    "RETURNING",
     # DDL
-    "CREATE", "TABLE", "DROP", "ALTER", "ADD", "COLUMN",
-    "INDEX", "VIEW", "SEQUENCE", "SCHEMA", "DATABASE", "EXTENSION",
+    "CREATE",
+    "TABLE",
+    "DROP",
+    "ALTER",
+    "ADD",
+    "COLUMN",
+    "INDEX",
+    "VIEW",
+    "SEQUENCE",
+    "SCHEMA",
+    "DATABASE",
+    "EXTENSION",
     # Joins
-    "JOIN", "LEFT", "RIGHT", "INNER", "OUTER", "FULL", "CROSS", "NATURAL",
+    "JOIN",
+    "LEFT",
+    "RIGHT",
+    "INNER",
+    "OUTER",
+    "FULL",
+    "CROSS",
+    "NATURAL",
     # Filtering / ordering
-    "ON", "AND", "OR", "NOT", "IN", "EXISTS", "BETWEEN", "LIKE", "ILIKE",
-    "HAVING", "LIMIT", "OFFSET", "DISTINCT", "ALL", "AS",
-    "UNION", "INTERSECT", "EXCEPT",
+    "ON",
+    "AND",
+    "OR",
+    "NOT",
+    "IN",
+    "EXISTS",
+    "BETWEEN",
+    "LIKE",
+    "ILIKE",
+    "HAVING",
+    "LIMIT",
+    "OFFSET",
+    "DISTINCT",
+    "ALL",
+    "AS",
+    "UNION",
+    "INTERSECT",
+    "EXCEPT",
     # Multi-word phrases
-    "GROUP BY", "ORDER BY", "ON CONFLICT", "DO NOTHING",
-    "IF NOT EXISTS", "IF EXISTS", "OR REPLACE",
-    "PRIMARY KEY", "FOREIGN KEY", "REFERENCES",
-    "NOT NULL", "NO ACTION", "SET NULL",
-    "IS NULL", "IS NOT NULL", "NULLS FIRST", "NULLS LAST",
-    "PARTITION BY", "DO UPDATE",
+    "GROUP BY",
+    "ORDER BY",
+    "ON CONFLICT",
+    "DO NOTHING",
+    "IF NOT EXISTS",
+    "IF EXISTS",
+    "OR REPLACE",
+    "PRIMARY KEY",
+    "FOREIGN KEY",
+    "REFERENCES",
+    "NOT NULL",
+    "NO ACTION",
+    "SET NULL",
+    "IS NULL",
+    "IS NOT NULL",
+    "NULLS FIRST",
+    "NULLS LAST",
+    "PARTITION BY",
+    "DO UPDATE",
     # Constraints
-    "CONSTRAINT", "UNIQUE", "DEFAULT", "NULL", "CHECK",
-    "CASCADE", "RESTRICT",
+    "CONSTRAINT",
+    "UNIQUE",
+    "DEFAULT",
+    "NULL",
+    "CHECK",
+    "CASCADE",
+    "RESTRICT",
     # Transactions
-    "BEGIN", "COMMIT", "ROLLBACK", "TRANSACTION", "SAVEPOINT",
+    "BEGIN",
+    "COMMIT",
+    "ROLLBACK",
+    "TRANSACTION",
+    "SAVEPOINT",
     # Maintenance
-    "GRANT", "REVOKE", "TRUNCATE", "EXPLAIN", "ANALYZE",
-    "VACUUM", "REINDEX", "CLUSTER",
+    "GRANT",
+    "REVOKE",
+    "TRUNCATE",
+    "EXPLAIN",
+    "ANALYZE",
+    "VACUUM",
+    "REINDEX",
+    "CLUSTER",
     # Types
-    "INTEGER", "BIGINT", "SMALLINT", "TEXT", "VARCHAR", "CHAR",
-    "BOOLEAN", "NUMERIC", "REAL", "FLOAT", "SERIAL", "BIGSERIAL",
-    "TIMESTAMP", "TIMESTAMPTZ", "DATE", "TIME",
-    "INTERVAL", "JSON", "JSONB", "UUID", "ARRAY", "BYTEA",
+    "INTEGER",
+    "BIGINT",
+    "SMALLINT",
+    "TEXT",
+    "VARCHAR",
+    "CHAR",
+    "BOOLEAN",
+    "NUMERIC",
+    "REAL",
+    "FLOAT",
+    "SERIAL",
+    "BIGSERIAL",
+    "TIMESTAMP",
+    "TIMESTAMPTZ",
+    "DATE",
+    "TIME",
+    "INTERVAL",
+    "JSON",
+    "JSONB",
+    "UUID",
+    "ARRAY",
+    "BYTEA",
     "DOUBLE PRECISION",
     # Logic / values
-    "TRUE", "FALSE", "CASE", "WHEN", "THEN", "ELSE", "END",
-    "ASC", "DESC",
+    "TRUE",
+    "FALSE",
+    "CASE",
+    "WHEN",
+    "THEN",
+    "ELSE",
+    "END",
+    "ASC",
+    "DESC",
     # Window functions
-    "OVER", "WINDOW", "ROWS", "RANGE",
+    "OVER",
+    "WINDOW",
+    "ROWS",
+    "RANGE",
     # Aggregate / scalar functions
-    "COUNT", "SUM", "AVG", "MIN", "MAX",
-    "COALESCE", "NULLIF", "CAST", "EXTRACT",
-    "NOW", "CURRENT_TIMESTAMP", "CURRENT_DATE", "CURRENT_TIME",
-    "GENERATE_SERIES", "UNNEST", "STRING_AGG", "ARRAY_AGG",
-    "ROW_NUMBER", "RANK", "DENSE_RANK", "LAG", "LEAD",
+    "COUNT",
+    "SUM",
+    "AVG",
+    "MIN",
+    "MAX",
+    "COALESCE",
+    "NULLIF",
+    "CAST",
+    "EXTRACT",
+    "NOW",
+    "CURRENT_TIMESTAMP",
+    "CURRENT_DATE",
+    "CURRENT_TIME",
+    "GENERATE_SERIES",
+    "UNNEST",
+    "STRING_AGG",
+    "ARRAY_AGG",
+    "ROW_NUMBER",
+    "RANK",
+    "DENSE_RANK",
+    "LAG",
+    "LEAD",
     # PostgreSQL specific
-    "COPY", "LISTEN", "NOTIFY", "LOCK", "INHERITS",
-    "TABLESPACE", "OWNER", "TO", "PUBLIC",
-    "MATERIALIZED", "TEMPORARY", "TEMP", "UNLOGGED",
-    "CONCURRENTLY", "USING", "IMMUTABLE", "STABLE", "VOLATILE",
-    "STRICT", "SECURITY", "DEFINER", "INVOKER",
-    "SETOF", "COST", "ROWS", "RETURNS",
-    "LANGUAGE", "FUNCTION", "TRIGGER", "PROCEDURE",
-    "BEFORE", "AFTER", "INSTEAD", "OF", "FOR", "EACH", "ROW", "EXECUTE",
-    "DECLARE", "CURSOR", "OPEN", "CLOSE", "FETCH", "RETURN",
-    "NEXT", "RECORD", "TYPE", "DOMAIN", "ENUM",
-    "GREATEST", "LEAST",
+    "COPY",
+    "LISTEN",
+    "NOTIFY",
+    "LOCK",
+    "INHERITS",
+    "TABLESPACE",
+    "OWNER",
+    "TO",
+    "PUBLIC",
+    "MATERIALIZED",
+    "TEMPORARY",
+    "TEMP",
+    "UNLOGGED",
+    "CONCURRENTLY",
+    "USING",
+    "IMMUTABLE",
+    "STABLE",
+    "VOLATILE",
+    "STRICT",
+    "SECURITY",
+    "DEFINER",
+    "INVOKER",
+    "SETOF",
+    "COST",
+    "ROWS",
+    "RETURNS",
+    "LANGUAGE",
+    "FUNCTION",
+    "TRIGGER",
+    "PROCEDURE",
+    "BEFORE",
+    "AFTER",
+    "INSTEAD",
+    "OF",
+    "FOR",
+    "EACH",
+    "ROW",
+    "EXECUTE",
+    "DECLARE",
+    "CURSOR",
+    "OPEN",
+    "CLOSE",
+    "FETCH",
+    "RETURN",
+    "NEXT",
+    "RECORD",
+    "TYPE",
+    "DOMAIN",
+    "ENUM",
+    "GREATEST",
+    "LEAST",
 ]
 
 
@@ -128,6 +280,7 @@ class EditorTabs(Gtk.Box):
 
     def _apply_settings_to_tab(self, tab: EditorTab):
         from src.utils.settings import Settings
+
         settings = Settings()
         editor = settings.get_section("editor")
         scheme_id = editor.get("color_scheme", "classic")
@@ -266,7 +419,7 @@ class EditorTabs(Gtk.Box):
             return
         flags = re.IGNORECASE if not self._case_check.get_active() else 0
         if self._whole_word_check.get_active():
-            pattern = r'\b' + re.escape(search_text) + r'\b'
+            pattern = r"\b" + re.escape(search_text) + r"\b"
         else:
             pattern = re.escape(search_text)
         try:
@@ -308,7 +461,7 @@ class EditorTabs(Gtk.Box):
         self._search_text(search_text, forward=False)
 
     def _on_search_changed(self, entry):
-        if hasattr(self, '_search_debounce_id') and self._search_debounce_id:
+        if hasattr(self, "_search_debounce_id") and self._search_debounce_id:
             GLib.source_remove(self._search_debounce_id)
         self._search_debounce_id = GLib.timeout_add(300, self._do_highlight, entry.get_text())
 
@@ -457,7 +610,9 @@ class EditorTabs(Gtk.Box):
 
         self._whole_word_check = Gtk.CheckButton(label="ab|")
         self._whole_word_check.set_tooltip_text("Match whole word only")
-        self._whole_word_check.connect("toggled", lambda b: self._on_search_changed(self._search_entry))
+        self._whole_word_check.connect(
+            "toggled", lambda b: self._on_search_changed(self._search_entry)
+        )
         search_box.append(self._whole_word_check)
 
         btn_close = Gtk.Button(label="✕")
@@ -479,6 +634,7 @@ class EditorTabs(Gtk.Box):
 # ======================================================================
 # Single Editor Tab with Custom Popover Autocomplete
 # ======================================================================
+
 
 class EditorTab(Gtk.Box):
     """Single editor tab with GtkSourceView and custom Popover autocomplete."""
@@ -685,9 +841,7 @@ class EditorTab(Gtk.Box):
 
     def _show_completion_at_iter(self, text_iter: Gtk.TextIter):
         rect = self._view.get_iter_location(text_iter)
-        wx, wy = self._view.buffer_to_window_coords(
-            Gtk.TextWindowType.WIDGET, rect.x, rect.y
-        )
+        wx, wy = self._view.buffer_to_window_coords(Gtk.TextWindowType.WIDGET, rect.x, rect.y)
         point = Gdk.Rectangle()
         point.x = wx
         point.y = wy
@@ -788,8 +942,15 @@ class EditorTab(Gtk.Box):
             return True
 
         # Ak používateľ píše, skry popover (napr. pri písaní ďalšieho znaku)
-        if keyval not in (Gdk.KEY_Escape, Gdk.KEY_Return, Gdk.KEY_Tab,
-                          Gdk.KEY_Down, Gdk.KEY_Up, Gdk.KEY_KP_Down, Gdk.KEY_KP_Up):
+        if keyval not in (
+            Gdk.KEY_Escape,
+            Gdk.KEY_Return,
+            Gdk.KEY_Tab,
+            Gdk.KEY_Down,
+            Gdk.KEY_Up,
+            Gdk.KEY_KP_Down,
+            Gdk.KEY_KP_Up,
+        ):
             if self._completion_popover and self._completion_popover.is_visible():
                 # Necháme ho viditeľný, ale pri ďalšom znaku sa obnoví
                 pass

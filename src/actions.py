@@ -169,19 +169,19 @@ class ActionHandler:
             view.emit("paste-clipboard")
 
     def _on_find(self, action, param):
-        if self._window and hasattr(self._window, 'editor'):
+        if self._window and hasattr(self._window, "editor"):
             self._window.editor._on_find()
 
     def _on_find_next(self, action, param):
-        if self._window and hasattr(self._window, 'editor'):
+        if self._window and hasattr(self._window, "editor"):
             self._window.editor._on_find_next()
 
     def _on_find_prev(self, action, param):
-        if self._window and hasattr(self._window, 'editor'):
+        if self._window and hasattr(self._window, "editor"):
             self._window.editor._on_find_prev()
 
     def _on_replace_dialog(self, action, param):
-        if self._window and hasattr(self._window, 'editor'):
+        if self._window and hasattr(self._window, "editor"):
             self._window.editor._on_find()
             GLib.idle_add(self._window.editor._replace_entry.grab_focus)
 

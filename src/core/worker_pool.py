@@ -22,7 +22,7 @@ CPU_COUNT = max(1, multiprocessing.cpu_count() - 1)
 # Spawn context prevents GTK re-import in child processes on Linux.
 # Without this, fork() causes each worker to try to start a GTK main loop,
 # which crashes silently and leaves only 1 core active.
-_SPAWN_CTX = multiprocessing.get_context('spawn')
+_SPAWN_CTX = multiprocessing.get_context("spawn")
 
 
 def _compute_path_worker(
@@ -60,7 +60,7 @@ def _compute_path_worker(
         """Straight-line fallback between table midpoints."""
         return [
             (s["x"] + s["w"], s["y"] + s["h"] / 2),
-            (t["x"],          t["y"] + t["h"] / 2),
+            (t["x"], t["y"] + t["h"] / 2),
         ]
 
     if not src or not tgt:
@@ -91,47 +91,56 @@ def _compute_path_worker(
 
         # Obstacles — all tables except the FK endpoints
         obstacles = [
-            t for t in tables
-            if t["name"] not in (fk_data["from_table"], fk_data["to_table"])
+            t for t in tables if t["name"] not in (fk_data["from_table"], fk_data["to_table"])
         ]
 
         def _intersects_rect(lx1, ly1, lx2, ly2, rx, ry, rw, rh, margin=10):
             """Cohen-Sutherland line-rectangle intersection test.
-            
+
             Margin 10 matches the value used in _line_intersects_table
             in schema_designer.py for consistent collision detection.
             """
-            rx -= margin; ry -= margin
-            rw += margin * 2; rh += margin * 2
-            if lx1 > rx + rw and lx2 > rx + rw: return False
-            if lx1 < rx and lx2 < rx: return False
-            if ly1 > ry + rh and ly2 > ry + rh: return False
-            if ly1 < ry and ly2 < ry: return False
-            dx = lx2 - lx1; dy = ly2 - ly1
-            if dx == 0 and dy == 0: return False
-            for t in ([((rx - lx1) / dx), ((rx + rw - lx1) / dx)] if dx else []) + \
-                     ([((ry - ly1) / dy), ((ry + rh - ly1) / dy)] if dy else []):
+            rx -= margin
+            ry -= margin
+            rw += margin * 2
+            rh += margin * 2
+            if lx1 > rx + rw and lx2 > rx + rw:
+                return False
+            if lx1 < rx and lx2 < rx:
+                return False
+            if ly1 > ry + rh and ly2 > ry + rh:
+                return False
+            if ly1 < ry and ly2 < ry:
+                return False
+            dx = lx2 - lx1
+            dy = ly2 - ly1
+            if dx == 0 and dy == 0:
+                return False
+            for t in ([((rx - lx1) / dx), ((rx + rw - lx1) / dx)] if dx else []) + (
+                [((ry - ly1) / dy), ((ry + rh - ly1) / dy)] if dy else []
+            ):
                 if 0 <= t <= 1:
-                    px = lx1 + t * dx; py = ly1 + t * dy
+                    px = lx1 + t * dx
+                    py = ly1 + t * dy
                     if rx <= px <= rx + rw and ry <= py <= ry + rh:
                         return True
             return False
 
         def _detour(px1, py1, px2, py2, obs, margin=25):
             """Create orthogonal detour around a table obstacle.
-    
+
             Returns a list of points forming an L-shaped path around the obstacle.
             """
             ox, oy, ow, oh = obs["x"], obs["y"], obs["w"], obs["h"]
-    
+
             tx = ox - margin
             ty = oy - margin
             tw = ow + 2 * margin
             th = oh + 2 * margin
-    
+
             dx = px2 - px1
             dy = py2 - py1
-    
+
             # Choose corner based on direction
             if dx >= 0 and dy >= 0:
                 corner_x, corner_y = tx, ty + th  # bottom-left of expanded rect
@@ -141,7 +150,7 @@ def _compute_path_worker(
                 corner_x, corner_y = tx + tw, ty + th  # bottom-right
             else:
                 corner_x, corner_y = tx + tw, ty  # top-right
-    
+
             # Return FULL path (all points) — caller will skip the first one
             if abs(dx) > abs(dy):
                 return [
@@ -164,14 +173,16 @@ def _compute_path_worker(
         for _ in range(30):
             collision_found = False
             new_points = [points[0]]
-    
+
             for i in range(len(points) - 1):
                 sx1, sy1 = points[i]
                 sx2, sy2 = points[i + 1]
                 hit = next(
-                    (o for o in obstacles
-                     if _intersects_rect(sx1, sy1, sx2, sy2,
-                                         o["x"], o["y"], o["w"], o["h"])),
+                    (
+                        o
+                        for o in obstacles
+                        if _intersects_rect(sx1, sy1, sx2, sy2, o["x"], o["y"], o["w"], o["h"])
+                    ),
                     None,
                 )
                 if hit:
@@ -197,14 +208,14 @@ def _compute_path_worker(
                         last_x, last_y = deduped[-1]
                         if abs(px - last_x) > 2 or abs(py - last_y) > 2:
                             deduped.append((px, py))
-    
+
             points = deduped
-            
+
             # Limit path complexity to prevent memory issues with huge schemas
             MAX_PATH_POINTS = 50
             if len(points) > MAX_PATH_POINTS:
                 points = _straight(src, tgt)
-    
+
             if not collision_found:
                 break
 
@@ -218,6 +229,7 @@ def _compute_path_worker(
         )
         traceback.print_exc(file=sys.stderr)
         return _straight(src, tgt)
+
 
 def restart(self):
     """Shutdown old workers and force fresh pool creation."""
@@ -241,7 +253,7 @@ class WorkerPool:
         if self._pool is None:
             self._pool = ProcessPoolExecutor(
                 max_workers=self._max_workers,
-                mp_context=_SPAWN_CTX  # Critical: prevents GTK re-import in workers
+                mp_context=_SPAWN_CTX,  # Critical: prevents GTK re-import in workers
             )
         return self._pool
 

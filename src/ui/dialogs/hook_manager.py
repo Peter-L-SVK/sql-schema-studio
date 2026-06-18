@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.8 - Hook Manager Dialog (GPLv3)
+# SQL Schema Studio 0.9 - Hook Manager Dialog (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -36,17 +36,18 @@ class HookManagerDialog(Gtk.Window):
         self._results_dir = Path.home() / ".config" / "sql-schema-studio" / "hook_results"
         self._results_dir.mkdir(parents=True, exist_ok=True)
         self._last_results = {}
+        self._db_connector = db_connector
 
         self.set_default_size(500, 400)
         self._build_ui()
         self._load_hooks()
-        self._db_connector = db_connector
 
     def _build_ui(self):
+        """Build the dialog UI."""
         main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         set_margin(main_box, 16)
 
-        # Hook list
+        # Hook list header
         label = Gtk.Label(label="Installed Hooks", halign=Gtk.Align.START)
         label.add_css_class("heading")
         main_box.append(label)
@@ -55,24 +56,24 @@ class HookManagerDialog(Gtk.Window):
         self._tree = Gtk.TreeView(model=self._list_store)
         self._tree.set_headers_visible(True)
 
-        # Name
+        # Name column
         name_renderer = Gtk.CellRendererText()
         name_col = Gtk.TreeViewColumn("Hook", name_renderer, text=0)
         name_col.set_expand(True)
         self._tree.append_column(name_col)
 
-        # Language
+        # Language column
         lang_renderer = Gtk.CellRendererText()
         lang_col = Gtk.TreeViewColumn("Language", lang_renderer, text=1)
         self._tree.append_column(lang_col)
 
-        # Enabled toggle
+        # Enabled toggle column
         toggle_renderer = Gtk.CellRendererToggle()
         toggle_renderer.connect("toggled", self._on_toggled)
         toggle_col = Gtk.TreeViewColumn("Enabled", toggle_renderer, active=2)
         self._tree.append_column(toggle_col)
 
-        # Status
+        # Status column
         status_renderer = Gtk.CellRendererText()
         status_col = Gtk.TreeViewColumn("Status", status_renderer, text=3)
         self._tree.append_column(status_col)
@@ -95,6 +96,11 @@ class HookManagerDialog(Gtk.Window):
         btn_refresh.connect("clicked", lambda b: self._load_hooks())
         button_box.append(btn_refresh)
 
+        btn_configure = Gtk.Button(label="Configure")
+        btn_configure.set_tooltip_text("Configure selected hook")
+        btn_configure.connect("clicked", self._on_configure_hook)
+        button_box.append(btn_configure)
+
         btn_run = Gtk.Button(label="Run Selected")
         btn_run.add_css_class("suggested-action")
         btn_run.connect("clicked", self._on_run_hook)
@@ -108,6 +114,7 @@ class HookManagerDialog(Gtk.Window):
         self.set_child(main_box)
 
     def _load_hooks(self):
+        """Load available hooks from registry."""
         self._list_store.clear()
         try:
             from src.hooks.registry import PluginRegistry
@@ -132,6 +139,33 @@ class HookManagerDialog(Gtk.Window):
         except Exception as e:
             logger.error(f"Failed to load hooks: {e}")
 
+    def _on_configure_hook(self, button):
+        """Open configuration dialog for the selected hook."""
+        selection = self._tree.get_selection()
+        model, tree_iter = selection.get_selected()
+        if not tree_iter:
+            return
+
+        hook_name = model.get_value(tree_iter, 0)
+
+        try:
+            from src.hooks.registry import PluginRegistry
+
+            registry = PluginRegistry()
+            registry.discover_plugins()
+            all_hooks = registry.list_hooks()
+            hook = all_hooks.get(hook_name)
+
+            if hook and hook_name == "Kebola Normalizer":
+                from src.ui.dialogs.keboola_config import KeboolaConfigDialog
+
+                dialog = KeboolaConfigDialog(self, hook, on_saved=self._load_hooks)
+                dialog.present()
+            else:
+                logger.info(f"No configuration UI for hook: {hook_name}")
+        except Exception as e:
+            logger.error(f"Failed to configure hook: {e}")
+
     def _on_toggled(self, renderer, path):
         """Toggle hook enabled state."""
         self._list_store[path][2] = not self._list_store[path][2]
@@ -140,6 +174,7 @@ class HookManagerDialog(Gtk.Window):
         logger.info(f"Hook '{hook_name}' {'enabled' if enabled else 'disabled'}")
 
     def _on_run_hook(self, button):
+        """Execute the selected hook."""
         selection = self._tree.get_selection()
         model, tree_iter = selection.get_selected()
         if not tree_iter:
@@ -157,6 +192,7 @@ class HookManagerDialog(Gtk.Window):
 
             all_hooks = registry.list_hooks()
             hook = all_hooks.get(hook_name)
+
             if hook_name == "Synthetic Data Generator":
                 self._show_generator_dialog(hook)
                 return
@@ -179,7 +215,7 @@ class HookManagerDialog(Gtk.Window):
                 self._show_result(hook_name, hook_result)
 
             elif hook and hasattr(hook, "execute"):
-                # Async hook (original style) — run in event loop
+                # Async hook (original style)
                 context = HookContext(
                     trigger=HookTrigger.SCHEDULED_INTERVAL,
                     database="",
@@ -222,8 +258,6 @@ class HookManagerDialog(Gtk.Window):
 
     def _show_result(self, hook_name, result):
         """Show hook execution result in a readable dialog."""
-
-        # Parse result if it's a string
         if isinstance(result, str):
             try:
                 data = json.loads(result.replace("'", '"'))
@@ -232,11 +266,9 @@ class HookManagerDialog(Gtk.Window):
         else:
             data = result
 
-        # Unpack "result" KEY
         if isinstance(data, dict) and "result" in data:
             data = data["result"]
-            logger.debug(f"Unpacked result: {list(data.keys())}")
-        # Format as readable text
+
         text = f"<b>Hook:</b> {hook_name}\n\n"
 
         if isinstance(data, dict):
@@ -276,7 +308,7 @@ class HookManagerDialog(Gtk.Window):
         else:
             text += str(data)
 
-        # Create dialog with copy button
+        # Create result dialog
         dialog = Gtk.Window(
             transient_for=self,
             modal=True,
@@ -287,7 +319,6 @@ class HookManagerDialog(Gtk.Window):
         main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         set_margin(main_box, 12)
 
-        # Result text (selectable)
         label = Gtk.Label()
         label.set_markup(text)
         label.set_selectable(True)
@@ -299,7 +330,6 @@ class HookManagerDialog(Gtk.Window):
         scroll.set_child(label)
         main_box.append(scroll)
 
-        # Copy button
         btn_copy = Gtk.Button(label="Copy to Clipboard")
         btn_copy.connect("clicked", lambda b: self._copy_to_clipboard(text))
 
@@ -317,7 +347,6 @@ class HookManagerDialog(Gtk.Window):
 
     def _save_result(self, hook_name, result):
         """Save hook result to JSON file."""
-
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"{hook_name.replace(' ', '_').lower()}_{timestamp}.json"
         filepath = self._results_dir / filename
@@ -334,7 +363,6 @@ class HookManagerDialog(Gtk.Window):
                     indent=2,
                     default=str,
                 )
-
                 self._last_results[hook_name] = filepath
                 logger.info(f"Result saved to {filepath}")
         except Exception as e:
@@ -342,7 +370,6 @@ class HookManagerDialog(Gtk.Window):
 
     def _on_export_all(self, button):
         """Export all saved results to a single JSON file."""
-
         if not self._last_results:
             self._show_error("Export All", "No results to export. Run some hooks first.")
             return
@@ -365,8 +392,6 @@ class HookManagerDialog(Gtk.Window):
 
     def _on_export_all_response(self, dialog, result):
         """Handle export all response."""
-        from datetime import datetime
-
         try:
             file = dialog.save_finish(result)
             if not file:
@@ -374,11 +399,8 @@ class HookManagerDialog(Gtk.Window):
 
             path = file.get_path()
 
-            # Collect all saved results
             all_results = []
-            results_dir = self._results_dir
-
-            for json_file in sorted(results_dir.glob("*.json")):
+            for json_file in sorted(self._results_dir.glob("*.json")):
                 try:
                     with open(json_file, "r") as f:
                         data = json.load(f)
@@ -386,7 +408,6 @@ class HookManagerDialog(Gtk.Window):
                 except Exception:
                     continue
 
-            # Write combined export
             with open(path, "w") as f:
                 json.dump(
                     {
@@ -415,7 +436,6 @@ class HookManagerDialog(Gtk.Window):
         """Copy text to clipboard."""
         import re
 
-        # Strip HTML tags for plain text
         plain = re.sub(r"<[^>]+>", "", text)
         plain = plain.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
 
@@ -424,7 +444,7 @@ class HookManagerDialog(Gtk.Window):
         logger.info("Result copied to clipboard")
 
     def _show_error(self, hook_name, error):
-        """Show hook execution error."""
+        """Show hook execution error dialog."""
         dialog = Gtk.MessageDialog(
             transient_for=self,
             modal=True,
@@ -437,9 +457,9 @@ class HookManagerDialog(Gtk.Window):
         dialog.present()
 
     def _show_generator_dialog(self, hook):
-        """Show configuration dialog for data generator."""
+        """Show configuration dialog for Synthetic Data Generator."""
         from src.hooks.python_hooks.data_generator import PRESETS
-        
+
         dialog = Gtk.Window(
             transient_for=self,
             modal=True,
@@ -447,10 +467,10 @@ class HookManagerDialog(Gtk.Window):
             default_width=400,
             default_height=300,
         )
-    
+
         main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         set_margin(main_box, 16)
-    
+
         # Preset selector
         main_box.append(Gtk.Label(label="Data Preset:", halign=Gtk.Align.START))
         preset_combo = Gtk.ComboBoxText()
@@ -458,7 +478,7 @@ class HookManagerDialog(Gtk.Window):
             preset_combo.append_text(preset_name)
         preset_combo.set_active(0)
         main_box.append(preset_combo)
-    
+
         # Row count
         main_box.append(Gtk.Label(label="Number of rows:", halign=Gtk.Align.START))
         count_entry = Gtk.Entry()
@@ -472,34 +492,34 @@ class HookManagerDialog(Gtk.Window):
         cpu_check = Gtk.CheckButton(label="Use multi-CPU (faster for >1000 rows)")
         cpu_check.set_active(False)
         main_box.append(cpu_check)
-    
+
         # Preset description
         desc_label = Gtk.Label()
         desc_label.set_wrap(True)
         desc_label.set_halign(Gtk.Align.START)
         main_box.append(desc_label)
-    
+
         def update_description(combo):
             preset = combo.get_active_text()
             config = PRESETS.get(preset, {})
             cols = len(config.get("columns", {}))
             table = config.get("table", "?")
             desc_label.set_text(f"Creates table '{table}' with {cols} columns.")
-    
+
         preset_combo.connect("changed", update_description)
         update_description(preset_combo)
-    
+
         # Buttons
         button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         button_box.set_halign(Gtk.Align.END)
-    
+
         btn_cancel = Gtk.Button(label="Cancel")
         btn_cancel.connect("clicked", lambda b: dialog.close())
         button_box.append(btn_cancel)
-    
+
         btn_generate = Gtk.Button(label="Generate")
         btn_generate.add_css_class("suggested-action")
-    
+
         def do_generate(b):
             preset = preset_combo.get_active_text()
             use_multi_cpu = cpu_check.get_active()
@@ -525,10 +545,10 @@ class HookManagerDialog(Gtk.Window):
             self._save_result("Synthetic Data Generator", result)
             self._show_result("Synthetic Data Generator", result)
             dialog.close()
-    
+
         btn_generate.connect("clicked", do_generate)
         button_box.append(btn_generate)
-    
+
         main_box.append(button_box)
         dialog.set_child(main_box)
         dialog.present()

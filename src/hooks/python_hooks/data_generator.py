@@ -124,9 +124,14 @@ class Plugin(BaseHook):
         count = context.data.get("count", 100)
         return self.execute_sync(conn_string, preset, count)
 
-    def execute_sync(self, conn_string: str, preset: str = "Supermarket", 
-                     count: int = 100, drop_existing: bool = False,
-                     use_multi_cpu: bool = False) -> dict:
+    def execute_sync(
+        self,
+        conn_string: str,
+        preset: str = "Supermarket",
+        count: int = 100,
+        drop_existing: bool = False,
+        use_multi_cpu: bool = False,
+    ) -> dict:
         """Generate synthetic data synchronously."""
         import psycopg
         from faker import Faker
@@ -152,7 +157,7 @@ class Plugin(BaseHook):
             cur.execute(f"CREATE TABLE IF NOT EXISTS {table_name} ({schema})")
 
             if use_multi_cpu and count > 1000:
-                 # Multi-CPU mode — split work across processes
+                # Multi-CPU mode — split work across processes
                 from src.hooks.python_hooks.data_generator import _generate_chunk as worker
                 from src.core.worker_pool import get_pool
 
@@ -164,10 +169,16 @@ class Plugin(BaseHook):
                     start = i * chunk_size
                     end = start + chunk_size if i < workers - 1 else count
                     futures.append(
-                        pool.submit(worker, conn_string, table_name,
-                                    list(columns.keys()), preset, end - start)
+                        pool.submit(
+                            worker,
+                            conn_string,
+                            table_name,
+                            list(columns.keys()),
+                            preset,
+                            end - start,
+                        )
                     )
-    
+
                 total = sum(f.result() for f in futures)
                 conn.close()
             else:
@@ -175,11 +186,10 @@ class Plugin(BaseHook):
                 col_names = list(columns.keys())
                 placeholders = ", ".join(["%s"] * len(col_names))
                 col_list = ", ".join(col_names)
-            
+
                 for _ in range(count):
                     row = tuple(
-                        getattr(fake, columns[col])(**params.get(col, {}))
-                        for col in col_names
+                        getattr(fake, columns[col])(**params.get(col, {})) for col in col_names
                     )
                     cur.execute(
                         f"INSERT INTO {table_name} ({col_list}) VALUES ({placeholders})", row
@@ -193,13 +203,15 @@ class Plugin(BaseHook):
                 + (" [multi-CPU]" if use_multi_cpu else ""),
                 "tables_analyzed": 1,
                 "recommendations_count": 1,
-                "recommendations": [{
-                    "table": f"public.{table_name}",
-                    "priority": "INFO",
-                    "action": f"Data generated ({preset})",
-                    "reason": f"Added {total} synthetic records for testing",
-                    "sql": f"-- {total} rows inserted into {table_name}",
-                }],
+                "recommendations": [
+                    {
+                        "table": f"public.{table_name}",
+                        "priority": "INFO",
+                        "action": f"Data generated ({preset})",
+                        "reason": f"Added {total} synthetic records for testing",
+                        "sql": f"-- {total} rows inserted into {table_name}",
+                    }
+                ],
             }
 
         except Exception as e:
@@ -207,8 +219,9 @@ class Plugin(BaseHook):
             return {"status": "error", "message": str(e)}
 
 
-def _generate_chunk(conn_string: str, table_name: str, col_names: list,
-                    preset: str, count: int) -> int:
+def _generate_chunk(
+    conn_string: str, table_name: str, col_names: list, preset: str, count: int
+) -> int:
     """Generate a chunk of data in a separate process."""
     import psycopg
     from faker import Faker
@@ -226,13 +239,8 @@ def _generate_chunk(conn_string: str, table_name: str, col_names: list,
     col_list = ", ".join(col_names)
 
     for _ in range(count):
-        row = tuple(
-            getattr(fake, columns[col])(**params.get(col, {}))
-            for col in col_names
-        )
-        cur.execute(
-            f"INSERT INTO {table_name} ({col_list}) VALUES ({placeholders})", row
-        )
+        row = tuple(getattr(fake, columns[col])(**params.get(col, {})) for col in col_names)
+        cur.execute(f"INSERT INTO {table_name} ({col_list}) VALUES ({placeholders})", row)
 
     conn.close()
     return count

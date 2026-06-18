@@ -25,6 +25,7 @@ class RoutingMixin:
     def _segments_intersect(self, x1, y1, x2, y2, x3, y3, x4, y4):
         def ccw(ax, ay, bx, by, cx, cy):
             return (bx - ax) * (cy - ay) - (by - ay) * (cx - ax)
+
         d1 = ccw(x3, y3, x4, y4, x1, y1)
         d2 = ccw(x3, y3, x4, y4, x2, y2)
         d3 = ccw(x1, y1, x2, y2, x3, y3)
@@ -44,10 +45,7 @@ class RoutingMixin:
         return False
 
     def _point_on_segment(self, x1, y1, x2, y2, px, py):
-        return (
-            min(x1, x2) <= px <= max(x1, x2)
-            and min(y1, y2) <= py <= max(y1, y2)
-        )
+        return min(x1, x2) <= px <= max(x1, x2) and min(y1, y2) <= py <= max(y1, y2)
 
     def _line_intersects_table(self, x1, y1, x2, y2, table, exclude_tables=None):
         if exclude_tables and table in exclude_tables:
@@ -224,9 +222,7 @@ class RoutingMixin:
         start_x, start_y = self._get_connection_point(
             source_table, fk.from_col_index, is_source=True
         )
-        end_x, end_y = self._get_connection_point(
-            target_table, fk.to_col_index, is_source=False
-        )
+        end_x, end_y = self._get_connection_point(target_table, fk.to_col_index, is_source=False)
 
         points = [(start_x, start_y)]
         points.extend(fk.waypoints)

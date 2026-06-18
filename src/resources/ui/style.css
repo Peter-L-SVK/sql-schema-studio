@@ -407,3 +407,23 @@ stackswitcher button:hover:not(:checked) {
     color: alpha(currentColor, 0.8);
     background: alpha(currentColor, 0.12);
 }
+
+.completion-popover {
+    padding: 0;
+    border-radius: 6px;
+}
+
+.completion-scroll {
+    padding: 4px;
+}
+
+.completion-item {
+    padding: 4px 12px;
+    font-family: monospace;
+    font-size: 11pt;
+}
+
+.completion-list row:selected .completion-item {
+    background-color: @accent_bg_color;
+    color: @accent_fg_color;
+}

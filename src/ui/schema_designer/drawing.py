@@ -94,7 +94,7 @@ class DrawingMixin:
             # All middle segments are obstacle-avoidance detours — always straight.
             # Applying curve/ortho to already-bent detour segments produces
             # the "crazy line" artefact.
-            is_detour = (0 < i < len(path) - 2)
+            is_detour = 0 < i < len(path) - 2
 
             seg_intersections = []
             for ix, iy, other_fk in intersections:
@@ -112,7 +112,9 @@ class DrawingMixin:
                     pre_x = ix - 7 * math.cos(segment_angle)
                     pre_y = iy - 7 * math.sin(segment_angle)
 
-                    self._draw_segment_styled(cr, prev_x, prev_y, pre_x, pre_y, fk.line_style, is_detour)
+                    self._draw_segment_styled(
+                        cr, prev_x, prev_y, pre_x, pre_y, fk.line_style, is_detour
+                    )
                     self._draw_line_jump(cr, ix, iy, segment_angle, fk.color)
 
                     prev_x = ix + 7 * math.cos(segment_angle)
@@ -140,7 +142,7 @@ class DrawingMixin:
 
         Styles are only applied to the first and last segment of a path,
         which are the actual connection segments between tables.
- 
+
         Styles:
           straight — direct line_to (always used for detour segments).
           curve    — horizontal S-curve via cubic Bezier; control points
@@ -183,7 +185,7 @@ class DrawingMixin:
         current_segments = []
         path = current_fk._cached_path
         for i in range(len(path) - 1):
-            current_segments.append((path[i][0], path[i][1], path[i+1][0], path[i+1][1]))
+            current_segments.append((path[i][0], path[i][1], path[i + 1][0], path[i + 1][1]))
 
         for other_fk in self._relationships:
             if other_fk is current_fk:
@@ -193,25 +195,27 @@ class DrawingMixin:
                 continue
             other_segments = []
             for i in range(len(other_path) - 1):
-                other_segments.append((other_path[i][0], other_path[i][1],
-                                       other_path[i+1][0], other_path[i+1][1]))
+                other_segments.append(
+                    (other_path[i][0], other_path[i][1], other_path[i + 1][0], other_path[i + 1][1])
+                )
             for seg1 in current_segments:
                 for seg2 in other_segments:
                     result = self._line_intersection(
-                        seg1[0], seg1[1], seg1[2], seg1[3],
-                        seg2[0], seg2[1], seg2[2], seg2[3]
+                        seg1[0], seg1[1], seg1[2], seg1[3], seg2[0], seg2[1], seg2[2], seg2[3]
                     )
                     if result is not None:
                         ix, iy = result
                         is_endpoint = False
                         for table in self._tables:
                             tw, th = table.get_size()
-                            if (abs(ix - table.x) < 15 or abs(ix - (table.x + tw)) < 15) and \
-                               (table.y - 15 <= iy <= table.y + th + 15):
+                            if (abs(ix - table.x) < 15 or abs(ix - (table.x + tw)) < 15) and (
+                                table.y - 15 <= iy <= table.y + th + 15
+                            ):
                                 is_endpoint = True
                                 break
-                            if (abs(iy - table.y) < 15 or abs(iy - (table.y + th)) < 15) and \
-                               (table.x - 15 <= ix <= table.x + tw + 15):
+                            if (abs(iy - table.y) < 15 or abs(iy - (table.y + th)) < 15) and (
+                                table.x - 15 <= ix <= table.x + tw + 15
+                            ):
                                 is_endpoint = True
                                 break
                         if not is_endpoint:
@@ -333,17 +337,17 @@ class DrawingMixin:
         cr.show_text("N")
 
         # "1" near to_table (parent) — left edge
-        cr.move_to(target_table.x - 20, target_table.y + tgt_h / 2 - 10)
+        cr.move_to(target_table.x - 28, target_table.y + tgt_h / 2 - 18)
         cr.show_text("1")
 
     def _draw_arrowhead_direct(self, cr, fk, x1, y1, x2, y2):
         """Draw arrowhead directly between two points (fallback)."""
         source_table = self._table_index.get(fk.from_table)
         target_table = self._table_index.get(fk.to_table)
-    
+
         if not source_table or not target_table:
             return
-    
+
         arrow_size = 10
         cr.set_source_rgb(*fk.color)
         cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
@@ -385,7 +389,7 @@ class DrawingMixin:
         cr.show_text("N")
 
         # "1" near to_table (parent) — left edge
-        cr.move_to(target_table.x - 20, target_table.y + tgt_h / 2 - 10)
+        cr.move_to(target_table.x - 28, target_table.y + tgt_h / 2 - 18)
         cr.show_text("1")
 
     # =====================================================================
@@ -424,9 +428,7 @@ class DrawingMixin:
         cr.rectangle(table.x, table.y, total_width, header_height)
         cr.set_line_width(1)
         cr.stroke()
-        cr.set_source_rgb(
-            table.color[0] * 0.5, table.color[1] * 0.5, table.color[2] * 0.5
-        )
+        cr.set_source_rgb(table.color[0] * 0.5, table.color[1] * 0.5, table.color[2] * 0.5)
         cr.rectangle(table.x, table.y, total_width, total_height)
         cr.set_line_width(1)
         cr.stroke()
@@ -447,9 +449,7 @@ class DrawingMixin:
             cr.line_to(table.x + total_width - 4, sep_y)
             cr.stroke()
         cr.set_source_rgb(0.1, 0.1, 0.1)
-        cr.select_font_face(
-            "Monospace", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL
-        )
+        cr.select_font_face("Monospace", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
         cr.set_font_size(11)
         y_pos = table.y + header_height + line_height - 4
         for i, line in enumerate(col_lines):
@@ -460,7 +460,5 @@ class DrawingMixin:
         if table == self._selected_table:
             cr.set_source_rgb(*table.color)
             cr.set_line_width(2)
-            cr.rectangle(
-                table.x - 2, table.y - 2, total_width + 4, total_height + 4
-            )
+            cr.rectangle(table.x - 2, table.y - 2, total_width + 4, total_height + 4)
             cr.stroke()

@@ -38,24 +38,51 @@ class AIToolsPopover:
         vbox.set_margin_end(4)
 
         items = [
-            ("Index Advisor", self._run_index_advisor,
-             "Recommend missing indexes based on FKs and naming patterns"),
-            ("Missing FKs", self._run_missing_fk_detector,
-             "Find columns ending with _id that lack foreign keys"),
-            ("Duplicate Rows", self._run_duplicate_detector,
-             "Detect duplicate data across all tables"),
-            ("Unused Indexes", self._run_unused_indexes,
-             "Find indexes with zero scans that can be removed"),
-            ("Slow Queries", self._run_slow_queries_analysis,
-             "Find slow queries that might benefit from indexes"),
-            ("Table Growth", self._run_table_growth_analysis,
-             "Analyze table sizes, dead rows, and vacuum status"),
-            ("Column Statistics", self._run_column_statistics,
-             "Show min, max, null %, and unique % for all columns"),
-            ("Query Analyzer", self._run_query_analyzer,
-             "Analyze table statistics using Polars engine"),
-            ("Performance Insights", self._run_performance_insights,
-             "Database performance overview with cache hit ratio"),
+            (
+                "Index Advisor",
+                self._run_index_advisor,
+                "Recommend missing indexes based on FKs and naming patterns",
+            ),
+            (
+                "Missing FKs",
+                self._run_missing_fk_detector,
+                "Find columns ending with _id that lack foreign keys",
+            ),
+            (
+                "Duplicate Rows",
+                self._run_duplicate_detector,
+                "Detect duplicate data across all tables",
+            ),
+            (
+                "Unused Indexes",
+                self._run_unused_indexes,
+                "Find indexes with zero scans that can be removed",
+            ),
+            (
+                "Slow Queries",
+                self._run_slow_queries_analysis,
+                "Find slow queries that might benefit from indexes",
+            ),
+            (
+                "Table Growth",
+                self._run_table_growth_analysis,
+                "Analyze table sizes, dead rows, and vacuum status",
+            ),
+            (
+                "Column Statistics",
+                self._run_column_statistics,
+                "Show min, max, null %, and unique % for all columns",
+            ),
+            (
+                "Query Analyzer",
+                self._run_query_analyzer,
+                "Analyze table statistics using Polars engine",
+            ),
+            (
+                "Performance Insights",
+                self._run_performance_insights,
+                "Database performance overview with cache hit ratio",
+            ),
         ]
 
         for label, callback, tooltip in items:
@@ -88,7 +115,7 @@ class AIToolsPopover:
 
     def _run_index_advisor(self):
         """Recommend missing indexes based on foreign keys and naming patterns.
-        
+
         Checks for:
         - Foreign key columns without indexes (HIGH priority)
         - Columns ending with _id (MEDIUM priority)
@@ -100,6 +127,7 @@ class AIToolsPopover:
         window = self._window
         try:
             from src.analytics.index_advisor import IndexAdvisor
+
             advisor = IndexAdvisor()
             recommendations = advisor.analyze_all_tables(window.db_connector)
             sql_lines = ["-- AI Index Advisor Recommendations\n"]
@@ -127,7 +155,7 @@ class AIToolsPopover:
 
     def _run_missing_fk_detector(self):
         """Detect columns ending with _id that lack foreign key constraints.
-        
+
         Searches for columns matching *_id pattern that have no FK constraint,
         and suggests the likely referenced table (e.g., user_id -> users.id).
         """
@@ -156,8 +184,9 @@ class AIToolsPopover:
                 rows = []
                 for r in results:
                     suggested = r["column_name"].replace("_id", "") + "s"
-                    rows.append([r["table_schema"], r["table_name"], r["column_name"],
-                                 f"{suggested}.id"])
+                    rows.append(
+                        [r["table_schema"], r["table_name"], r["column_name"], f"{suggested}.id"]
+                    )
                 window.results.show_query_result(cols, rows, 0)
                 window.statusbar.set_message(f"Found {len(rows)} missing foreign keys")
             else:
@@ -172,7 +201,7 @@ class AIToolsPopover:
 
     def _run_duplicate_detector(self):
         """Find duplicate rows across all tables using Polars engine.
-        
+
         Checks each table for completely identical rows and reports
         the count and percentage of duplicates found.
         """
@@ -181,20 +210,20 @@ class AIToolsPopover:
         window = self._window
         try:
             from src.analytics.engine import AnalyticsEngine
+
             engine = AnalyticsEngine(window.db_connector)
             tables = window.db_connector.get_tables("public")
             cols = ["Table", "Total Rows", "Duplicates", "% Duplicate"]
             rows = []
             for table in tables:
                 name = table["table_name"]
-                df = engine.query_to_df(f"SELECT * FROM public.\"{name}\"")
+                df = engine.query_to_df(f'SELECT * FROM public."{name}"')
                 if df.is_empty():
                     continue
                 total = len(df)
                 dup_count = df.is_duplicated().sum()
                 if dup_count > 0:
-                    rows.append([name, str(total), str(dup_count),
-                                 f"{dup_count/total*100:.1f}%"])
+                    rows.append([name, str(total), str(dup_count), f"{dup_count/total*100:.1f}%"])
             if rows:
                 window.results.show_query_result(cols, rows, 0)
                 window.statusbar.set_message(f"Found duplicates in {len(rows)} tables")
@@ -210,7 +239,7 @@ class AIToolsPopover:
 
     def _run_unused_indexes(self):
         """Find indexes with zero scans that can potentially be removed.
-        
+
         Queries pg_stat_user_indexes for indexes that have never been used
         by the query planner, ordered by size (largest first).
         """
@@ -227,9 +256,16 @@ class AIToolsPopover:
             """)
             if results:
                 cols = ["Schema", "Table", "Index", "Scans", "Tuples Read"]
-                rows = [[r["schemaname"], r["tablename"], r["indexname"],
-                         str(r["idx_scan"]), str(r["idx_tup_read"])]
-                        for r in results]
+                rows = [
+                    [
+                        r["schemaname"],
+                        r["tablename"],
+                        r["indexname"],
+                        str(r["idx_scan"]),
+                        str(r["idx_tup_read"]),
+                    ]
+                    for r in results
+                ]
                 window.results.show_query_result(cols, rows, 0)
                 window.statusbar.set_message(f"Found {len(rows)} unused indexes")
             else:
@@ -244,7 +280,7 @@ class AIToolsPopover:
 
     def _run_slow_queries_analysis(self):
         """Find slow queries using pg_stat_statements or pg_stat_activity.
-    
+
         First tries pg_stat_statements (more detailed).
         Falls back to pg_stat_activity for currently running queries.
         """
@@ -291,8 +327,16 @@ class AIToolsPopover:
                     query = r["query"]
                     if len(query) > 80:
                         query = query[:80] + "..."
-                    rows.append([query, str(r["calls"]), str(r["total_ms"]),
-                                 str(r["avg_ms"]), str(r["rows"]), "N/A"])
+                    rows.append(
+                        [
+                            query,
+                            str(r["calls"]),
+                            str(r["total_ms"]),
+                            str(r["avg_ms"]),
+                            str(r["rows"]),
+                            "N/A",
+                        ]
+                    )
                 window.results.show_query_result(cols, rows, 0)
                 window.statusbar.set_message(f"Found {len(rows)} queries")
             else:
@@ -317,6 +361,7 @@ class AIToolsPopover:
         window = self._window
         try:
             from src.analytics.engine import AnalyticsEngine
+
             engine = AnalyticsEngine(window.db_connector)
 
             results = engine.query_to_df("""
@@ -339,24 +384,23 @@ class AIToolsPopover:
             """)
 
             if not results.is_empty():
-                cols = ["Table", "Total", "Data", "Indexes", "Rows",
-                        "Dead %", "Last Vacuum"]
+                cols = ["Table", "Total", "Data", "Indexes", "Rows", "Dead %", "Last Vacuum"]
                 rows = []
                 for r in results.iter_rows():
                     last_vac = r[8] or r[7] or r[9]
-                    rows.append([
-                        r[0],
-                        f"{r[1]/1024/1024:.1f} MB" if r[1] else "0.0 MB",
-                        f"{r[2]/1024/1024:.1f} MB" if r[2] else "0.0 MB",
-                        f"{r[3]/1024/1024:.1f} MB" if r[3] else "0.0 MB",
-                        str(r[4] or 0),
-                        f"{r[6]}%" if r[6] else "0%",
-                        str(last_vac) if last_vac else "Never",
-                    ])
+                    rows.append(
+                        [
+                            r[0],
+                            f"{r[1]/1024/1024:.1f} MB" if r[1] else "0.0 MB",
+                            f"{r[2]/1024/1024:.1f} MB" if r[2] else "0.0 MB",
+                            f"{r[3]/1024/1024:.1f} MB" if r[3] else "0.0 MB",
+                            str(r[4] or 0),
+                            f"{r[6]}%" if r[6] else "0%",
+                            str(last_vac) if last_vac else "Never",
+                        ]
+                    )
                 window.results.show_query_result(cols, rows, 0)
-                window.statusbar.set_message(
-                    f"Analyzed {len(rows)} tables"
-                )
+                window.statusbar.set_message(f"Analyzed {len(rows)} tables")
         except Exception as e:
             logger.error(f"Table growth analysis failed: {e}")
             window.statusbar.set_message(f"Table growth analysis failed: {e}")
@@ -367,7 +411,7 @@ class AIToolsPopover:
 
     def _run_column_statistics(self):
         """Show detailed column statistics using Polars engine.
-        
+
         For each column displays: data type, row count, null percentage,
         unique value percentage, and min/max values.
         Limited to first 10 tables to avoid memory issues.
@@ -377,37 +421,38 @@ class AIToolsPopover:
         window = self._window
         try:
             from src.analytics.engine import AnalyticsEngine
+
             engine = AnalyticsEngine(window.db_connector)
             tables = window.db_connector.get_tables("public")
 
-            cols = ["Table", "Column", "Type", "Rows", "Null %",
-                    "Unique %", "Min", "Max"]
+            cols = ["Table", "Column", "Type", "Rows", "Null %", "Unique %", "Min", "Max"]
             rows = []
 
             for table in tables[:10]:
                 name = table["table_name"]
-                df = engine.query_to_df(
-                    f"SELECT * FROM public.\"{name}\" LIMIT 1000"
-                )
+                df = engine.query_to_df(f'SELECT * FROM public."{name}" LIMIT 1000')
                 if df.is_empty():
                     continue
 
                 for col in df.columns:
-                    null_pct = (df[col].null_count() / len(df) * 100
-                                if len(df) > 0 else 0)
-                    unique_pct = (df[col].n_unique() / len(df) * 100
-                                  if len(df) > 0 else 0)
+                    null_pct = df[col].null_count() / len(df) * 100 if len(df) > 0 else 0
+                    unique_pct = df[col].n_unique() / len(df) * 100 if len(df) > 0 else 0
 
                     col_min = df[col].min()
                     col_max = df[col].max()
 
-                    rows.append([
-                        name, col, str(df[col].dtype), str(len(df)),
-                        f"{null_pct:.1f}%",
-                        f"{unique_pct:.1f}%",
-                        str(col_min)[:20] if col_min is not None else "-",
-                        str(col_max)[:20] if col_max is not None else "-",
-                    ])
+                    rows.append(
+                        [
+                            name,
+                            col,
+                            str(df[col].dtype),
+                            str(len(df)),
+                            f"{null_pct:.1f}%",
+                            f"{unique_pct:.1f}%",
+                            str(col_min)[:20] if col_min is not None else "-",
+                            str(col_max)[:20] if col_max is not None else "-",
+                        ]
+                    )
 
             if rows:
                 window.results.show_query_result(cols, rows, 0)
@@ -424,7 +469,7 @@ class AIToolsPopover:
 
     def _run_query_analyzer(self):
         """Analyze table statistics using Polars engine.
-        
+
         Shows row counts, column counts, estimated sizes,
         and highlights columns with >50% NULL values.
         """
@@ -433,6 +478,7 @@ class AIToolsPopover:
         window = self._window
         try:
             from src.analytics.engine import AnalyticsEngine
+
             engine = AnalyticsEngine(window.db_connector)
             tables = window.db_connector.get_tables("public")
             cols = ["Table", "Rows", "Columns", "Size (MB)", "Null Issues"]
@@ -441,16 +487,17 @@ class AIToolsPopover:
                 name = table["table_name"]
                 stats = engine.table_stats_safe("public", name)
                 null_issues = sum(
-                    1 for pct in stats.get("null_percentages", {}).values()
-                    if pct > 50
+                    1 for pct in stats.get("null_percentages", {}).values() if pct > 50
                 )
-                rows.append([
-                    name,
-                    f"{stats['row_count']:,}",
-                    str(stats['column_count']),
-                    str(stats['estimated_size_mb']),
-                    f"{null_issues} cols >50% NULL" if null_issues > 0 else "OK",
-                ])
+                rows.append(
+                    [
+                        name,
+                        f"{stats['row_count']:,}",
+                        str(stats["column_count"]),
+                        str(stats["estimated_size_mb"]),
+                        f"{null_issues} cols >50% NULL" if null_issues > 0 else "OK",
+                    ]
+                )
             window.results.show_query_result(cols, rows, 0)
             total_rows = sum(int(r[1].replace(",", "")) for r in rows)
             window.statusbar.set_message(
@@ -466,7 +513,7 @@ class AIToolsPopover:
 
     def _run_performance_insights(self):
         """Show database performance overview.
-        
+
         Displays active connections, commit/rollback counts,
         cache hit ratio, and top 10 largest tables.
         """
@@ -475,6 +522,7 @@ class AIToolsPopover:
         window = self._window
         try:
             from src.analytics.engine import AnalyticsEngine
+
             engine = AnalyticsEngine(window.db_connector)
 
             # Get database-level statistics
@@ -508,9 +556,7 @@ class AIToolsPopover:
                 summary_rows.append(["", ""])
                 summary_rows.append(["--- Top Tables ---", ""])
                 for r in table_sizes.iter_rows():
-                    summary_rows.append(
-                        [r[0], f"{r[1]/1024/1024:.1f} MB"]
-                    )
+                    summary_rows.append([r[0], f"{r[1]/1024/1024:.1f} MB"])
 
             window.results.show_query_result(summary_cols, summary_rows, 0)
             window.statusbar.set_message("Performance insights generated")

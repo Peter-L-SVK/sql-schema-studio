@@ -78,9 +78,7 @@ class PreferencesDialog(Gtk.Window):
         autocomplete_label.add_css_class("heading")
         autocomplete_label.set_margin_top(8)
         editor_page.append(autocomplete_label)
-        self._autocomplete_check = Gtk.CheckButton(
-            label="Enable SQL keyword autocomplete"
-        )
+        self._autocomplete_check = Gtk.CheckButton(label="Enable SQL keyword autocomplete")
         editor_page.append(self._autocomplete_check)
 
         # Color scheme
@@ -103,14 +101,10 @@ class PreferencesDialog(Gtk.Window):
         general_page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
         set_margin(general_page, 16)
 
-        self._confirm_close_check = Gtk.CheckButton(
-            label="Warn when closing with unsaved changes"
-        )
+        self._confirm_close_check = Gtk.CheckButton(label="Warn when closing with unsaved changes")
         general_page.append(self._confirm_close_check)
 
-        self._restore_session_check = Gtk.CheckButton(
-            label="Restore last session on startup"
-        )
+        self._restore_session_check = Gtk.CheckButton(label="Restore last session on startup")
         general_page.append(self._restore_session_check)
 
         notebook.append_page(general_page, Gtk.Label(label="General"))
@@ -232,6 +226,7 @@ class PreferencesDialog(Gtk.Window):
 
             # Apply autocomplete setting globally
             from src.ui.editor_tabs import EditorTab
+
             EditorTab.set_autocomplete_enabled(autocomplete_enabled)
 
             logger.info(f"Preferences applied to {len(self._editor._tabs)} editor tabs")

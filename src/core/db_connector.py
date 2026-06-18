@@ -93,6 +93,7 @@ class ConnectionProfile:
         """Save SSH password to system keyring."""
         try:
             import keyring
+
             keyring.set_password("sql-schema-studio", f"{self.name}/ssh", password)
         except Exception as e:
             logger.warning(f"Could not save SSH password: {e}")
@@ -101,10 +102,12 @@ class ConnectionProfile:
         """Get SSH password from system keyring."""
         try:
             import keyring
+
             saved = keyring.get_password("sql-schema-studio", f"{self.name}/ssh")
             return saved or ""
         except Exception:
             return ""
+
 
 class DatabaseConnector:
     """Manages PostgreSQL connections with keyring-backed credentials."""
@@ -162,7 +165,7 @@ class DatabaseConnector:
 
     def disconnect(self, profile_name: str | None = None) -> None:
         """Close database connection and SSH tunnel."""
-        if hasattr(self, '_active_tunnel') and self._active_tunnel:
+        if hasattr(self, "_active_tunnel") and self._active_tunnel:
             self._active_tunnel.stop()
             self._active_tunnel = None
         name = profile_name or self._active_profile
@@ -188,7 +191,11 @@ class DatabaseConnector:
             return self._build_conn_string(profile)
 
         # If we have alredy SSH tunnel, use it
-        if hasattr(self, '_active_tunnel') and self._active_tunnel and self._active_tunnel.is_active:
+        if (
+            hasattr(self, "_active_tunnel")
+            and self._active_tunnel
+            and self._active_tunnel.is_active
+        ):
             return (
                 f"host=127.0.0.1 port={self._active_tunnel.local_port} "
                 f"dbname={profile.database} user={profile.username} "

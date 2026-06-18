@@ -69,6 +69,7 @@ class WorkerBridgeMixin:
 
         try:
             from src.core.worker_pool import get_pool, _compute_path_worker
+
             pool = get_pool()
         except Exception as e:
             logger.warning(f"Worker pool unavailable: {e}")
@@ -153,6 +154,7 @@ class WorkerBridgeMixin:
         """Restart worker pool to free memory from completed workers."""
         try:
             from src.core.worker_pool import get_pool
+
             get_pool().restart()
         except Exception:
             pass
@@ -161,6 +163,7 @@ class WorkerBridgeMixin:
         """Shutdown worker pool completely (on designer close)."""
         try:
             from src.core.worker_pool import get_pool
+
             get_pool().shutdown()
         except Exception:
             pass

@@ -32,13 +32,13 @@ class AnalyticsEngine:
 
     def table_stats_safe(self, schema: str, table: str) -> dict:
         """Get table statistics with safe defaults for all keys.
-    
+
         Use this when calling from UI code that doesn't want to handle
         missing keys. Always returns all expected keys with defaults.
         """
         try:
-            df = self.query_to_df(f"SELECT * FROM {schema}.\"{table}\"")
-        
+            df = self.query_to_df(f'SELECT * FROM {schema}."{table}"')
+
             if df.is_empty():
                 return {
                     "row_count": 0,
@@ -47,7 +47,7 @@ class AnalyticsEngine:
                     "estimated_size_mb": 0,
                     "null_percentages": {},
                 }
-        
+
             return {
                 "row_count": len(df),
                 "column_count": len(df.columns),
@@ -91,7 +91,7 @@ class AnalyticsEngine:
             Dict with row_count, columns, null_counts, distinct_counts,
             memory_usage, and column types.
         """
-        df = self.query_to_df(f"SELECT * FROM {schema}.\"{table}\"")
+        df = self.query_to_df(f'SELECT * FROM {schema}."{table}"')
 
         if df.is_empty():
             return {"row_count": 0, "columns": [], "empty": True}
@@ -117,9 +117,7 @@ class AnalyticsEngine:
             Dict with min, max, mean, median, std, unique count,
             null count, and top values.
         """
-        df = self.query_to_df(
-            f"SELECT \"{column}\" FROM {schema}.\"{table}\""
-        )
+        df = self.query_to_df(f'SELECT "{column}" FROM {schema}."{table}"')
 
         if df.is_empty():
             return {"empty": True}
@@ -136,24 +134,28 @@ class AnalyticsEngine:
 
         # Numeric statistics
         if col.dtype in (pl.Int64, pl.Float64, pl.Int32, pl.Float32):
-            profile.update({
-                "min": col.min(),
-                "max": col.max(),
-                "mean": round(col.mean(), 2) if col.mean() is not None else None,
-                "median": col.median(),
-                "std": round(col.std(), 2) if col.std() is not None else None,
-                "sum": col.sum(),
-            })
+            profile.update(
+                {
+                    "min": col.min(),
+                    "max": col.max(),
+                    "mean": round(col.mean(), 2) if col.mean() is not None else None,
+                    "median": col.median(),
+                    "std": round(col.std(), 2) if col.std() is not None else None,
+                    "sum": col.sum(),
+                }
+            )
 
         # String statistics
         if col.dtype == pl.Utf8:
             lengths = col.str.len_chars()
-            profile.update({
-                "min_length": lengths.min(),
-                "max_length": lengths.max(),
-                "mean_length": round(lengths.mean(), 1) if lengths.mean() is not None else None,
-                "empty_count": col.str.len_chars().eq(0).sum(),
-            })
+            profile.update(
+                {
+                    "min_length": lengths.min(),
+                    "max_length": lengths.max(),
+                    "mean_length": round(lengths.mean(), 1) if lengths.mean() is not None else None,
+                    "empty_count": col.str.len_chars().eq(0).sum(),
+                }
+            )
 
         # Top values
         if col.n_unique() > 0 and col.n_unique() <= 100:
@@ -190,13 +192,12 @@ class AnalyticsEngine:
         Returns:
             Polars DataFrame with correlation values, or None if no numeric columns.
         """
-        df = self.query_to_df(f"SELECT * FROM {schema}.\"{table}\"")
+        df = self.query_to_df(f'SELECT * FROM {schema}."{table}"')
         if df.is_empty():
             return None
 
         numeric_cols = [
-            c for c in df.columns
-            if df[c].dtype in (pl.Int64, pl.Float64, pl.Int32, pl.Float32)
+            c for c in df.columns if df[c].dtype in (pl.Int64, pl.Float64, pl.Int32, pl.Float32)
         ]
 
         if len(numeric_cols) < 2:

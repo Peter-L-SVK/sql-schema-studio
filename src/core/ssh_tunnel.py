@@ -26,6 +26,7 @@ logger = get_logger(__name__)
 @dataclass
 class SSHTunnelConfig:
     """Configuration for an SSH tunnel."""
+
     enabled: bool = False
     ssh_host: str = ""
     ssh_port: int = 22
