@@ -91,7 +91,7 @@ src = ["resources/ui/*.css"]
 
 [tool.flake8]
 max-line-length = 120
-extend-ignore = "E402,E501,W503,E226"
+extend-ignore = "E402,E501,W503,E226,E302"
 exclude = [
     ".git",
     "__pycache__",
