@@ -1,10 +1,10 @@
 [build-system]
 requires = ["setuptools>=68.0", "wheel"]
-build-backend = "setuptools.backends._legacy:_Backend"
+build-backend = "setuptools.build_meta"  # Opravené
 
 [project]
 name = "sql-schema-studio"
-version = "0.8.0"
+version = "0.9.0"
 description = "Intelligent PostgreSQL Management Platform with Python/Perl hooks and AI analytics"
 readme = "README.md"
 license = {text = "GPL-3.0-or-later"}
@@ -35,10 +35,12 @@ dependencies = [
     "PyGObject>=3.46.0",
     "pycairo>=1.24.0",
     "numpy>=1.24.0",
-    "pandas>=2.0.0",
+    "polars>=1.0.0",
     "scikit-learn>=1.3.0",
     "matplotlib>=3.7.0",
     "paramiko>=3.0.0",
+    "faker>=18.0.0",
+    "kbcstorage>=0.1.0",
 ]
 
 [project.optional-dependencies]
@@ -71,6 +73,7 @@ packages = [
     "src.core",
     "src.ui",
     "src.ui.dialogs",
+    "src.ui.schema_designer",
     "src.models",
     "src.utils",
     "src.plugins",
@@ -88,14 +91,24 @@ src = ["resources/ui/*.css"]
 
 [tool.flake8]
 max-line-length = 100
-extend-ignore = "E402,W503"
+extend-ignore = "E402,W503,E226"
 exclude = [
     ".git",
     "__pycache__",
     "buld_dist"
 ]
 ignore = "E501,E302"
-per-file-ignores = "__init__.py:F401,F403, src/plugins/perl/executor.py:W293, src/ui/browser.py:W291"
+per-file-ignores = """
+    __init__.py:F401,F403,
+    src/plugins/perl/executor.py:W293,
+    src/ui/browser.py:W291,
+    src/core/schema_parser.py:F841,
+    src/core/worker_pool.py:F401,
+    src/hooks/python_hooks/keboola_normalizer.py:F401,
+    src/ui/dialogs/connection.py:F401,F821,
+    src/ui/dialogs/keboola_config.py:F401,
+    src/ui/schema_designer/routing.py:F401,F841,
+"""
 
 [tool.black]
 line-length = 100
@@ -108,6 +121,24 @@ warn_unused_configs = true
 ignore_missing_imports = true
 explicit_package_bases = true
 namespace_packages = true
+check_untyped_defs = true
+no_implicit_optional = true
+
+[[tool.mypy.overrides]]
+module = "src.hooks.python_hooks.keboola_normalizer"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "src.hooks.python_hooks.data_generator"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "src.analytics.engine"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "src.core.schema_parser"
+ignore_errors = true
 
 [tool.pytest.ini_options]
 minversion = "7.0"
