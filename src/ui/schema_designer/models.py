@@ -63,7 +63,7 @@ class ForeignKey:
 class SchemaTable:
     """Represents a table on the designer canvas."""
 
-    def __init__(self, name: str, x: float = 50, y: float = 50, color=(0.3, 0.5, 0.8)):
+    def __init__(self, name: str, x: float = 50, y: float = 50, color=(0.3, 0.5, 0.9)):
         self.name = name
         self.x = x
         self.y = y

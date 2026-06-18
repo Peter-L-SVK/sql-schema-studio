@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.8 - About Dialog (GPLv3)
+# SQL Schema Studio 0.9 - About Dialog (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -36,7 +36,7 @@ def show_about(parent):
         transient_for=parent,
         modal=True,
         program_name="SQL Schema Studio",
-        version="0.8.0",
+        version="0.9.0",
         comments="Intelligent PostgreSQL Management Platform\n\n"
         "Visual schema designer • SQL editor • AI analytics\n"
         "Written in Python3 and Gtk-4.0\n\n"
