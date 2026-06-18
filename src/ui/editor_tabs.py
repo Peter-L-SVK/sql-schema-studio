@@ -477,20 +477,12 @@ class EditorTabs(Gtk.Box):
 
 
 # ======================================================================
-# Single Editor Tab
+# Single Editor Tab with Custom Popover Autocomplete
 # ======================================================================
 
 class EditorTab(Gtk.Box):
     """Single editor tab with GtkSourceView and custom Popover autocomplete."""
 
-    # Class-level setting shared across all tabs
-    _autocomplete_enabled: bool = True
-
-    @classmethod
-    def set_autocomplete_enabled(cls, enabled: bool):
-        """Enable or disable autocomplete for all tabs."""
-        cls._autocomplete_enabled = enabled
-    
     def __init__(self, parent_editor, title: str = "Query", content: str = ""):
         super().__init__(orientation=Gtk.Orientation.VERTICAL)
         self._parent_editor = parent_editor
@@ -504,6 +496,7 @@ class EditorTab(Gtk.Box):
         self._selected_index: int = -1
         self._completing: bool = False
         self._popover_debounce_id: int = 0
+        self._prev_text_length: int = 0  # Sledovanie či sa text zväčšuje alebo zmenšuje
 
         scroll = Gtk.ScrolledWindow()
         scroll.set_vexpand(True)
@@ -558,7 +551,7 @@ class EditorTab(Gtk.Box):
         buffer.connect("changed", self._on_buffer_changed)
 
     def _build_completion_popover(self):
-        """Create the popover and its listbox – bez ScrolledWindow, nech sa veľkosť prispôsobí."""
+        """Create the popover and its listbox."""
         self._completion_popover = Gtk.Popover()
         self._completion_popover.set_autohide(True)
         self._completion_popover.set_has_arrow(False)
@@ -571,16 +564,11 @@ class EditorTab(Gtk.Box):
         self._completion_popover.set_child(self._completion_list)
 
     def _get_word_at_cursor(self) -> tuple[str, Gtk.TextIter, Gtk.TextIter]:
-        """Get the current word (possibly multi-word) at cursor position.
-    
-        For multi-word matches, looks back up to 3 words.
-        Returns (word, start_iter, end_iter).
-        """
+        """Get the current word (possibly multi-word) at cursor position."""
         buffer = self._view.get_buffer()
         cursor = buffer.get_iter_at_mark(buffer.get_insert())
         end = cursor.copy()
-    
-        # Get current word
+
         start = cursor.copy()
         while not start.starts_line():
             prev = start.copy()
@@ -590,13 +578,12 @@ class EditorTab(Gtk.Box):
             if ch in " \t\n\r()[]{},;.=<>!+-*/%|&^~@#:;\"'`":
                 break
             start = prev
-    
+
         word = buffer.get_text(start, end, False)
-    
+
         # Try to expand to multi-word (up to 3 words back)
         expanded_start = start.copy()
         for _ in range(3):
-            # Skip whitespace backwards
             while not expanded_start.starts_line():
                 prev = expanded_start.copy()
                 if not prev.backward_char():
@@ -608,8 +595,7 @@ class EditorTab(Gtk.Box):
                 expanded_start = prev
             else:
                 break
-        
-            # Get previous word
+
             prev_word_start = expanded_start.copy()
             while not prev_word_start.starts_line():
                 prev = prev_word_start.copy()
@@ -619,56 +605,65 @@ class EditorTab(Gtk.Box):
                 if ch in " \t\n\r()[]{},;.=<>!+-*/%|&^~@#:;\"'`":
                     break
                 prev_word_start = prev
-        
-            # Check if this multi-word combination exists in keywords
+
             candidate = buffer.get_text(prev_word_start, end, False)
             candidate_upper = candidate.upper()
-        
-            # Only expand if it matches at least one keyword
+
             if any(kw.startswith(candidate_upper) for kw in SQL_KEYWORDS):
                 start = prev_word_start
                 word = candidate
-    
+
         return word, start, end
 
     def _on_buffer_changed(self, buffer):
         if self._completing:
             return
-        if not EditorTab._autocomplete_enabled:
+
+        # Zisti aktuálnu dĺžku textu
+        current_len = buffer.get_char_count()
+
+        # Ak sa text zmenšuje (maže sa), skry popover a neotváraj
+        if current_len < self._prev_text_length:
             self._hide_completion()
+            self._prev_text_length = current_len
+            if self._popover_debounce_id:
+                GLib.source_remove(self._popover_debounce_id)
+                self._popover_debounce_id = 0
             return
+
+        self._prev_text_length = current_len
+
         if self._popover_debounce_id:
             GLib.source_remove(self._popover_debounce_id)
-        self._popover_debounce_id = GLib.timeout_add(100, self._do_update_popover, buffer)
+        self._popover_debounce_id = GLib.timeout_add(300, self._do_update_popover, buffer)
 
     def _do_update_popover(self, buffer):
         """Update completion popover with matching keywords."""
         self._popover_debounce_id = 0
         word, start, end = self._get_word_at_cursor()
-    
-        if len(word) < 2:
+
+        # Zvýšená minimálna dĺžka na 3 znaky
+        if len(word) < 3:
             self._hide_completion()
             return False
-    
+
         word_upper = word.upper()
-    
-        # Find matches - exact and starts-with
+
         matches = [kw for kw in SQL_KEYWORDS if kw.startswith(word_upper)]
-    
-        # Also include case-insensitive matches
-        if not matches:
-            matches = [kw for kw in SQL_KEYWORDS 
-                       if kw.upper().startswith(word_upper)]
-    
+
         if not matches:
             self._hide_completion()
             return False
-    
-        # Sort: exact matches first, then alphabetically
+
+        # Zoradenie: presné zhody prvé
         exact = [m for m in matches if m.upper() == word_upper]
         starts = [m for m in matches if m.upper() != word_upper]
         matches = exact + sorted(starts)
-    
+
+        # Obmedz počet návrhov na 15 (aby nebolo príliš veľa)
+        if len(matches) > 15:
+            matches = matches[:15]
+
         self._completion_matches = matches
         self._selected_index = -1
         self._populate_completion_list(matches)
@@ -745,6 +740,7 @@ class EditorTab(Gtk.Box):
             row.grab_focus()
 
     def _on_key_pressed(self, controller, keyval, keycode, state):
+        # Navigácia v popoveri
         if self._completion_popover and self._completion_popover.is_visible():
             if keyval in (Gdk.KEY_Down, Gdk.KEY_KP_Down):
                 self._select_next_in_popover()
@@ -762,6 +758,7 @@ class EditorTab(Gtk.Box):
                 self._hide_completion()
                 return True
 
+        # Klávesové skratky
         if keyval == Gdk.KEY_F5:
             self._window._on_run_clicked()
             return True
@@ -789,6 +786,14 @@ class EditorTab(Gtk.Box):
         if keyval == Gdk.KEY_t and (state & Gdk.ModifierType.CONTROL_MASK):
             self._parent_editor.add_tab()
             return True
+
+        # Ak používateľ píše, skry popover (napr. pri písaní ďalšieho znaku)
+        if keyval not in (Gdk.KEY_Escape, Gdk.KEY_Return, Gdk.KEY_Tab,
+                          Gdk.KEY_Down, Gdk.KEY_Up, Gdk.KEY_KP_Down, Gdk.KEY_KP_Up):
+            if self._completion_popover and self._completion_popover.is_visible():
+                # Necháme ho viditeľný, ale pri ďalšom znaku sa obnoví
+                pass
+
         return False
 
     def get_text(self) -> str:
