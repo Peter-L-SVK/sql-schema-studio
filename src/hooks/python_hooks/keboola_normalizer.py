@@ -1,12 +1,12 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.9 - Kebola Normalizer Hook (GPLv3)
+# SQL Schema Studio 0.9 - Keboola Normalizer Hook (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
 # Feel free to distribute and modify.
 # ----------------------------------------------------------------------
 
-"""Kebola Normalizer Hook - Data normalization via Keboola platform."""
+"""Keboola Normalizer Hook - Data normalization via Keboola platform."""
 
 import json
 import os
@@ -32,7 +32,7 @@ except ImportError:
     logger.warning("Keboola client not installed. Run: pip install kbcstorage")
 
 
-class KebolaNormalizerHook(BaseHook):
+class KeboolaNormalizerHook(BaseHook):
     """Data normalization hook using Keboola platform.
 
     Performs local CSV validation and can optionally upload to Keboola
@@ -117,7 +117,7 @@ class KebolaNormalizerHook(BaseHook):
     def get_metadata(self) -> Dict[str, str]:
         """Return hook metadata."""
         return {
-            "name": "Kebola Normalizer",
+            "name": "Keboola Normalizer",
             "version": "1.0.0",
             "author": "Peter Leukanič",
             "description": "Data normalization using Keboola platform (cloud ETL/ELT)",
@@ -457,7 +457,7 @@ class KebolaNormalizerHook(BaseHook):
 
 
 # Plugin class for discovery
-class Plugin(KebolaNormalizerHook):
+class Plugin(KeboolaNormalizerHook):
     """Plugin entry point for hook discovery."""
 
     pass

@@ -156,7 +156,7 @@ class HookManagerDialog(Gtk.Window):
             all_hooks = registry.list_hooks()
             hook = all_hooks.get(hook_name)
 
-            if hook and hook_name == "Kebola Normalizer":
+            if hook and hook_name == "Keboola Normalizer":
                 from src.ui.dialogs.keboola_config import KeboolaConfigDialog
 
                 dialog = KeboolaConfigDialog(self, hook, on_saved=self._load_hooks)
