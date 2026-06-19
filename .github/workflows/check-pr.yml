@@ -41,4 +41,4 @@ jobs:
       
       - name: Run black (check formatting)
         run: |
-           echo "Black would reformat some files. Run 'black src/ tests/' locally."
+          black --check src/ tests/
