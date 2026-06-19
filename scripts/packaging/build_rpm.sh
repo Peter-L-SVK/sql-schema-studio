@@ -38,7 +38,7 @@ echo "Creating source tarball..."
 tar --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='*.pyo' \
     -czf ${BUILD_DIR}/SOURCES/sql-schema-studio-${VERSION}.tar.gz \
     --transform "s/^/sql-schema-studio-${VERSION}\//" \
-    src/ pyproject.toml README.md LICENSE 2>/dev/null
+    src/ pyproject.toml README.md LICENSE 2>/dev/null || true
 
 if [ ! -f "${BUILD_DIR}/SOURCES/sql-schema-studio-${VERSION}.tar.gz" ]; then
     echo "ERROR: Failed to create source tarball"
@@ -149,7 +149,7 @@ chmod 755 %{buildroot}%{_bindir}/sql-schema-studio
 - Release vVERSION_PLACEHOLDER
 SPEC_EOF
 
-# Replace placeholderls
+# Replace placeholders
 sed -i "s/VERSION_PLACEHOLDER/${VERSION}/g" ${BUILD_DIR}/SPECS/sql-schema-studio.spec
 sed -i "s/CHANGELOG_DATE_PLACEHOLDER/${CHANGELOG_DATE}/g" ${BUILD_DIR}/SPECS/sql-schema-studio.spec
 
@@ -159,19 +159,19 @@ rpmbuild -ba ${BUILD_DIR}/SPECS/sql-schema-studio.spec --nodeps
 
 if [ $? -eq 0 ]; then
     echo ""
-    echo "✅ RPM built successfully!"
+    echo "RPM built successfully!"
     echo ""
     
     # Copy to current directory
     find ${BUILD_DIR}/RPMS -name "*.rpm" -type f -exec cp {} "$PROJECT_ROOT" \;
     
-    echo "📦 RPM files in project root:"
+    echo "RPM files in project root:"
     ls -la "$PROJECT_ROOT"/*.rpm 2>/dev/null || echo "  (none found)"
     echo ""
     echo "Install with:"
     echo "  sudo dnf install $PROJECT_ROOT/sql-schema-studio-${VERSION}-1.*.rpm"
 else
     echo ""
-    echo "❌ RPM build failed!"
+    echo "RPM build failed!"
     exit 1
 fi
