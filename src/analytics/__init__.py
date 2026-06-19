@@ -1,12 +1,7 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.9 - Analytics / __Init__ (GPLv3)
+# SQL Schema Studio 0.8 - Analytics / __Init__ (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
 # Feel free to distribute and modify.
 # ----------------------------------------------------------------------
-
-from src.analytics.engine import AnalyticsEngine
-from src.analytics.index_advisor import IndexAdvisor
-
-__all__ = ["AnalyticsEngine", "IndexAdvisor"]

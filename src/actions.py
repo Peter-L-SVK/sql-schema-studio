@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.9 - Menu Actions (GPLv3)
+# SQL Schema Studio 0.8 - Menu Actions (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -18,7 +18,7 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("GtkSource", "5")
-from gi.repository import Gio, GLib
+from gi.repository import Gio
 
 from src.ui.dialogs.about import show_about
 
@@ -38,19 +38,6 @@ class ActionHandler:
     @property
     def _window(self):
         return self._get_window()
-
-    # --- Helpers ---
-
-    def _get_editor_view(self):
-        """Get the active editor view, or None."""
-        if self._window and hasattr(self._window, "editor"):
-            return self._window.editor.get_active_view()
-        return None
-
-    def _get_editor_buffer(self):
-        """Get the active editor buffer, or None."""
-        view = self._get_editor_view()
-        return view.get_buffer() if view else None
 
     # --- Registration ---
 
@@ -74,8 +61,6 @@ class ActionHandler:
 
     def _register_file_actions(self):
         self._add_action("new_connection", self._on_new_connection)
-        self._add_action("new_tab", self._on_new_tab, ["<Ctrl>T"])
-        self._add_action("close_tab", self._on_close_tab, ["<Ctrl>W"])
         self._add_action("open_schema", self._on_open_schema, ["<Ctrl>O"])
         self._add_action("save_schema", self._on_save_schema, ["<Ctrl>S"])
         self._add_action("save_schema_as", self._on_save_schema_as, ["<Ctrl><Shift>S"])
@@ -88,14 +73,6 @@ class ActionHandler:
     def _on_new_connection(self, action, param):
         if self._window:
             self._window._on_connect_clicked()
-
-    def _on_new_tab(self, action, param):
-        if self._window:
-            self._window._on_new_tab()
-
-    def _on_close_tab(self, action, param):
-        if self._window:
-            self._window._on_close_tab()
 
     def _on_open_schema(self, action, param):
         if self._window:
@@ -137,25 +114,20 @@ class ActionHandler:
         self._add_action("copy", self._on_copy, ["<Ctrl>C"])
         self._add_action("paste", self._on_paste, ["<Ctrl>V"])
         self._add_action("preferences", self._on_preferences)
-        self._add_action("find", self._on_find, ["<Ctrl>F"])
-        self._add_action("find_next", self._on_find_next, ["F3"])
-        self._add_action("find_prev", self._on_find_prev, ["<Shift>F3"])
-        self._add_action("replace", self._on_replace_dialog, ["<Ctrl>H"])
 
     def _on_undo(self, action, param):
-        buffer = self._get_editor_buffer()
-        if buffer:
+        if self._window and hasattr(self._window, "editor"):
+            buffer = self._window.editor._view.get_buffer()
             buffer.undo()
 
     def _on_redo(self, action, param):
-        buffer = self._get_editor_buffer()
-        if buffer:
+        if self._window and hasattr(self._window, "editor"):
+            buffer = self._window.editor._view.get_buffer()
             buffer.redo()
 
     def _on_cut(self, action, param):
-        view = self._get_editor_view()
-        if view:
-            view.emit("cut-clipboard")
+        if self._window and hasattr(self._window, "editor"):
+            self._window.editor._view.emit("cut-clipboard")
 
     def _on_copy(self, action, param):
         if self._window:
@@ -164,26 +136,8 @@ class ActionHandler:
                 focused.emit("copy-clipboard")
 
     def _on_paste(self, action, param):
-        view = self._get_editor_view()
-        if view:
-            view.emit("paste-clipboard")
-
-    def _on_find(self, action, param):
         if self._window and hasattr(self._window, "editor"):
-            self._window.editor._on_find()
-
-    def _on_find_next(self, action, param):
-        if self._window and hasattr(self._window, "editor"):
-            self._window.editor._on_find_next()
-
-    def _on_find_prev(self, action, param):
-        if self._window and hasattr(self._window, "editor"):
-            self._window.editor._on_find_prev()
-
-    def _on_replace_dialog(self, action, param):
-        if self._window and hasattr(self._window, "editor"):
-            self._window.editor._on_find()
-            GLib.idle_add(self._window.editor._replace_entry.grab_focus)
+            self._window.editor._view.emit("paste-clipboard")
 
     def _on_preferences(self, action, param):
         if self._window:
