@@ -300,7 +300,13 @@ class ActionHandler:
             logger.warning("Not connected to database")
 
     def _on_tools_query_analyzer(self, action, param):
-        logger.info("Open query analyzer (not implemented)")
+        """Run Query Analyzer from menu."""
+        if self._window and self._window.db_connector.is_connected:
+            from src.ui.ai_tools import AIToolsPopover
+            tools = AIToolsPopover(self._window)
+            tools._run_query_analyzer()
+        else:
+            logger.warning("Not connected to database")
 
     # --- Help ---
 

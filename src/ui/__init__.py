@@ -5,3 +5,24 @@
 # This is free software with NO WARRANTY.
 # Feel free to distribute and modify.
 # ----------------------------------------------------------------------
+
+"""UI package exports."""
+
+from src.ui.ai_tools import AIToolsPopover
+from src.ui.results import ResultsPanel
+from src.ui.editor_tabs import EditorTabs, EditorTab
+from src.ui.toolbar import Toolbar
+from src.ui.statusbar import StatusBar
+from src.ui.browser import DatabaseBrowser
+from src.ui.menubar import build_menubar
+
+__all__ = [
+    "AIToolsPopover",
+    "ResultsPanel",
+    "EditorTabs",
+    "EditorTab",
+    "Toolbar",
+    "StatusBar",
+    "DatabaseBrowser",
+    "build_menubar",
+]
