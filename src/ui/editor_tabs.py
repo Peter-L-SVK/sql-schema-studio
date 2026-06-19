@@ -354,7 +354,7 @@ class EditorTabs(Gtk.Box):
         if self._active_tab_index >= len(self._tabs):
             self._active_tab_index = len(self._tabs) - 1
 
-    def rename_tab(self, tab: 'EditorTab', new_title: str):
+    def rename_tab(self, tab: "EditorTab", new_title: str):
         """Rename a specific tab."""
         idx = self._tabs.index(tab)
         if 0 <= idx < len(self._tab_labels):
@@ -689,7 +689,7 @@ class EditorTab(Gtk.Box):
         self.append(scroll)
         self._modified: bool = False
         self._original_title: str = title
-    
+
         buffer = self._view.get_buffer()
         buffer.connect("modified-changed", self._on_modified_changed)
 
@@ -992,7 +992,7 @@ class EditorTab(Gtk.Box):
             start, end = buffer.get_selection_bounds()
             return str(buffer.get_text(start, end, False))
         return self.get_text()
-    
+
     def _on_modified_changed(self, buffer):
         """Update tab label when buffer modification state changes."""
         self._modified = buffer.get_modified()
