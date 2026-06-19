@@ -87,6 +87,7 @@ Depends: python3 (>= 3.12),
          python3-kbcstorage,
          gir1.2-gtk-4.0,
          gir1.2-gtksource-5
+	 libvte-2.91-gtk4-dev
 Recommends: python3-plotly
 Maintainer: Peter Leukanič <peter@leukanic.eu>
 Description: Intelligent PostgreSQL Management Platform

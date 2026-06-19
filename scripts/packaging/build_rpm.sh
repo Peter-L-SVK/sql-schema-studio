@@ -102,6 +102,7 @@ Requires:       python3-paramiko
 Requires:       python3-kbcstorage
 Requires:       gtk4
 Requires:       gtksourceview5
+Requires:	vte291-gtk4
 
 %description
 SQL Schema Studio is a GTK4 desktop application for PostgreSQL database
