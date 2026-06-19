@@ -1,0 +1,53 @@
+name: Tests
+
+on:
+  push:
+    branches: [main, develop, feat/*]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: ["3.12", "3.13"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+          pip install flake8-pyproject
+
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-4-dev \
+            libgtksourceview-5-dev \
+            libcairo2-dev \
+            libgirepository1.0-dev \
+            gir1.2-gtk-4.0 \
+            gir1.2-gtksource-5
+
+     - name: Run flake8 (optional)
+       run: |
+         echo "Skipping flake8 for now"
+         # flake8 src/ --count --statistics || true
+
+      - name: Run mypy
+        run: |
+          mypy src/
+
+      - name: Run pytest
+        run: |
+          pytest tests/ -v --tb=short

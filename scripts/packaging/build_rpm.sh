@@ -2,15 +2,15 @@
 # Build RPM package for SQL Schema Studio
 set -e
 
-# Zisti koreňový adresár projektu (kde je pyproject.toml)
+# Get location of the TOML file
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# Skript je v scripts/packaging/build_rpm.sh, takže ideme o 2 úrovne vyššie
+# Script is in scripts/packaging/build_rpm.sh, so we move 2 levels up
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$PROJECT_ROOT"
 
 echo "Building RPM for SQL Schema Studio from $PROJECT_ROOT"
 
-# Kontrola či pyproject.toml existuje
+# Check if pyproject exists
 if [ ! -f "pyproject.toml" ]; then
     echo "ERROR: pyproject.toml not found in $PROJECT_ROOT"
     echo "Current directory: $(pwd)"
@@ -45,7 +45,7 @@ if [ ! -f "${BUILD_DIR}/SOURCES/sql-schema-studio-${VERSION}.tar.gz" ]; then
     exit 1
 fi
 
-# Získaj aktuálny dátum pre changelog
+# Get the actual date for the changelog
 CHANGELOG_DATE=$(LC_TIME=C date +"%a %b %d %Y")
 
 # Create spec file
@@ -68,10 +68,13 @@ Requires:       python3-sqlparse
 Requires:       python3-keyring
 Requires:       python3-numpy
 Requires:       python3-pandas
+Requires:       python3-polars
 Requires:       python3-scikit-learn
 Requires:       python3-matplotlib
 Requires:       python3-cairo
 Requires:       python3-paramiko
+Requires:       python3-faker
+Requires:       python3-kbcstorage
 Requires:       gtk4
 Requires:       gtksourceview5
 
@@ -87,6 +90,7 @@ Features:
 - PostgreSQL log analyzer
 - Extensible Python/Perl hook system
 - SSH tunnel support
+- Keboola integration for data normalization
 
 %prep
 %setup -q
@@ -145,7 +149,7 @@ chmod 755 %{buildroot}%{_bindir}/sql-schema-studio
 - Release vVERSION_PLACEHOLDER
 SPEC_EOF
 
-# Nahraď placeholder-y
+# Replace placeholderls
 sed -i "s/VERSION_PLACEHOLDER/${VERSION}/g" ${BUILD_DIR}/SPECS/sql-schema-studio.spec
 sed -i "s/CHANGELOG_DATE_PLACEHOLDER/${CHANGELOG_DATE}/g" ${BUILD_DIR}/SPECS/sql-schema-studio.spec
 
@@ -155,19 +159,19 @@ rpmbuild -ba ${BUILD_DIR}/SPECS/sql-schema-studio.spec
 
 if [ $? -eq 0 ]; then
     echo ""
-    echo "RPM built successfully!"
+    echo "✅ RPM built successfully!"
     echo ""
     
     # Copy to current directory
     find ${BUILD_DIR}/RPMS -name "*.rpm" -type f -exec cp {} "$PROJECT_ROOT" \;
     
-    echo "RPM files in project root:"
+    echo "📦 RPM files in project root:"
     ls -la "$PROJECT_ROOT"/*.rpm 2>/dev/null || echo "  (none found)"
     echo ""
     echo "Install with:"
     echo "  sudo dnf install $PROJECT_ROOT/sql-schema-studio-${VERSION}-1.*.rpm"
 else
     echo ""
-    echo "RPM build failed!"
+    echo "❌ RPM build failed!"
     exit 1
 fi
