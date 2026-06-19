@@ -354,9 +354,13 @@ class EditorTabs(Gtk.Box):
         if self._active_tab_index >= len(self._tabs):
             self._active_tab_index = len(self._tabs) - 1
 
-    def rename_tab(self, tab: EditorTab, new_title: str):
+    def rename_tab(self, tab: 'EditorTab', new_title: str):
+        """Rename a specific tab."""
         idx = self._tabs.index(tab)
         if 0 <= idx < len(self._tab_labels):
+            # Update original title if it's not the modified indicator
+            if not new_title.startswith("• "):
+                tab._original_title = new_title
             self._tab_labels[idx].set_text(new_title)
 
     def get_active_tab(self) -> EditorTab | None:
@@ -653,7 +657,7 @@ class EditorTab(Gtk.Box):
         self._selected_index: int = -1
         self._completing: bool = False
         self._popover_debounce_id: int = 0
-        self._prev_text_length: int = 0  # Sledovanie či sa text zväčšuje alebo zmenšuje
+        self._prev_text_length: int = 0
 
         scroll = Gtk.ScrolledWindow()
         scroll.set_vexpand(True)
@@ -683,6 +687,11 @@ class EditorTab(Gtk.Box):
 
         scroll.set_child(self._view)
         self.append(scroll)
+        self._modified: bool = False
+        self._original_title: str = title
+    
+        buffer = self._view.get_buffer()
+        buffer.connect("modified-changed", self._on_modified_changed)
 
     def _setup_sql_language(self):
         manager = GtkSource.LanguageManager.get_default()
@@ -972,8 +981,10 @@ class EditorTab(Gtk.Box):
         return str(buffer.get_text(start, end, False))
 
     def set_text(self, text: str):
+        """Set editor content."""
         buffer = self._view.get_buffer()
         buffer.set_text(text)
+        buffer.set_modified(False)
 
     def get_selected_text(self) -> str:
         buffer = self._view.get_buffer()
@@ -981,3 +992,11 @@ class EditorTab(Gtk.Box):
             start, end = buffer.get_selection_bounds()
             return str(buffer.get_text(start, end, False))
         return self.get_text()
+    
+    def _on_modified_changed(self, buffer):
+        """Update tab label when buffer modification state changes."""
+        self._modified = buffer.get_modified()
+        if self._modified:
+            self._parent_editor.rename_tab(self, f"• {self._original_title}")
+        else:
+            self._parent_editor.rename_tab(self, self._original_title)

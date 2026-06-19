@@ -361,8 +361,11 @@ class MainWindow(Gtk.ApplicationWindow):
         content = self.editor.get_text()
         with open(path, "w") as f:
             f.write(content)
+        # Reset modified flag on active tab
+        tab = self.editor.get_active_tab()
+        if tab:
+            tab._view.get_buffer().set_modified(False)
         self.statusbar.set_connection(f"Saved: {os.path.basename(path)}")
-        logger.info(f"Saved file: {path}")
 
     def _on_export_csv(self):
         """Export last query results to CSV."""
