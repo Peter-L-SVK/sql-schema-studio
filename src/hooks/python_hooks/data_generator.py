@@ -128,7 +128,7 @@ class Plugin(BaseHook):
             "version": "1.0.0",
             "author": "SQL Schema Studio",
             "description": "Generates synthetic data for testing hooks and performance.",
-            "triggers": str(HookTrigger.SCHEDULED_INTERVAL.value),  # Zmeň na str
+            "triggers": [HookTrigger.SCHEDULED_INTERVAL.value],
         }
 
     async def execute(self, context: HookContext) -> Dict[str, Any]:
