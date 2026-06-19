@@ -14,39 +14,40 @@ jobs:
   build-rpm:
     name: Build RPM
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
+
       - name: Install RPM build tools
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            rpm \
-            rpm2cpio \
-            cpio \
-            python3 \
-            python3-pip \
-            python3-setuptools
-      
+          rpm \
+          rpm2cpio \
+          cpio \
+          python3 \
+          python3-pip \
+          python3-setuptools \
+          python3-dev
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      
+
       - name: Install Python dependencies
         run: |
           pip install --upgrade pip
           pip install build
-      
+
       - name: Build RPM package
         run: |
           chmod +x scripts/packaging/build_rpm.sh
           ./scripts/packaging/build_rpm.sh
-      
+
       - name: Upload RPM artifact
         uses: actions/upload-artifact@v4
         with:
