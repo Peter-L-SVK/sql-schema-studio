@@ -15,6 +15,23 @@ jobs:
       matrix:
         python-version: ["3.12", "3.13"]
 
+    # PostgreSQL service container for database tests
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: admin123 # Matches TEST_PASSWORD in conftest.py
+        ports:
+          - 5432:5432
+        # Ensure PostgreSQL is ready before steps start
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -40,8 +57,8 @@ jobs:
             python3-gi-cairo \
             libffi-dev \
             libssl-dev \
-            pkg-config
-
+            pkg-config \
+            rpm
 
       - name: Install Python dependencies
         run: |
