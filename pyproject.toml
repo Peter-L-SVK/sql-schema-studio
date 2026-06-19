@@ -76,9 +76,6 @@ packages = [
     "src.ui.schema_designer",
     "src.models",
     "src.utils",
-    "src.plugins",
-    "src.plugins.python",
-    "src.plugins.perl",
     "src.analytics",
     "src.analytics.visualizations",
     "src.hooks",
@@ -126,7 +123,7 @@ namespace_packages = true
 check_untyped_defs = true
 no_implicit_optional = true
 
-# Ignorovať schema_designer moduly (mixin problémy)
+# Ignore schema_designer modules (mixin problems)
 [[tool.mypy.overrides]]
 module = "src.ui.schema_designer.*"
 ignore_errors = true
