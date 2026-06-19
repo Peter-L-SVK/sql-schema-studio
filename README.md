@@ -11,9 +11,6 @@
 [![Build DEB](https://github.com/Peter-L-SVK/sql-schema-studio/actions/workflows/build-deb.yml/badge.svg)](https://github.com/Peter-L-SVK/sql-schema-studio/actions/workflows/build-deb.yml)
 [![PR Check](https://github.com/Peter-L-SVK/sql-schema-studio/actions/workflows/check-pr.yml/badge.svg)](https://github.com/Peter-L-SVK/sql-schema-studio/actions/workflows/check-pr.yml)
 
-<!-- Test Coverage & Quality Badges -->
-[![Test Status](https://img.shields.io/badge/tests-passing-brightgreen)](https://github.com/Peter-L-SVK/sql-schema-studio/actions/workflows/tests.yml)
-
 <a href="https://buymeacoffee.com/leukanic.peter"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" height="20px"></a>  
 
 SQL Schema Studio is a native GTK4 PostgreSQL client built for Linux — not Electron, not a web app.
