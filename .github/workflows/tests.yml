@@ -29,7 +29,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
           pip install flake8-pyproject
-
           sudo apt-get update
           sudo apt-get install -y \
             libgtk-4-dev \
@@ -39,14 +38,17 @@ jobs:
             gir1.2-gtk-4.0 \
             gir1.2-gtksource-5
 
-     - name: Run flake8 (optional)
-       run: |
-         echo "Skipping flake8 for now"
-         # flake8 src/ --count --statistics || true
+      - name: Run flake8
+        run: |
+          flake8 src/ --count --statistics
 
       - name: Run mypy
         run: |
           mypy src/
+
+      - name: Run black (check formatting)
+        run: |
+          black --check src/ tests/
 
       - name: Run pytest
         run: |
