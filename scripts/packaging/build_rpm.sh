@@ -155,7 +155,7 @@ sed -i "s/CHANGELOG_DATE_PLACEHOLDER/${CHANGELOG_DATE}/g" ${BUILD_DIR}/SPECS/sql
 
 echo "Building RPM..."
 # Build RPM
-rpmbuild -ba ${BUILD_DIR}/SPECS/sql-schema-studio.spec
+rpmbuild -ba ${BUILD_DIR}/SPECS/sql-schema-studio.spec --nodeps
 
 if [ $? -eq 0 ]; then
     echo ""
