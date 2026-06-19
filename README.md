@@ -31,21 +31,47 @@ recommendations. Extend with Python and Perl hooks for custom automation.
 
 ## Current Features
 
-- **Connection manager** with saved profiles and system keyring password storage
-- **Database browser** with schema/table tree, live filtering, and double-click to query
-- **SQL editor** with GtkSourceView syntax highlighting, line numbers, and F5 execution
-- **Query execution** with formatted results, timing, and EXPLAIN ANALYZE support
+### Editor
+- **Multi-tab SQL editor** with Ctrl+T new tab, Ctrl+W close, drag to reorder
+- **Autocomplete** with case-insensitive keyword matching and popover navigation
+- **Syntax highlighting** via GtkSourceView 5 with multiple color schemes
+- **Search & Replace** with case-sensitive toggle (Ctrl+F, Ctrl+H)
 - **File operations** — open, save, and save as for SQL files (Ctrl+O/S/Shift+S)
+- **Query execution** with formatted results, timing, and EXPLAIN ANALYZE support
+
+### Schema Designer
+- **Visual schema designer** with drag-and-drop tables, column editor, and FK relationships
+- **Smart line routing** with obstacle avoidance and waypoints
+- **Line jumps** (bridge arcs) for crossing lines
+- **Bidirectional FK** with directional arrows and cardinality labels (1:N)
+- **3 line styles** (straight, S-curve, orthogonal)
+- **Color schemes** — 8 presets + custom color picker with GTK ColorDialog
+- **Zoom & Pan** (Ctrl+Scroll, middle mouse drag, arrow keys)
+- **Undo/Redo** (Ctrl+Z/Y) for all designer actions
+- **SQL file import** — drag .sql files onto the designer to reverse-engineer schemas
+- **Generate SQL** from designed schema
+
+### Data Management
+- **Connection manager** with saved profiles and system keyring password storage
+- **SSH tunnel support** for remote PostgreSQL connections (password, key file, agent)
+- **Database browser** with schema/table tree, live filtering, and double-click to query
 - **Data export** — export query results to CSV and JSON
 - **Data import** — import CSV and JSON files with preview dialog
-- **Visual schema designer** with drag-and-drop tables, column editor, and FK relationships
-  with multiple line styles (straight, S-curve, orthogonal) and arrow heads
-- **SQL file import** — drag .sql files onto the designer to reverse-engineer schemas
 - **Query history** with SQLite storage, search, and type categorization
+
+### AI & Analytics
 - **AI index advisor** — rule-based index recommendations for foreign keys and columns
+- **Polars analytics engine** — column profiling, table comparison, correlation matrix
 - **Hook system** with Python and Perl plugin support, execution, and JSON export
-- **Built-in hooks** — Auto-Vacuum Advisor with ML prediction, Schema Anomaly Detector with
-  9 detection rules, PostgreSQL Log Analyzer with 3 reading methods
+- **Built-in hooks**:
+  - Auto-Vacuum Advisor with ML prediction
+  - Schema Anomaly Detector (9 detection rules)
+  - PostgreSQL Log Analyzer (3 reading methods: SQL, CSV, text)
+  - Synthetic Data Generator with multi-CPU support
+  - Keboola Normalizer with CSV validation and cloud upload
+- **Multi-CPU worker pool** for parallel analytics processing
+
+### UI/UX
 - **Preferences dialog** with persistent editor settings (font, color scheme, tab width)
 - **Window state persistence** — remembers size and pane positions across sessions
 - Full menu bar with keyboard shortcuts, undo/redo, clipboard, SQL formatting
@@ -54,35 +80,72 @@ recommendations. Extend with Python and Perl hooks for custom automation.
 
 ## Planned
 
-- Multi-tab SQL editor and results panel
+### v1.0.0
 - Migration generator with up/down SQL diffs
-- Color schemes and bidirectional FK for schema designer
-- Polars analytics engine and Kebola normalization hook
-- RPM/DEB packaging and installation
-- Browse data with inline editing
+- FK Editor dialog (ON DELETE/ON UPDATE cascade rules)
+- Export schema to GraphQL and pg_dump
+- Graph visualization of table dependencies
+- RPM/DEB packages in official repositories
+- Flatpak / AppImage distribution
+- PyPI package
+- Complete test suite and performance benchmarking
+- LaTeX user manual (PDF + EPUB)
+
+### Future
 - Visual query builder with drag-and-drop JOINs
-- SSH tunnel support for remote connections
-- User manual and documentation
+- Multi-database support (MySQL/MariaDB, SQLite)
+- Data editor with inline editing
+- Dark mode / light mode toggle
+- Query profiler (execution timeline)
+- Git integration for schemas
+- Cython optimization for critical paths
+- SSH tunneling with jump hosts
+
+## Requirements
+
+- Linux or FreeBSD
+- Windows 10/11 via WSL2
+- Python 3.12 or later
+- GTK 4 and GtkSourceView 5
+- PostgreSQL 12 or later
+- Perl 5.30 or later (optional, for Perl hooks)
+- Developed on Fedora 43 Cinnamon and tested on Fedora 43 KDE Plasma 6
+
 
 ## Installation from Packages
 
 ### Fedora / RHEL (RPM)
 
 ```bash
+# Install build dependencies
 sudo dnf install rpm-build rpmdevtools rpmlint python3-devel
+
+# Clone and build
 git clone https://github.com/Peter-L-SVK/sql-schema-studio.git
 cd sql-schema-studio
+
+# Build RPM package
 ./scripts/packaging/build_rpm.sh
+
+# Install
 sudo dnf install ~/rpmbuild/RPMS/noarch/sql-schema-studio-*.rpm
 ```
 
 ### Debian / Ubuntu / Mint (DEB) / WSL2
 
 ```bash
-sudo apt install dpkg-dev debhelper python3-dev
+# Install build dependencies
+sudo apt update
+sudo apt install -y dpkg-dev debhelper python3-dev
+
+# Clone and build
 git clone https://github.com/Peter-L-SVK/sql-schema-studio.git
 cd sql-schema-studio
+
+# Build DEB package
 ./scripts/packaging/build_deb.sh
+
+# Install
 sudo dpkg -i sql-schema-studio_*.deb
 sudo apt --fix-broken install
 ```
@@ -93,28 +156,26 @@ sudo apt --fix-broken install
 sql-schema-studio
 ```
 
-**Note:** Currently the application can only be launched via terminal. Desktop launcher (.desktop file) is planned for v0.9.0.
+### From Source (Development)
 
-## From Source
-
-### Debian / Ubuntu / Mint / WSL2
+#### Debian / Ubuntu / Mint / WSL2
 
 ```bash
 sudo apt update
 sudo apt install -y python3-psycopg python3-gi python3-sqlparse python3-keyring \
   python3-numpy python3-pandas python3-sklearn python3-matplotlib python3-cairo \
-  python3-paramiko gir1.2-gtk-4.0 gir1.2-gtksource-5
+  python3-paramiko python3-faker python3-kbcstorage gir1.2-gtk-4.0 gir1.2-gtksource-5
 
 git clone https://github.com/Peter-L-SVK/sql-schema-studio.git
 cd sql-schema-studio
-pip install --user -e .
-sql-schema-studio
+python3 -m src.main
 ```
 
-### Fedora / CentOS / RedHat
+#### Fedora / CentOS / RedHat
 
 ```bash
-sudo dnf install python3-gobject gtk4 gtksourceview5 libadwaita cairo python3-cairo
+sudo dnf install python3-gobject gtk4 gtksourceview5 libadwaita cairo python3-cairo \
+  python3-polars python3-paramiko python3-faker python3-kbcstorage
 
 git clone https://github.com/Peter-L-SVK/sql-schema-studio.git
 cd sql-schema-studio
@@ -132,7 +193,7 @@ wsl --update
 sudo apt update && sudo apt upgrade -y
 sudo apt install -y python3-psycopg python3-gi python3-sqlparse python3-keyring \
   python3-numpy python3-pandas python3-sklearn python3-matplotlib python3-cairo \
-  python3-paramiko gir1.2-gtk-4.0 gir1.2-gtksource-5 \
+  python3-paramiko python3-faker python3-kbcstorage gir1.2-gtk-4.0 gir1.2-gtksource-5 \
   postgresql postgresql-client
 
 sudo service postgresql start
@@ -140,7 +201,7 @@ sudo service postgresql start
 git clone https://github.com/Peter-L-SVK/sql-schema-studio.git
 cd sql-schema-studio
 pip install --user -e .
-sql-schema-studio
+python3 -m src.main
 ```
 
 ## Development
@@ -153,18 +214,22 @@ python3 -m flake8 src/ tests/
 python3 -m mypy src/
 ```
 
-## System Requirements
+## System Dependencies
+
+This project requires the following system packages:
 
 **Debian / Ubuntu / Mint:**
 ```bash
 sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-4.0 \
   gir1.2-gtksource-5 libgtk-4-1 libgtksourceview-5-0 \
-  libcairo2-dev python3-cairo
+  libcairo2-dev python3-cairo python3-polars python3-paramiko \
+  python3-faker python3-kbcstorage
 ```
 
 **Fedora / CentOS / RedHat:**
 ```bash
-sudo dnf install python3-gobject gtk4 gtksourceview5 libadwaita cairo python3-cairo
+sudo dnf install python3-gobject gtk4 gtksourceview5 libadwaita cairo python3-cairo \
+  python3-polars python3-paramiko python3-faker python3-kbcstorage
 ```
 
 ## Architecture

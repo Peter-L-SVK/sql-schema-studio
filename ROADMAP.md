@@ -23,37 +23,39 @@
 ## v0.9.0 — Schema Designer Pro + Multi-Tab Editor
 
 ### Multi-Tab System
-- [ ] Tabbed SQL editor (Ctrl+T, Ctrl+W, drag tabs)
+- [x] Tabbed SQL editor (Ctrl+T, Ctrl+W, drag tabs)
 - [ ] Unsaved changes indicator (•)
 - [ ] Restore open tabs on startup
 - [ ] Tabbed results panel
 
 ### Schema Designer
-- [ ] Color schemes — blue, green, orange, red, purple, gray
-- [ ] Bidirectional FK with cascade rules (ON DELETE/ON UPDATE)
+- [x] Color schemes — blue, green, orange, red, purple, gray
+- [x] Bidirectional FK with cascade rules (ON DELETE/ON UPDATE)
 - [ ] FK Editor dialog (direction, rules)
 - [ ] Directional arrows (↔, →, ←)
-- [ ] Zoom and pan for canvas
-
-### Migrations
-- [ ] Migration generator with up/down SQL diffs
-- [ ] Schema comparison (live DB vs designer)
+- [x] Zoom and pan for canvas
 
 ### Export/Import
 - [ ] Export schema to GraphQL
 - [ ] Export to SQL dump (pg_dump compatible)
 
 ### AI/ML Extensions
-- [ ] Streaming/yield for large result sets
+- [x] Streaming/yield for large result sets
 - [ ] Lazy loading in browser
-- [ ] Polars replacing pandas
-- [ ] Kebola normalization hook
-- [ ] Prophet — database growth prediction
-- [ ] XGBoost — index impact prediction
+- [x] Polars replacing pandas
+- [x] Keboola normalization hook
+- [x] Prophet — database growth prediction
+- [x] XGBoost — index impact prediction
 
 ### Infrastructure
-- [ ] SSH tunnel support
+- [x] SSH tunnel support
+
+### Deferred to v1.0.0
 - [ ] Desktop launcher (.desktop file)
+
+#### Migrations
+- [ ] Migration generator with up/down SQL diffs
+- [ ] Schema comparison (live DB vs designer)
 
 ---
 
