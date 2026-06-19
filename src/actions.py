@@ -303,6 +303,7 @@ class ActionHandler:
         """Run Query Analyzer from menu."""
         if self._window and self._window.db_connector.is_connected:
             from src.ui.ai_tools import AIToolsPopover
+
             tools = AIToolsPopover(self._window)
             tools._run_query_analyzer()
         else:
