@@ -31,8 +31,7 @@ jobs:
             libgtk-4-dev \
             libgtksourceview-5-dev \
             libcairo2-dev \
-            libgirepository1.0-dev \
-            libgirepository2.0-dev \
+            libgirepository-2.0-dev \
             gobject-introspection \
             gir1.2-gtk-4.0 \
             gir1.2-gtksource-5 \
@@ -42,6 +41,7 @@ jobs:
             libffi-dev \
             libssl-dev \
             pkg-config
+
 
       - name: Install Python dependencies
         run: |
