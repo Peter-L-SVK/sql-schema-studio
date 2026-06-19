@@ -1,16 +1,32 @@
 #!/bin/bash
-# Build RPM package for SQL Schema Studio
+# =============================================================================
+# SQL Schema Studio - RPM Package Build Script
+# =============================================================================
+# This script builds an RPM package for SQL Schema Studio.
+# It creates a source tarball, generates a spec file, and builds the RPM.
+#
+# Usage: ./scripts/packaging/build_rpm.sh
+#
+# The script automatically detects the project root, version from pyproject.toml,
+# and handles the build process with --nodeps to bypass dependency checks
+# (required for Ubuntu-based CI runners).
+# =============================================================================
+
 set -e
 
-# Get location of the TOML file
+# -----------------------------------------------------------------------------
+# 1. Locate project root directory (where pyproject.toml is located)
+# -----------------------------------------------------------------------------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# Script is in scripts/packaging/build_rpm.sh, so we move 2 levels up
+# Script is in scripts/packaging/build_rpm.sh, so go up 2 levels
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$PROJECT_ROOT"
 
 echo "Building RPM for SQL Schema Studio from $PROJECT_ROOT"
 
-# Check if pyproject exists
+# -----------------------------------------------------------------------------
+# 2. Validate pyproject.toml exists
+# -----------------------------------------------------------------------------
 if [ ! -f "pyproject.toml" ]; then
     echo "ERROR: pyproject.toml not found in $PROJECT_ROOT"
     echo "Current directory: $(pwd)"
@@ -18,6 +34,9 @@ if [ ! -f "pyproject.toml" ]; then
     exit 1
 fi
 
+# -----------------------------------------------------------------------------
+# 3. Extract version from pyproject.toml
+# -----------------------------------------------------------------------------
 VERSION=$(grep "^version" pyproject.toml | head -1 | cut -d'"' -f2)
 if [ -z "$VERSION" ]; then
     echo "ERROR: Could not find version in pyproject.toml"
@@ -29,11 +48,15 @@ ARCH=noarch
 
 echo "Version: $VERSION"
 
-# Setup RPM build environment
+# -----------------------------------------------------------------------------
+# 4. Setup RPM build environment
+# -----------------------------------------------------------------------------
 BUILD_DIR=~/rpmbuild
 mkdir -p ${BUILD_DIR}/{BUILD,RPMS,SOURCES,SPECS,SRPMS,BUILDROOT}
 
-# Create source tarball
+# -----------------------------------------------------------------------------
+# 5. Create source tarball
+# -----------------------------------------------------------------------------
 echo "Creating source tarball..."
 tar --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='*.pyo' \
     -czf ${BUILD_DIR}/SOURCES/sql-schema-studio-${VERSION}.tar.gz \
@@ -45,10 +68,14 @@ if [ ! -f "${BUILD_DIR}/SOURCES/sql-schema-studio-${VERSION}.tar.gz" ]; then
     exit 1
 fi
 
-# Get the actual date for the changelog
+# -----------------------------------------------------------------------------
+# 6. Generate changelog date (RFC format for RPM)
+# -----------------------------------------------------------------------------
 CHANGELOG_DATE=$(LC_TIME=C date +"%a %b %d %Y")
 
-# Create spec file
+# -----------------------------------------------------------------------------
+# 7. Create RPM spec file
+# -----------------------------------------------------------------------------
 cat > ${BUILD_DIR}/SPECS/sql-schema-studio.spec << 'SPEC_EOF'
 Name:           sql-schema-studio
 Version:        VERSION_PLACEHOLDER
@@ -146,29 +173,39 @@ chmod 755 %{buildroot}/usr/bin/sql-schema-studio
 - Release vVERSION_PLACEHOLDER
 SPEC_EOF
 
-# Replace placeholders
+# -----------------------------------------------------------------------------
+# 8. Replace placeholders in spec file
+# -----------------------------------------------------------------------------
 sed -i "s/VERSION_PLACEHOLDER/${VERSION}/g" ${BUILD_DIR}/SPECS/sql-schema-studio.spec
 sed -i "s/CHANGELOG_DATE_PLACEHOLDER/${CHANGELOG_DATE}/g" ${BUILD_DIR}/SPECS/sql-schema-studio.spec
 
+# -----------------------------------------------------------------------------
+# 9. Build the RPM package
+# -----------------------------------------------------------------------------
 echo "Building RPM..."
-# Build RPM
+
+# --nodeps bypasses dependency checks (required on Ubuntu CI runners)
+# Python environment is already set up via setup-python action
 rpmbuild -ba ${BUILD_DIR}/SPECS/sql-schema-studio.spec --nodeps
 
+# -----------------------------------------------------------------------------
+# 10. Copy the built RPM to project root
+# -----------------------------------------------------------------------------
 if [ $? -eq 0 ]; then
     echo ""
-    echo "RPM built successfully!"
+    echo "✅ RPM built successfully!"
     echo ""
     
     # Copy to current directory
     find ${BUILD_DIR}/RPMS -name "*.rpm" -type f -exec cp {} "$PROJECT_ROOT" \;
     
-    echo "RPM files in project root:"
+    echo "📦 RPM files in project root:"
     ls -la "$PROJECT_ROOT"/*.rpm 2>/dev/null || echo "  (none found)"
     echo ""
     echo "Install with:"
     echo "  sudo dnf install $PROJECT_ROOT/sql-schema-studio-${VERSION}-1.*.rpm"
 else
     echo ""
-    echo "RPM build failed!"
+    echo "❌ RPM build failed!"
     exit 1
 fi

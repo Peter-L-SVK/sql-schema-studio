@@ -4,7 +4,14 @@
 [![Top Language](https://img.shields.io/github/languages/top/Peter-L-SVK/sql-schema-studio)](https://github.com/Peter-L-SVK/sql-schema-studio)
 [![GitHub release](https://img.shields.io/github/v/release/Peter-L-SVK/sql-schema-studio)](https://github.com/Peter-L-SVK/sql-schema-studio/releases/latest)
 [![GitHub last commit](https://img.shields.io/github/last-commit/Peter-L-SVK/sql-schema-studio)](https://github.com/Peter-L-SVK/sql-schema-studio/commits/main)
-<a href="https://buymeacoffee.com/leukanic.peter"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" height="20px"></a>
+
+<!-- CI/CD Status Badges -->
+[![Tests](https://github.com/Peter-L-SVK/sql-schema-studio/actions/workflows/tests.yml/badge.svg)](https://github.com/Peter-L-SVK/sql-schema-studio/actions/workflows/tests.yml)
+[![Build RPM](https://github.com/Peter-L-SVK/sql-schema-studio/actions/workflows/build-rpm.yml/badge.svg)](https://github.com/Peter-L-SVK/sql-schema-studio/actions/workflows/build-rpm.yml)
+[![Build DEB](https://github.com/Peter-L-SVK/sql-schema-studio/actions/workflows/build-deb.yml/badge.svg)](https://github.com/Peter-L-SVK/sql-schema-studio/actions/workflows/build-deb.yml)
+[![PR Check](https://github.com/Peter-L-SVK/sql-schema-studio/actions/workflows/check-pr.yml/badge.svg)](https://github.com/Peter-L-SVK/sql-schema-studio/actions/workflows/check-pr.yml)
+
+<a href="https://buymeacoffee.com/leukanic.peter"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" height="20px"></a>  
 
 SQL Schema Studio is a native GTK4 PostgreSQL client built for Linux — not Electron, not a web app.
 It runs lean on any Linux desktop, extends via Python or Perl hooks, and ships a visual schema designer

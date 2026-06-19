@@ -1,0 +1,44 @@
+name: PR Check
+
+on:
+  pull_request:
+    branches: [main, stage]
+
+jobs:
+  quick-check:
+    name: Quick Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 mypy black
+          pip install flake8-pyproject 
+          
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-4-dev \
+            libgtksourceview-5-dev \
+            libcairo2-dev \
+            libgirepository1.0-dev
+      
+      - name: Run flake8
+        run: |
+          flake8 src/ --count --statistics
+      
+      - name: Run mypy
+        run: |
+          mypy src/ --ignore-missing-imports
+      
+      - name: Run black (check formatting)
+        run: |
+          black --check src/ tests/

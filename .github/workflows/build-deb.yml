@@ -1,4 +1,4 @@
-name: Build RPM
+name: Build DEB
 
 on:
   push:
@@ -14,20 +14,22 @@ on:
 
 jobs:
   build:
-    name: Build RPM Package
+    name: Build DEB Package
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install RPM build tools
+      - name: Install DEB build tools
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            rpm \
-            rpm2cpio \
-            cpio \
+            build-essential \
+            debhelper \
+            devscripts \
+            dpkg-dev \
+            fakeroot \
             python3 \
             python3-pip \
             python3-setuptools \
@@ -43,17 +45,17 @@ jobs:
           pip install --upgrade pip
           pip install build
 
-      - name: Build RPM
+      - name: Build DEB
         run: |
-          chmod +x scripts/packaging/build_rpm.sh
-          ./scripts/packaging/build_rpm.sh
+          chmod +x scripts/packaging/build_deb.sh
+          ./scripts/packaging/build_deb.sh
 
-      - name: Upload RPM artifact
+      - name: Upload DEB artifact
         uses: actions/upload-artifact@v4
         with:
-          name: rpm-package
+          name: deb-package
           path: |
-            *.rpm
+            *.deb
           retention-days: 30
 
       - name: Upload to Release
@@ -61,7 +63,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            *.rpm
+            *.deb
           draft: false
           prerelease: false
           generate_release_notes: true
