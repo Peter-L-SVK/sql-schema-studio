@@ -2,15 +2,15 @@
 # Build RPM package for SQL Schema Studio
 set -e
 
-# Zisti koreňový adresár projektu (kde je pyproject.toml)
+# Get location of the TOML file
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# Skript je v scripts/packaging/build_rpm.sh, takže ideme o 2 úrovne vyššie
+# Script is in scripts/packaging/build_rpm.sh, so we move 2 levels up
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$PROJECT_ROOT"
 
 echo "Building RPM for SQL Schema Studio from $PROJECT_ROOT"
 
-# Kontrola či pyproject.toml existuje
+# Check if pyproject exists
 if [ ! -f "pyproject.toml" ]; then
     echo "ERROR: pyproject.toml not found in $PROJECT_ROOT"
     echo "Current directory: $(pwd)"
@@ -38,14 +38,14 @@ echo "Creating source tarball..."
 tar --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='*.pyo' \
     -czf ${BUILD_DIR}/SOURCES/sql-schema-studio-${VERSION}.tar.gz \
     --transform "s/^/sql-schema-studio-${VERSION}\//" \
-    src/ pyproject.toml README.md LICENSE 2>/dev/null
+    src/ pyproject.toml README.md LICENSE 2>/dev/null || true
 
 if [ ! -f "${BUILD_DIR}/SOURCES/sql-schema-studio-${VERSION}.tar.gz" ]; then
     echo "ERROR: Failed to create source tarball"
     exit 1
 fi
 
-# Získaj aktuálny dátum pre changelog
+# Get the actual date for the changelog
 CHANGELOG_DATE=$(LC_TIME=C date +"%a %b %d %Y")
 
 # Create spec file
@@ -72,6 +72,7 @@ Requires:       python3-scikit-learn
 Requires:       python3-matplotlib
 Requires:       python3-cairo
 Requires:       python3-paramiko
+Requires:       python3-kbcstorage
 Requires:       gtk4
 Requires:       gtksourceview5
 
@@ -87,34 +88,35 @@ Features:
 - PostgreSQL log analyzer
 - Extensible Python/Perl hook system
 - SSH tunnel support
+- Keboola integration for data normalization
 
 %prep
 %setup -q
 
 %install
-# Create Python package directory
-mkdir -p %{buildroot}%{python3_sitelib}/sql_schema_studio
-cp -r src/* %{buildroot}%{python3_sitelib}/sql_schema_studio/
+# Create Python package directory - use absolute path
+mkdir -p %{buildroot}/usr/lib/python3/dist-packages/sql_schema_studio
+cp -r src/* %{buildroot}/usr/lib/python3/dist-packages/sql_schema_studio/
 
 # Remove __pycache__
 find %{buildroot} -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
 
 # Install icon
-mkdir -p %{buildroot}%{_datadir}/icons/hicolor/scalable/apps/
+mkdir -p %{buildroot}/usr/share/icons/hicolor/scalable/apps/
 if [ -f "src/resources/ui/icons/logo.svg" ]; then
-    cp src/resources/ui/icons/logo.svg %{buildroot}%{_datadir}/icons/hicolor/scalable/apps/sql-schema-studio.svg
+    cp src/resources/ui/icons/logo.svg %{buildroot}/usr/share/icons/hicolor/scalable/apps/sql-schema-studio.svg
 fi
 
 # Install desktop file
-mkdir -p %{buildroot}%{_datadir}/applications/
+mkdir -p %{buildroot}/usr/share/applications/
 if [ -f "src/resources/desktop/sql-schema-studio.desktop" ]; then
-    cp src/resources/desktop/sql-schema-studio.desktop %{buildroot}%{_datadir}/applications/
+    cp src/resources/desktop/sql-schema-studio.desktop %{buildroot}/usr/share/applications/
 else
-    cat > %{buildroot}%{_datadir}/applications/sql-schema-studio.desktop << 'DESKTOP_EOF'
+    cat > %{buildroot}/usr/share/applications/sql-schema-studio.desktop << 'DESKTOP_EOF'
 [Desktop Entry]
 Name=SQL Schema Studio
 Comment=Intelligent PostgreSQL Management Platform
-Exec=%{_bindir}/sql-schema-studio
+Exec=/usr/bin/sql-schema-studio
 Icon=sql-schema-studio
 Terminal=false
 Type=Application
@@ -125,19 +127,18 @@ DESKTOP_EOF
 fi
 
 # Create launcher script
-mkdir -p %{buildroot}%{_bindir}
-cat > %{buildroot}%{_bindir}/sql-schema-studio << 'LAUNCHER_EOF'
+mkdir -p %{buildroot}/usr/bin
+cat > %{buildroot}/usr/bin/sql-schema-studio << 'LAUNCHER_EOF'
 #!/bin/bash
 exec python3 -m sql_schema_studio.main "$@"
 LAUNCHER_EOF
-chmod 755 %{buildroot}%{_bindir}/sql-schema-studio
+chmod 755 %{buildroot}/usr/bin/sql-schema-studio
 
 %files
-%{python3_sitelib}/sql_schema_studio/
-%{_bindir}/sql-schema-studio
-%{_datadir}/icons/hicolor/scalable/apps/sql-schema-studio.svg
-%{_datadir}/applications/sql-schema-studio.desktop
-
+/usr/lib/python3/dist-packages/sql_schema_studio/
+/usr/bin/sql-schema-studio
+/usr/share/icons/hicolor/scalable/apps/sql-schema-studio.svg
+/usr/share/applications/sql-schema-studio.desktop
 %doc README.md LICENSE
 
 %changelog
@@ -145,13 +146,13 @@ chmod 755 %{buildroot}%{_bindir}/sql-schema-studio
 - Release vVERSION_PLACEHOLDER
 SPEC_EOF
 
-# Nahraď placeholder-y
+# Replace placeholders
 sed -i "s/VERSION_PLACEHOLDER/${VERSION}/g" ${BUILD_DIR}/SPECS/sql-schema-studio.spec
 sed -i "s/CHANGELOG_DATE_PLACEHOLDER/${CHANGELOG_DATE}/g" ${BUILD_DIR}/SPECS/sql-schema-studio.spec
 
 echo "Building RPM..."
 # Build RPM
-rpmbuild -ba ${BUILD_DIR}/SPECS/sql-schema-studio.spec
+rpmbuild -ba ${BUILD_DIR}/SPECS/sql-schema-studio.spec --nodeps
 
 if [ $? -eq 0 ]; then
     echo ""
