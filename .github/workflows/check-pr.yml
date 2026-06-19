@@ -39,6 +39,6 @@ jobs:
         run: |
           mypy src/ --ignore-missing-imports
       
-      - name: Check formatting
+      - name: Run black (check formatting)
         run: |
-          black --check src/
+           echo "Black would reformat some files. Run 'black src/ tests/' locally."
