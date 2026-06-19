@@ -14,6 +14,7 @@ from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
+import sys
 import os
 import time
 import gi
@@ -151,15 +152,39 @@ class MainWindow(Gtk.ApplicationWindow):
 
     # --- Action handlers ---
     def _on_close_request(self, window):
-        """Handle window close — disconnect cleanly first"""
+        """Handle window close — check for unsaved changes first."""
         self._save_window_state()
 
-        if self.db_connector.is_connected:
-            try:
-                self.db_connector.disconnect()
-                logger.info("Disconnected on window close")
-            except Exception as e:
-                logger.error(f"Disconnect on close error: {e}")
+        # Check for unsaved editor changes
+        if hasattr(self, "editor") and self.editor.has_unsaved_changes():
+            unsaved = self.editor.get_unsaved_tabs()
+            dialog = Gtk.AlertDialog()
+            dialog.set_message(
+                f"You have {len(unsaved)} tab(s) with unsaved changes:\n"
+                + "\n".join(f"  • {t}" for t in unsaved)
+                + "\n\nDo you want to save before closing?"
+            )
+            dialog.set_buttons(["Cancel", "Close without Saving", "Save and Close"])
+            dialog.set_cancel_button(0)
+            dialog.set_default_button(2)
+
+            def on_response(dialog, result):
+                response = dialog.choose_finish(result)
+                if response == 0:  # Cancel
+                    return True  # Stop close
+                elif response == 1:  # Close without Saving
+                    self._do_close()
+                    sys.exit(0)
+                elif response == 2:  # Save and Close
+                    self._save_all_tabs()
+                    self._do_close()
+                    sys.exit(0)
+
+            dialog.choose(self, None, on_response)
+            return True  # Stop default close handler
+
+        # No unsaved changes — close normally
+        self._do_close()
         return False
 
     def _on_connect_clicked(self):
@@ -605,3 +630,25 @@ class MainWindow(Gtk.ApplicationWindow):
         tab = self.editor.get_active_tab()
         if tab:
             self.editor.close_tab(tab)
+
+    def _save_all_tabs(self):
+        """Save all unsaved tabs. Prompts for filename if needed."""
+        for tab in self.editor._tabs:
+            if tab._modified:
+                # Switch to tab
+                idx = self.editor._tabs.index(tab)
+                self.editor._notebook.set_current_page(idx)
+                # Try to save
+                if hasattr(self, "_current_file") and self._current_file:
+                    self._save_to_file(self._current_file)
+                else:
+                    self._on_file_save_as()  # Will prompt for filename
+
+    def _do_close(self):
+        """Actually close the window after checks."""
+        if self.db_connector.is_connected:
+            try:
+                self.db_connector.disconnect()
+                logger.info("Disconnected on window close")
+            except Exception as e:
+                logger.error(f"Disconnect on close error: {e}")

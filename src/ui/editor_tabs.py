@@ -635,6 +635,17 @@ class EditorTabs(Gtk.Box):
         tab = self.get_active_tab()
         return tab._view if tab else None
 
+    def has_unsaved_changes(self) -> bool:
+        """Check if any tab has unsaved changes."""
+        for tab in self._tabs:
+            if tab._modified:
+                return True
+            return False
+
+    def get_unsaved_tabs(self) -> list[str]:
+        """Get list of tab titles with unsaved changes."""
+        return [tab._title for tab in self._tabs if tab._modified]
+
 
 # ======================================================================
 # Single Editor Tab with Custom Popover Autocomplete
