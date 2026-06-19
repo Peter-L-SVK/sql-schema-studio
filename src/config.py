@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.9 - Configuration (GPLv3)
+# SQL Schema Studio 0.8 - Configuration (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -70,19 +70,6 @@ SCHEMA_TABLE_HEADER_HEIGHT: int = 32
 SCHEMA_TABLE_BODY_PADDING: int = 4
 SCHEMA_CANVAS_WIDTH: int = 1200
 SCHEMA_CANVAS_HEIGHT: int = 800
-SCHEMA_CANVAS_BG: tuple = (0.15, 0.15, 0.15)  # Gray
-
-# Schema Designer colors
-SCHEMA_COLORS = {
-    "blue": (0.3, 0.5, 0.9),
-    "green": (0.3, 0.7, 0.4),
-    "orange": (0.9, 0.5, 0.2),
-    "red": (0.9, 0.3, 0.3),
-    "purple": (0.6, 0.4, 0.9),
-    "gray": (0.5, 0.5, 0.5),
-    "teal": (0.2, 0.7, 0.7),
-    "pink": (0.9, 0.4, 0.7),
-}
 
 # Hook manager
 HOOK_RESULT_DIALOG_WIDTH: int = 500
