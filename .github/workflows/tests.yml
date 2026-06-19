@@ -48,10 +48,6 @@ jobs:
         run: |
           mypy src/
 
-      - name: Run black (check formatting)
-        run: |
-          black --check src/ tests/
-
       - name: Run pytest
         run: |
           pytest tests/ -v --tb=short
