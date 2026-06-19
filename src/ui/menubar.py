@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.8 - Menu Bar (GPLv3)
+# SQL Schema Studio 0.9 - Menu Bar (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -22,6 +22,8 @@ def build_menubar():
     # File
     file_menu = Gio.Menu()
     file_menu.append("New Connection...", "app.new_connection")
+    file_menu.append("New Tab", "app.new_tab")
+    file_menu.append("Close Tab", "app.close_tab")
     file_menu.append("Open SQL File...", "app.open_schema")
     file_menu.append("Save File", "app.save_schema")
     file_menu.append("Save SQL As...", "app.save_schema_as")
@@ -47,6 +49,11 @@ def build_menubar():
     edit_menu.append("Cut", "app.cut")
     edit_menu.append("Copy", "app.copy")
     edit_menu.append("Paste", "app.paste")
+    edit_menu.append_section(None, Gio.Menu())
+    edit_menu.append("Find...", "app.find")
+    edit_menu.append("Find Next", "app.find_next")
+    edit_menu.append("Find Previous", "app.find_prev")
+    edit_menu.append("Replace...", "app.replace")
     edit_menu.append_section(None, Gio.Menu())
     edit_menu.append("Preferences", "app.preferences")
 

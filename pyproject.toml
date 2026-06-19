@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools>=68.0", "wheel"]
-build-backend = "setuptools.build_meta"
+build-backend = "setuptools.build_meta"  # Opravené
 
 [project]
 name = "sql-schema-studio"
@@ -76,6 +76,9 @@ packages = [
     "src.ui.schema_designer",
     "src.models",
     "src.utils",
+    "src.plugins",
+    "src.plugins.python",
+    "src.plugins.perl",
     "src.analytics",
     "src.analytics.visualizations",
     "src.hooks",
@@ -123,7 +126,7 @@ namespace_packages = true
 check_untyped_defs = true
 no_implicit_optional = true
 
-# Ignore schema_designer modules (mixin problems)
+# Ignorovať schema_designer moduly (mixin problémy)
 [[tool.mypy.overrides]]
 module = "src.ui.schema_designer.*"
 ignore_errors = true

@@ -38,7 +38,7 @@ echo "Creating source tarball..."
 tar --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='*.pyo' \
     -czf ${BUILD_DIR}/SOURCES/sql-schema-studio-${VERSION}.tar.gz \
     --transform "s/^/sql-schema-studio-${VERSION}\//" \
-    src/ pyproject.toml README.md LICENSE 2>/dev/null || true
+    src/ pyproject.toml README.md LICENSE 2>/dev/null
 
 if [ ! -f "${BUILD_DIR}/SOURCES/sql-schema-studio-${VERSION}.tar.gz" ]; then
     echo "ERROR: Failed to create source tarball"
@@ -68,10 +68,12 @@ Requires:       python3-sqlparse
 Requires:       python3-keyring
 Requires:       python3-numpy
 Requires:       python3-pandas
+Requires:       python3-polars
 Requires:       python3-scikit-learn
 Requires:       python3-matplotlib
 Requires:       python3-cairo
 Requires:       python3-paramiko
+Requires:       python3-faker
 Requires:       python3-kbcstorage
 Requires:       gtk4
 Requires:       gtksourceview5
@@ -94,29 +96,29 @@ Features:
 %setup -q
 
 %install
-# Create Python package directory - use absolute path
-mkdir -p %{buildroot}/usr/lib/python3/dist-packages/sql_schema_studio
-cp -r src/* %{buildroot}/usr/lib/python3/dist-packages/sql_schema_studio/
+# Create Python package directory
+mkdir -p %{buildroot}%{python3_sitelib}/sql_schema_studio
+cp -r src/* %{buildroot}%{python3_sitelib}/sql_schema_studio/
 
 # Remove __pycache__
 find %{buildroot} -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
 
 # Install icon
-mkdir -p %{buildroot}/usr/share/icons/hicolor/scalable/apps/
+mkdir -p %{buildroot}%{_datadir}/icons/hicolor/scalable/apps/
 if [ -f "src/resources/ui/icons/logo.svg" ]; then
-    cp src/resources/ui/icons/logo.svg %{buildroot}/usr/share/icons/hicolor/scalable/apps/sql-schema-studio.svg
+    cp src/resources/ui/icons/logo.svg %{buildroot}%{_datadir}/icons/hicolor/scalable/apps/sql-schema-studio.svg
 fi
 
 # Install desktop file
-mkdir -p %{buildroot}/usr/share/applications/
+mkdir -p %{buildroot}%{_datadir}/applications/
 if [ -f "src/resources/desktop/sql-schema-studio.desktop" ]; then
-    cp src/resources/desktop/sql-schema-studio.desktop %{buildroot}/usr/share/applications/
+    cp src/resources/desktop/sql-schema-studio.desktop %{buildroot}%{_datadir}/applications/
 else
-    cat > %{buildroot}/usr/share/applications/sql-schema-studio.desktop << 'DESKTOP_EOF'
+    cat > %{buildroot}%{_datadir}/applications/sql-schema-studio.desktop << 'DESKTOP_EOF'
 [Desktop Entry]
 Name=SQL Schema Studio
 Comment=Intelligent PostgreSQL Management Platform
-Exec=/usr/bin/sql-schema-studio
+Exec=%{_bindir}/sql-schema-studio
 Icon=sql-schema-studio
 Terminal=false
 Type=Application
@@ -127,18 +129,19 @@ DESKTOP_EOF
 fi
 
 # Create launcher script
-mkdir -p %{buildroot}/usr/bin
-cat > %{buildroot}/usr/bin/sql-schema-studio << 'LAUNCHER_EOF'
+mkdir -p %{buildroot}%{_bindir}
+cat > %{buildroot}%{_bindir}/sql-schema-studio << 'LAUNCHER_EOF'
 #!/bin/bash
 exec python3 -m sql_schema_studio.main "$@"
 LAUNCHER_EOF
-chmod 755 %{buildroot}/usr/bin/sql-schema-studio
+chmod 755 %{buildroot}%{_bindir}/sql-schema-studio
 
 %files
-/usr/lib/python3/dist-packages/sql_schema_studio/
-/usr/bin/sql-schema-studio
-/usr/share/icons/hicolor/scalable/apps/sql-schema-studio.svg
-/usr/share/applications/sql-schema-studio.desktop
+%{python3_sitelib}/sql_schema_studio/
+%{_bindir}/sql-schema-studio
+%{_datadir}/icons/hicolor/scalable/apps/sql-schema-studio.svg
+%{_datadir}/applications/sql-schema-studio.desktop
+
 %doc README.md LICENSE
 
 %changelog
@@ -146,29 +149,29 @@ chmod 755 %{buildroot}/usr/bin/sql-schema-studio
 - Release vVERSION_PLACEHOLDER
 SPEC_EOF
 
-# Replace placeholders
+# Replace placeholderls
 sed -i "s/VERSION_PLACEHOLDER/${VERSION}/g" ${BUILD_DIR}/SPECS/sql-schema-studio.spec
 sed -i "s/CHANGELOG_DATE_PLACEHOLDER/${CHANGELOG_DATE}/g" ${BUILD_DIR}/SPECS/sql-schema-studio.spec
 
 echo "Building RPM..."
 # Build RPM
-rpmbuild -ba ${BUILD_DIR}/SPECS/sql-schema-studio.spec --nodeps
+rpmbuild -ba ${BUILD_DIR}/SPECS/sql-schema-studio.spec
 
 if [ $? -eq 0 ]; then
     echo ""
-    echo "RPM built successfully!"
+    echo "✅ RPM built successfully!"
     echo ""
     
     # Copy to current directory
     find ${BUILD_DIR}/RPMS -name "*.rpm" -type f -exec cp {} "$PROJECT_ROOT" \;
     
-    echo "RPM files in project root:"
+    echo "📦 RPM files in project root:"
     ls -la "$PROJECT_ROOT"/*.rpm 2>/dev/null || echo "  (none found)"
     echo ""
     echo "Install with:"
     echo "  sudo dnf install $PROJECT_ROOT/sql-schema-studio-${VERSION}-1.*.rpm"
 else
     echo ""
-    echo "RPM build failed!"
+    echo "❌ RPM build failed!"
     exit 1
 fi
