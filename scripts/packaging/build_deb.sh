@@ -65,7 +65,7 @@ exec python3 -m sql_schema_studio.main "$@"
 LAUNCHER
 chmod +x ${BUILD_DIR}/${DEB_NAME}/usr/bin/sql-schema-studio
 
-# Create control file
+# Create control file with correct dependencies
 cat > ${BUILD_DIR}/${DEB_NAME}/DEBIAN/control << EOF
 Package: sql-schema-studio
 Version: ${VERSION}
@@ -73,23 +73,22 @@ Section: database
 Priority: optional
 Architecture: ${ARCH}
 Depends: python3 (>= 3.12),
-         python3-psycopg,
+         python3-psycopg2,
          python3-gi,
          python3-gi-cairo,
          python3-sqlparse,
          python3-keyring,
          python3-numpy,
          python3-pandas,
-         python3-sklearn,
+         python3-scikit-learn,
          python3-matplotlib,
          python3-cairo,
          python3-paramiko,
-         python3-faker,
          gir1.2-gtk-4.0,
          gir1.2-gtksource-5,
          gir1.2-vte-3.91
-Recommends: python3-plotly
-Suggests: kbcstorage
+Recommends: python3-pipx
+Suggests: python3-faker, python3-kbcstorage
 Maintainer: Peter Leukanič <peter@leukanic.eu>
 Description: Intelligent PostgreSQL Management Platform
  SQL Schema Studio is a GTK4 desktop application for PostgreSQL database
@@ -108,6 +107,23 @@ License: GPL-3.0-or-later
 Homepage: https://github.com/peter-leukanic/sql-schema-studio
 EOF
 
+# Create post-installation script to suggest optional packages
+cat > ${BUILD_DIR}/${DEB_NAME}/DEBIAN/postinst << 'POSTINST'
+#!/bin/bash
+set -e
+
+echo "SQL Schema Studio installed successfully!"
+echo ""
+echo "To install optional dependencies for additional features:"
+echo "  sudo apt install python3-faker python3-kbcstorage"
+echo ""
+echo "Or use pipx for user-level installation:"
+echo "  pipx install faker kbcstorage"
+echo ""
+echo "Run with: sql-schema-studio"
+POSTINST
+chmod +x ${BUILD_DIR}/${DEB_NAME}/DEBIAN/postinst
+
 # Build the package
 dpkg-deb --build ${BUILD_DIR}/${DEB_NAME}
 
@@ -117,3 +133,7 @@ mv ${BUILD_DIR}/${DEB_NAME}.deb .
 echo "✅ DEB built: ${DEB_NAME}.deb"
 echo "Install with: sudo dpkg -i ${DEB_NAME}.deb"
 echo "If dependencies fail, run: sudo apt --fix-broken install"
+echo ""
+echo "Optional dependencies (install after package):"
+echo "  pipx install faker kbcstorage"
+echo "  sudo apt install python3-faker python3-kbcstorage"

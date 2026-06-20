@@ -142,32 +142,42 @@ sudo dpkg -i sql-schema-studio_*.deb
 sudo apt --fix-broken install
 ```
 
-
 ### Run
 
 ```bash
 sql-schema-studio
 ```
 
-#### Debian / Ubuntu / Mint / WSL2
+## Run from source
+
+### Debian / Ubuntu / Mint / WSL2
 
 ```bash
 sudo apt update
-sudo apt install -y python3-psycopg python3-gi python3-gi-cairo \
-  python3-sqlparse python3-keyring python3-numpy python3-pandas \
-  python3-sklearn python3-matplotlib python3-cairo python3-paramiko \
-  python3-faker gir1.2-gtk-4.0 gir1.2-gtksource-5 gir1.2-vte-3.91
+sudo apt install -y python3-psycopg2 python3-gi python3-gi-cairo \
+  python3-sqlparse python3-keyring python3-numpy \
+  python3-scikit-learn python3-matplotlib python3-cairo python3-paramiko \
+  gir1.2-gtk-4.0 gir1.2-gtksource-5 gir1.2-vte-3.91 \
+  python3-pipx
 
-# Keboola hook (optional) – not in distro repos
-pip3 install --user kbcstorage
+# Install pipx if not already installed (it's in the apt command above)
+# pipx ensures isolated Python package installations
 
+# Install optional dependencies with pipx (recommended)
+pipx install faker kbcstorage
+
+# Clone and install from source
 git clone https://github.com/Peter-L-SVK/sql-schema-studio.git
 cd sql-schema-studio
+
+# Install in development mode
 pip install --user -e .
+
+# Run the application
 python3 -m src.main
 ```
 
-#### Fedora / CentOS / RedHat
+### Fedora / CentOS / RedHat
 
 ```bash
 sudo dnf install python3-gobject gtk4 gtksourceview5 libadwaita cairo python3-cairo \
@@ -182,52 +192,129 @@ python3 -m src.main
 ### Windows (WSL2)
 
 ```bash
+# Install WSL2 (run this in Windows PowerShell as admin)
 wsl --install
 wsl --update
 
 # Inside WSL2 terminal (Debian / Ubuntu):
 sudo apt update && sudo apt upgrade -y
-sudo apt install -y python3-psycopg python3-gi python3-gi-cairo \
-  python3-sqlparse python3-keyring python3-numpy python3-pandas \
-  python3-sklearn python3-matplotlib python3-cairo python3-paramiko \
-  python3-faker gir1.2-gtk-4.0 gir1.2-gtksource-5 gir1.2-vte-3.91 \
-  postgresql postgresql-client
 
-# (Optional) start local PostgreSQL
+# Install required system dependencies
+sudo apt install -y python3-psycopg2 python3-gi python3-gi-cairo \
+  python3-sqlparse python3-keyring python3-numpy python3-pandas \
+  python3-scikit-learn python3-matplotlib python3-cairo python3-paramiko \
+  gir1.2-gtk-4.0 gir1.2-gtksource-5 gir1.2-vte-3.91 \
+  python3-pipx postgresql postgresql-client
+
+# Install pipx if not already installed
+# pipx ensures isolated Python package installations
+
+# Install optional dependencies with pipx (recommended)
+pipx install faker kbcstorage
+
+# (Optional) Start local PostgreSQL
 sudo service postgresql start
 
+# Clone and install from source
 git clone https://github.com/Peter-L-SVK/sql-schema-studio.git
 cd sql-schema-studio
+
+# Install in development mode
 pip install --user -e .
+
+# Run the application
 python3 -m src.main
+
+# Note: GUI will work automatically through WSLg on Windows 11
+# For Windows 10, you may need to set up an X server
 ```
 
-## Development
+## Development Installation
+
+For development work with all dependencies:
 
 ```bash
+# Install system dependencies as above
+
+# Clone the repository
+git clone https://github.com/Peter-L-SVK/sql-schema-studio.git
+cd sql-schema-studio
+
+# Install with development extras
 pip install -e ".[dev]"
+
+# Install optional development tools
+pip install black flake8 mypy pytest pytest-cov
+
+# Run tests
 python3 -m pytest tests/ -v
+
+# Check code style
 python3 -m black src/ tests/
 python3 -m flake8 src/ tests/
 python3 -m mypy src/
 ```
 
-## System Dependencies
+## Dependency Breakdown
 
-This project requires the following system packages:
+### Required System Packages (installed via apt/dnf)
+These are essential for the application to run:
+- **PostgreSQL client**: `python3-psycopg2` - Database connectivity
+- **GTK4 GUI**: `python3-gi`, `python3-gi-cairo`, `gir1.2-gtk-4.0`, `gir1.2-gtksource-5` - GUI framework
+- **SQL parsing**: `python3-sqlparse` - SQL parsing and formatting
+- **Data processing**: `python3-numpy`, `python3-pandas`, `python3-scikit-learn` - Analytics engine
+- **Visualization**: `python3-matplotlib`, `python3-cairo` - Charts and graphs
+- **SSH tunneling**: `python3-paramiko` - Secure remote connections
+- **Terminal**: `gir1.2-vte-3.91` - Embedded terminal widget
+- **Keyring**: `python3-keyring` - Secure password storage
 
-**Debian / Ubuntu / Mint:**
+### Optional Packages (install via pipx or apt)
+These add extra features but aren't required:
+- **Synthetic data**: `faker` - Generate test data (pipx install faker)
+- **Keboola integration**: `kbcstorage` - Cloud data platform (pipx install kbcstorage)
+
+## Installation Troubleshooting
+
+### Common Issues
+
+**1. "ModuleNotFoundError: No module named 'sklearn'"**
 ```bash
-sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-4.0 \
-  gir1.2-gtksource-5 libgtk-4-1 libgtksourceview-5-0 \
-  libcairo2-dev python3-cairo python3-polars python3-paramiko \
-  python3-faker python3-kbcstorage
+# Fix: Install scikit-learn
+sudo apt install python3-scikit-learn  # Debian/Ubuntu
+sudo dnf install python3-scikit-learn  # Fedora
 ```
 
-**Fedora / CentOS / RedHat:**
+**2. "ModuleNotFoundError: No module named 'faker'"**
 ```bash
-sudo dnf install python3-gobject gtk4 gtksourceview5 libadwaita cairo python3-cairo \
-  python3-polars python3-paramiko python3-faker python3-kbcstorage
+# Fix: Install faker via pipx
+pipx install faker
+# Or via apt (if available)
+sudo apt install python3-faker
+```
+
+**3. "ModuleNotFoundError: No module named 'kbcstorage'"**
+```bash
+# Fix: Install kbcstorage via pipx
+pipx install kbcstorage
+```
+
+**4. GTK4 or GtkSourceView not found**
+```bash
+# Debian/Ubuntu
+sudo apt install gir1.2-gtk-4.0 gir1.2-gtksource-5 gir1.2-vte-3.91
+
+# Fedora
+sudo dnf install gtk4 gtksourceview5 vte291-gtk4
+```
+
+**5. WSL2 GUI not working**
+```bash
+# Ensure WSLg is enabled (Windows 11)
+wsl --update
+
+# For Windows 10, install an X server like VcXsrv
+# and set DISPLAY environment variable
+export DISPLAY=$(ip route list default | awk '{print $3}'):0
 ```
 
 ## Architecture
