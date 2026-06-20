@@ -223,7 +223,7 @@ def _compute_path_worker(
 
     except Exception as e:
         # Print full traceback to stderr so it's visible in terminal output
-        logger.error(
+        print(
             f"Worker error for FK '{fk_data.get('name', 'unknown')}': {e}",
             file=sys.stderr,
         )
