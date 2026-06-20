@@ -174,11 +174,9 @@ class MainWindow(Gtk.ApplicationWindow):
                     return True  # Stop close
                 elif response == 1:  # Close without Saving
                     self._do_close()
-                    sys.exit(0)
                 elif response == 2:  # Save and Close
                     self._save_all_tabs()
                     self._do_close()
-                    sys.exit(0)
 
             dialog.choose(self, None, on_response)
             return True  # Stop default close handler
@@ -646,9 +644,11 @@ class MainWindow(Gtk.ApplicationWindow):
 
     def _do_close(self):
         """Actually close the window after checks."""
+        self._save_window_state()
         if self.db_connector.is_connected:
             try:
                 self.db_connector.disconnect()
                 logger.info("Disconnected on window close")
             except Exception as e:
                 logger.error(f"Disconnect on close error: {e}")
+        self.get_application().quit()

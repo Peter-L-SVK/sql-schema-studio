@@ -126,7 +126,10 @@ class ActionHandler:
             self._window._on_import_json()
 
     def _on_quit(self, action, param):
-        self._app.quit()
+        if self._window:
+            self._window._on_close_request(None)
+        else:
+            self._app.quit()
 
     # --- Edit ---
 
