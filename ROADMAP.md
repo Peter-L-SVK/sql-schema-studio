@@ -24,9 +24,9 @@
 
 ### Multi-Tab System
 - [x] Tabbed SQL editor (Ctrl+T, Ctrl+W, drag tabs)
-- [ ] Unsaved changes indicator (•)
+- [x] Unsaved changes indicator (•)
 - [ ] Restore open tabs on startup
-- [ ] Tabbed results panel
+- [x] Tabbed results panel
 
 ### Schema Designer
 - [x] Color schemes — blue, green, orange, red, purple, gray
@@ -34,10 +34,6 @@
 - [ ] FK Editor dialog (direction, rules)
 - [ ] Directional arrows (↔, →, ←)
 - [x] Zoom and pan for canvas
-
-### Export/Import
-- [ ] Export schema to GraphQL
-- [ ] Export to SQL dump (pg_dump compatible)
 
 ### AI/ML Extensions
 - [x] Streaming/yield for large result sets
@@ -51,12 +47,15 @@
 - [x] SSH tunnel support
 
 ### Deferred to v1.0.0
-- [ ] Desktop launcher (.desktop file)
+- [ ] Support for desktop launcher (.desktop file) 
 
 #### Migrations
 - [ ] Migration generator with up/down SQL diffs
 - [ ] Schema comparison (live DB vs designer)
 
+#### Export/Import
+- [ ] Export schema to GraphQL
+- [ ] Export to SQL dump (pg_dump compatible)
 ---
 
 ## v1.0.0 — Beta Release

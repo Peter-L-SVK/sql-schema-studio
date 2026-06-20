@@ -1,16 +1,9 @@
-# SQL Schema Studio
+# SQL Schema Studio <br>[![Tests](https://github.com/Peter-L-SVK/sql-schema-studio/actions/workflows/tests.yml/badge.svg)](https://github.com/Peter-L-SVK/sql-schema-studio/actions/workflows/tests.yml) [![Build RPM](https://github.com/Peter-L-SVK/sql-schema-studio/actions/workflows/build-rpm.yml/badge.svg)](https://github.com/Peter-L-SVK/sql-schema-studio/actions/workflows/build-rpm.yml) [![Build DEB](https://github.com/Peter-L-SVK/sql-schema-studio/actions/workflows/build-deb.yml/badge.svg)](https://github.com/Peter-L-SVK/sql-schema-studio/actions/workflows/build-deb.yml) [![PR Check](https://github.com/Peter-L-SVK/sql-schema-studio/actions/workflows/check-pr.yml/badge.svg)](https://github.com/Peter-L-SVK/sql-schema-studio/actions/workflows/check-pr.yml)
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Top Language](https://img.shields.io/github/languages/top/Peter-L-SVK/sql-schema-studio)](https://github.com/Peter-L-SVK/sql-schema-studio)
 [![GitHub release](https://img.shields.io/github/v/release/Peter-L-SVK/sql-schema-studio)](https://github.com/Peter-L-SVK/sql-schema-studio/releases/latest)
 [![GitHub last commit](https://img.shields.io/github/last-commit/Peter-L-SVK/sql-schema-studio)](https://github.com/Peter-L-SVK/sql-schema-studio/commits/main)
-
-<!-- CI/CD Status Badges -->
-[![Tests](https://github.com/Peter-L-SVK/sql-schema-studio/actions/workflows/tests.yml/badge.svg)](https://github.com/Peter-L-SVK/sql-schema-studio/actions/workflows/tests.yml)
-[![Build RPM](https://github.com/Peter-L-SVK/sql-schema-studio/actions/workflows/build-rpm.yml/badge.svg)](https://github.com/Peter-L-SVK/sql-schema-studio/actions/workflows/build-rpm.yml)
-[![Build DEB](https://github.com/Peter-L-SVK/sql-schema-studio/actions/workflows/build-deb.yml/badge.svg)](https://github.com/Peter-L-SVK/sql-schema-studio/actions/workflows/build-deb.yml)
-[![PR Check](https://github.com/Peter-L-SVK/sql-schema-studio/actions/workflows/check-pr.yml/badge.svg)](https://github.com/Peter-L-SVK/sql-schema-studio/actions/workflows/check-pr.yml)
-
 <a href="https://buymeacoffee.com/leukanic.peter"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" height="20px"></a>  
 
 SQL Schema Studio is a native GTK4 PostgreSQL client built for Linux — not Electron, not a web app.
@@ -118,7 +111,7 @@ recommendations. Extend with Python and Perl hooks for custom automation.
 
 ```bash
 # Install build dependencies
-sudo dnf install rpm-build rpmdevtools rpmlint python3-devel
+sudo dnf install rpm-build rpmdevtools rpmlint python3-devel vte291-gtk4
 
 # Clone and build
 git clone https://github.com/Peter-L-SVK/sql-schema-studio.git
@@ -136,7 +129,7 @@ sudo dnf install ~/rpmbuild/RPMS/noarch/sql-schema-studio-*.rpm
 ```bash
 # Install build dependencies
 sudo apt update
-sudo apt install -y dpkg-dev debhelper python3-dev
+sudo apt install -y dpkg-dev debhelper python3-dev libvte-2.91-gtk4-dev
 
 # Clone and build
 git clone https://github.com/Peter-L-SVK/sql-schema-studio.git
@@ -164,7 +157,7 @@ sql-schema-studio
 sudo apt update
 sudo apt install -y python3-psycopg python3-gi python3-sqlparse python3-keyring \
   python3-numpy python3-pandas python3-sklearn python3-matplotlib python3-cairo \
-  python3-paramiko python3-faker python3-kbcstorage gir1.2-gtk-4.0 gir1.2-gtksource-5
+  python3-paramiko python3-faker python3-kbcstorage gir1.2-gtk-4.0 gir1.2-gtksource-5 libvte-2.91-gtk4-dev
 
 git clone https://github.com/Peter-L-SVK/sql-schema-studio.git
 cd sql-schema-studio
@@ -175,12 +168,12 @@ python3 -m src.main
 
 ```bash
 sudo dnf install python3-gobject gtk4 gtksourceview5 libadwaita cairo python3-cairo \
-  python3-polars python3-paramiko python3-faker python3-kbcstorage
+  python3-polars python3-paramiko python3-faker python3-kbcstorage vte291-gtk4
 
 git clone https://github.com/Peter-L-SVK/sql-schema-studio.git
 cd sql-schema-studio
 pip install --user -e .
-sql-schema-studio
+python3 -m src.main
 ```
 
 ### Windows (WSL2)
@@ -194,7 +187,7 @@ sudo apt update && sudo apt upgrade -y
 sudo apt install -y python3-psycopg python3-gi python3-sqlparse python3-keyring \
   python3-numpy python3-pandas python3-sklearn python3-matplotlib python3-cairo \
   python3-paramiko python3-faker python3-kbcstorage gir1.2-gtk-4.0 gir1.2-gtksource-5 \
-  postgresql postgresql-client
+  postgresql postgresql-client libvte-2.91-gtk4-dev
 
 sudo service postgresql start
 
@@ -240,9 +233,12 @@ src/
 ├── app.py                      Gtk.Application lifecycle
 ├── actions.py                  Menu and toolbar handlers
 ├── config.py                   Centralized constants
-├── core/                       Database connectivity, query execution, SQL parsing
+├── core/                       Database connectivity, query execution, SQL parsing, SSH, worker pool
 ├── ui/                         GTK4 interface (window, browser, editor, designer)
-│   └── dialogs/                Connection, about, preferences, column editor, hooks
+│   ├── editor/                 Multi tabed editor with autocomplete
+│   ├── dialogs/                Connection, about, preferences, column editor, hooks
+│   ├── schema_designer/	    Grafical schema designer
+│   └── window/                 Application window with it's tools
 ├── models/                     Table, column, and relationship data models
 ├── hooks/                      Plugin system with Python and Perl executors
 │   ├── python/                 Python hook runtime
