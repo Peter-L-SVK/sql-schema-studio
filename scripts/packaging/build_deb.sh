@@ -75,20 +75,21 @@ Architecture: ${ARCH}
 Depends: python3 (>= 3.12),
          python3-psycopg,
          python3-gi,
+         python3-gi-cairo,
          python3-sqlparse,
          python3-keyring,
          python3-numpy,
-         python3-polars,
+         python3-pandas,
          python3-sklearn,
          python3-matplotlib,
          python3-cairo,
          python3-paramiko,
          python3-faker,
-         python3-kbcstorage,
          gir1.2-gtk-4.0,
          gir1.2-gtksource-5,
-	 libvte-2.91-gtk4-dev
+         gir1.2-vte-3.91
 Recommends: python3-plotly
+Suggests: kbcstorage
 Maintainer: Peter Leukanič <peter@leukanic.eu>
 Description: Intelligent PostgreSQL Management Platform
  SQL Schema Studio is a GTK4 desktop application for PostgreSQL database

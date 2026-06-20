@@ -127,9 +127,8 @@ sudo dnf install ~/rpmbuild/RPMS/noarch/sql-schema-studio-*.rpm
 ### Debian / Ubuntu / Mint (DEB) / WSL2
 
 ```bash
-# Install build dependencies
-sudo apt update
-sudo apt install -y dpkg-dev debhelper python3-dev libvte-2.91-gtk4-dev
+# Only dpkg-dev is needed to build the .deb package
+sudo apt install -y dpkg-dev
 
 # Clone and build
 git clone https://github.com/Peter-L-SVK/sql-schema-studio.git
@@ -143,24 +142,28 @@ sudo dpkg -i sql-schema-studio_*.deb
 sudo apt --fix-broken install
 ```
 
+
 ### Run
 
 ```bash
 sql-schema-studio
 ```
 
-### From Source (Development)
-
 #### Debian / Ubuntu / Mint / WSL2
 
 ```bash
 sudo apt update
-sudo apt install -y python3-psycopg python3-gi python3-sqlparse python3-keyring \
-  python3-numpy python3-pandas python3-sklearn python3-matplotlib python3-cairo \
-  python3-paramiko python3-faker python3-kbcstorage gir1.2-gtk-4.0 gir1.2-gtksource-5 libvte-2.91-gtk4-dev
+sudo apt install -y python3-psycopg python3-gi python3-gi-cairo \
+  python3-sqlparse python3-keyring python3-numpy python3-pandas \
+  python3-sklearn python3-matplotlib python3-cairo python3-paramiko \
+  python3-faker gir1.2-gtk-4.0 gir1.2-gtksource-5 gir1.2-vte-3.91
+
+# Keboola hook (optional) – not in distro repos
+pip3 install --user kbcstorage
 
 git clone https://github.com/Peter-L-SVK/sql-schema-studio.git
 cd sql-schema-studio
+pip install --user -e .
 python3 -m src.main
 ```
 
@@ -184,11 +187,13 @@ wsl --update
 
 # Inside WSL2 terminal (Debian / Ubuntu):
 sudo apt update && sudo apt upgrade -y
-sudo apt install -y python3-psycopg python3-gi python3-sqlparse python3-keyring \
-  python3-numpy python3-pandas python3-sklearn python3-matplotlib python3-cairo \
-  python3-paramiko python3-faker python3-kbcstorage gir1.2-gtk-4.0 gir1.2-gtksource-5 \
-  postgresql postgresql-client libvte-2.91-gtk4-dev
+sudo apt install -y python3-psycopg python3-gi python3-gi-cairo \
+  python3-sqlparse python3-keyring python3-numpy python3-pandas \
+  python3-sklearn python3-matplotlib python3-cairo python3-paramiko \
+  python3-faker gir1.2-gtk-4.0 gir1.2-gtksource-5 gir1.2-vte-3.91 \
+  postgresql postgresql-client
 
+# (Optional) start local PostgreSQL
 sudo service postgresql start
 
 git clone https://github.com/Peter-L-SVK/sql-schema-studio.git
