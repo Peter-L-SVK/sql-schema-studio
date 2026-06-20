@@ -335,7 +335,6 @@ class SchemaDesigner(WorkerBridgeMixin, RoutingMixin, DrawingMixin, Gtk.Box):
             self._save_state("drag_waypoint")
             self._dragging_waypoint_fk = fk
             self._dragging_waypoint_index = idx
-            logger.debug(f"Dragging waypoint {idx} of FK {fk.name}")
             return
         table = self._find_table_at(start_x, start_y)
         if table:
@@ -343,7 +342,6 @@ class SchemaDesigner(WorkerBridgeMixin, RoutingMixin, DrawingMixin, Gtk.Box):
             self._dragging = table
             self._drag_offset_x = table.x - start_x
             self._drag_offset_y = table.y - start_y
-            logger.debug(f"Dragging {table.name}")
 
     def _on_drag_update(self, gesture, offset_x, offset_y):
         if self._dragging_waypoint_fk:
@@ -366,19 +364,11 @@ class SchemaDesigner(WorkerBridgeMixin, RoutingMixin, DrawingMixin, Gtk.Box):
 
     def _on_drag_end(self, gesture, offset_x, offset_y):
         if self._dragging_waypoint_fk:
-            logger.debug(
-                f"Dropped waypoint {self._dragging_waypoint_index} "
-                f"of FK {self._dragging_waypoint_fk.name}"
-            )
             self._dragging_waypoint_fk = None
             self._dragging_waypoint_index = -1
             self._canvas.queue_draw()
             return
         if self._dragging:
-            logger.debug(
-                f"Dropped {self._dragging.name} at "
-                f"({self._dragging.x:.0f}, {self._dragging.y:.0f})"
-            )
             self._dragging = None
             self._update_canvas_size()
             self._canvas.queue_draw()

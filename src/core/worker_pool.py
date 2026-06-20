@@ -223,7 +223,7 @@ def _compute_path_worker(
 
     except Exception as e:
         # Print full traceback to stderr so it's visible in terminal output
-        print(
+        logger.error(
             f"Worker error for FK '{fk_data.get('name', 'unknown')}': {e}",
             file=sys.stderr,
         )
@@ -254,7 +254,6 @@ class WorkerPool:
         if self._pool:
             self._pool.shutdown(wait=False)
             self._pool = None
-        logger.debug("Worker pool restarted")
 
     def submit(self, func: Callable, *args, **kwargs) -> Future:
         """Submit a task to the process pool.
