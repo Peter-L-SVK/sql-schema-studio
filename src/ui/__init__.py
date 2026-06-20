@@ -10,7 +10,7 @@
 
 from src.ui.ai_tools import AIToolsPopover
 from src.ui.results import ResultsPanel
-from src.ui.editor_tabs import EditorTabs, EditorTab
+from src.ui.editor import EditorTabs, EditorTab
 from src.ui.toolbar import Toolbar
 from src.ui.statusbar import StatusBar
 from src.ui.browser import DatabaseBrowser
