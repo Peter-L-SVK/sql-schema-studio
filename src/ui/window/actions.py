@@ -28,6 +28,7 @@ class WindowActionsMixin:
     statusbar: Any
     browser: Any
     editor: Any
+    results: Any
     _query_history: Any
     _last_result: tuple | None
 
@@ -80,7 +81,7 @@ class WindowActionsMixin:
             self.toolbar.set_run_sensitive(True)
             q = query.strip().upper()
             if error:
-                self.editor.show_error(error, elapsed)
+                self.results.show_error(error, elapsed)
                 self.statusbar.set_message(f"Error ({elapsed:.3f}s)")
                 self._query_history.add(
                     query=query, execution_time=elapsed, row_count=0, success=False
@@ -88,7 +89,7 @@ class WindowActionsMixin:
                 self._refresh_browser_if_ddl(q)
                 return
             if not result:
-                self.editor.show_text(f"Query executed.\nTime: {elapsed:.3f}s")
+                self.results.show_text(f"Query executed.\nTime: {elapsed:.3f}s")
                 self.statusbar.set_query_stats(0, elapsed)
                 self._query_history.add(
                     query=query, execution_time=elapsed, row_count=0, success=True
@@ -97,7 +98,7 @@ class WindowActionsMixin:
                 columns = list(result[0].keys())
                 rows = [list(r.values()) for r in result]
                 self._last_result = (columns, rows)
-                self.editor.show_results(columns, rows, elapsed)
+                self.results.show_query_result(columns, rows, elapsed)
                 self.statusbar.set_query_stats(len(rows), elapsed)
                 self._query_history.add(
                     query=query, execution_time=elapsed, row_count=len(rows), success=True

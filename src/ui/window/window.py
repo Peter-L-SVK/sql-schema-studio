@@ -22,6 +22,7 @@ from src.core.query_history import QueryHistory
 from src.ui.menubar import build_menubar
 from src.ui.toolbar import Toolbar
 from src.ui.editor_tabs import EditorTabs
+from src.ui.results import ResultsPanel
 from src.ui.browser import DatabaseBrowser
 from src.ui.statusbar import StatusBar
 from src.utils.logging import get_logger
@@ -47,6 +48,7 @@ class MainWindow(WindowActionsMixin, WindowDialogsMixin, Gtk.ApplicationWindow):
         self.toolbar = Toolbar(self)
         self.browser = DatabaseBrowser(self)
         self.editor = EditorTabs(self)
+        self.results = ResultsPanel()
         self.statusbar = StatusBar()
         self._query_history = QueryHistory()
         self._current_file = None
@@ -66,7 +68,13 @@ class MainWindow(WindowActionsMixin, WindowDialogsMixin, Gtk.ApplicationWindow):
         self._hpaned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
         self._hpaned.set_wide_handle(True)
         self._hpaned.set_start_child(self.browser)
-        self._hpaned.set_end_child(self.editor)
+
+        right_vpaned = Gtk.Paned(orientation=Gtk.Orientation.VERTICAL)
+        right_vpaned.set_wide_handle(True)
+        right_vpaned.set_start_child(self.editor)
+        right_vpaned.set_end_child(self.results)
+
+        self._hpaned.set_end_child(right_vpaned)
         main_vbox.append(self._hpaned)
 
         main_vbox.append(self.statusbar)
