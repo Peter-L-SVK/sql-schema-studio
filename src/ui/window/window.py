@@ -21,7 +21,7 @@ from src.config import DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT
 from src.core.query_history import QueryHistory
 from src.ui.menubar import build_menubar
 from src.ui.toolbar import Toolbar
-from src.ui.editor_tabs import EditorTabs
+from src.ui.editor import EditorTabs
 from src.ui.results import ResultsPanel
 from src.ui.browser import DatabaseBrowser
 from src.ui.statusbar import StatusBar
