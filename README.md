@@ -111,14 +111,7 @@ recommendations. Extend with Python and Perl hooks for custom automation.
 
 ```bash
 # Install build dependencies
-sudo apt install -y python3-psycopg2 python3-gi python3-gi-cairo \
-  python3-sqlparse python3-keyring python3-numpy \
-  python3-scikit-learn python3-matplotlib python3-cairo python3-paramiko \
-  gir1.2-gtk-4.0 gir1.2-gtksource-5 libvte-2.91-gtk4-dev \
-  python3-pipx
-  
-# Install dependencies with pipx
-pipx install faker kbcstorage scikit-learn
+sudo dnf install rpm-build rpmdevtools rpmlint python3-devel vte291-gtk4
 
 # Clone and build
 git clone https://github.com/Peter-L-SVK/sql-schema-studio.git
@@ -134,8 +127,16 @@ sudo dnf install ~/rpmbuild/RPMS/noarch/sql-schema-studio-*.rpm
 ### Debian / Ubuntu / Mint (DEB) / WSL2
 
 ```bash
-# Only dpkg-dev is needed to build the .deb package
-sudo apt install -y dpkg-dev
+# Install build dependencies
+sudo apt install -y python3-psycopg2 python3-gi python3-gi-cairo \
+  python3-sqlparse python3-keyring python3-numpy \
+  python3-scikit-learn python3-matplotlib python3-cairo python3-paramiko \
+  gir1.2-gtk-4.0 gir1.2-gtksource-5 libvte-2.91-gtk4-dev \
+  python3-pipx
+  
+# Install dependencies with pipx
+pipx install faker kbcstorage scikit-learn
+
 
 # Clone and build
 git clone https://github.com/Peter-L-SVK/sql-schema-studio.git

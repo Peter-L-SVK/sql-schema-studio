@@ -84,8 +84,7 @@ Depends: python3 (>= 3.12),
          python3-paramiko,
          gir1.2-gtk-4.0,
          gir1.2-gtksource-5,
-         libvte-2.91-gtk4-dev
-         
+         libvte-2.91-gtk4-dev        
 Recommends: python3-pipx
 Suggests: python3-faker, python3-kbcstorage
 Maintainer: Peter Leukanič <peter@leukanic.eu>
