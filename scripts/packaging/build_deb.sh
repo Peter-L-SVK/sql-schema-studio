@@ -79,14 +79,13 @@ Depends: python3 (>= 3.12),
          python3-sqlparse,
          python3-keyring,
          python3-numpy,
-         python3-pandas,
-         python3-scikit-learn,
          python3-matplotlib,
          python3-cairo,
          python3-paramiko,
          gir1.2-gtk-4.0,
          gir1.2-gtksource-5,
-         gir1.2-vte-3.91
+	 libvte-2.91-gtk4-dev,
+         
 Recommends: python3-pipx
 Suggests: python3-faker, python3-kbcstorage
 Maintainer: Peter Leukanič <peter@leukanic.eu>
@@ -118,7 +117,7 @@ echo "To install optional dependencies for additional features:"
 echo "  sudo apt install python3-faker python3-kbcstorage"
 echo ""
 echo "Or use pipx for user-level installation:"
-echo "  pipx install faker kbcstorage"
+echo "  pipx install faker kbcstorage scikit-learn --include-deps"
 echo ""
 echo "Run with: sql-schema-studio"
 POSTINST

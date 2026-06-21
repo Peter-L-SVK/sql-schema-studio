@@ -111,7 +111,14 @@ recommendations. Extend with Python and Perl hooks for custom automation.
 
 ```bash
 # Install build dependencies
-sudo dnf install rpm-build rpmdevtools rpmlint python3-devel vte291-gtk4
+sudo apt install -y python3-psycopg2 python3-gi python3-gi-cairo \
+  python3-sqlparse python3-keyring python3-numpy \
+  python3-scikit-learn python3-matplotlib python3-cairo python3-paramiko \
+  gir1.2-gtk-4.0 gir1.2-gtksource-5 libvte-2.91-gtk4-dev \
+  python3-pipx
+  
+# Install dependencies with pipx
+pipx install faker kbcstorage scikit-learn
 
 # Clone and build
 git clone https://github.com/Peter-L-SVK/sql-schema-studio.git
@@ -157,14 +164,14 @@ sudo apt update
 sudo apt install -y python3-psycopg2 python3-gi python3-gi-cairo \
   python3-sqlparse python3-keyring python3-numpy \
   python3-scikit-learn python3-matplotlib python3-cairo python3-paramiko \
-  gir1.2-gtk-4.0 gir1.2-gtksource-5 gir1.2-vte-3.91 \
+  gir1.2-gtk-4.0 gir1.2-gtksource-5 libvte-2.91-gtk4-dev \
   python3-pipx
 
 # Install pipx if not already installed (it's in the apt command above)
 # pipx ensures isolated Python package installations
 
-# Install optional dependencies with pipx (recommended)
-pipx install faker kbcstorage
+# Install dependencies with pipx
+pipx install faker kbcstorage scikit-learn
 
 # Clone and install from source
 git clone https://github.com/Peter-L-SVK/sql-schema-studio.git
@@ -201,16 +208,16 @@ sudo apt update && sudo apt upgrade -y
 
 # Install required system dependencies
 sudo apt install -y python3-psycopg2 python3-gi python3-gi-cairo \
-  python3-sqlparse python3-keyring python3-numpy python3-pandas \
-  python3-scikit-learn python3-matplotlib python3-cairo python3-paramiko \
-  gir1.2-gtk-4.0 gir1.2-gtksource-5 gir1.2-vte-3.91 \
-  python3-pipx postgresql postgresql-client
+  python3-sqlparse python3-keyring python3-numpy \
+  python3-matplotlib python3-cairo python3-paramiko \
+  gir1.2-gtk-4.0 gir1.2-gtksource-5 libvte-2.91-gtk4-dev \
+  python3-pipx postgresql postgresql-client 
 
 # Install pipx if not already installed
 # pipx ensures isolated Python package installations
 
-# Install optional dependencies with pipx (recommended)
-pipx install faker kbcstorage
+# Install dependencies with pipx
+pipx install faker kbcstorage scikit-learn
 
 # (Optional) Start local PostgreSQL
 sudo service postgresql start
