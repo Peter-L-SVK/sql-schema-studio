@@ -177,9 +177,6 @@ pipx install faker kbcstorage scikit-learn
 git clone https://github.com/Peter-L-SVK/sql-schema-studio.git
 cd sql-schema-studio
 
-# Install in development mode
-pip install --user -e .
-
 # Run the application
 python3 -m src.main
 ```
@@ -225,9 +222,6 @@ sudo service postgresql start
 # Clone and install from source
 git clone https://github.com/Peter-L-SVK/sql-schema-studio.git
 cd sql-schema-studio
-
-# Install in development mode
-pip install --user -e .
 
 # Run the application
 python3 -m src.main
@@ -308,7 +302,7 @@ pipx install kbcstorage
 **4. GTK4 or GtkSourceView not found**
 ```bash
 # Debian/Ubuntu
-sudo apt install gir1.2-gtk-4.0 gir1.2-gtksource-5 gir1.2-vte-3.91
+sudo apt install gir1.2-gtk-4.0 gir1.2-gtksource-5 libvte-2.91-gtk4-dev
 
 # Fedora
 sudo dnf install gtk4 gtksourceview5 vte291-gtk4
