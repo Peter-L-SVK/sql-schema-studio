@@ -21,6 +21,13 @@ from src.ui.editor.keywords import SQL_KEYWORDS
 class EditorTab(Gtk.Box):
     """Single editor tab with GtkSourceView and custom Popover autocomplete."""
 
+    _autocomplete_enabled = True
+
+    @classmethod
+    def set_autocomplete_enabled(cls, enabled: bool):
+        """Enable or disable autocomplete globally for all EditorTab instances."""
+        cls._autocomplete_enabled = enabled
+
     def __init__(self, parent_editor, title: str = "Query", content: str = ""):
         super().__init__(orientation=Gtk.Orientation.VERTICAL)
         self._parent_editor = parent_editor

@@ -8,6 +8,7 @@
 
 """Preferences dialog with persistent settings."""
 
+import os
 import gi
 
 gi.require_version("Gtk", "4.0")
@@ -17,6 +18,7 @@ from gi.repository import Gtk, GtkSource, Pango
 from src.utils.gtk_helpers import set_margin
 from src.utils.settings import Settings
 from src.utils.logging import get_logger
+from src.ui.results import ResultsPanel
 
 logger = get_logger(__name__)
 
@@ -32,15 +34,21 @@ class PreferencesDialog(Gtk.Window):
         )
         self._editor = editor
         self._settings = Settings()
-        self.set_default_size(520, 460)
+        self.set_default_size(520, 500)
+
+        # Snapshots for change detection
+        self._originals = {}
 
         self._build_ui()
         self._load_settings()
 
+    # =================================================================
+    # UI construction
+    # =================================================================
+
     def _build_ui(self):
         main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
 
-        # Notebook tabs
         notebook = Gtk.Notebook()
         set_margin(notebook, 12)
 
@@ -81,21 +89,62 @@ class PreferencesDialog(Gtk.Window):
         self._autocomplete_check = Gtk.CheckButton(label="Enable SQL keyword autocomplete")
         editor_page.append(self._autocomplete_check)
 
-        # Color scheme
-        scheme_label = Gtk.Label(label="Color Scheme", halign=Gtk.Align.START)
+        # Editor color scheme
+        scheme_label = Gtk.Label(label="Editor Color Scheme", halign=Gtk.Align.START)
         scheme_label.add_css_class("heading")
         scheme_label.set_margin_top(8)
         editor_page.append(scheme_label)
 
         self._scheme_combo = Gtk.ComboBoxText()
+        self._scheme_ids = []  # parallel list — GTK4 StringList workaround
         manager = GtkSource.StyleSchemeManager.get_default()
+        manager.set_search_path(
+            [
+                "/usr/share/gtksourceview-5/styles",
+                "/usr/share/gtksourceview-4/styles",
+                "/usr/share/gtksourceview-3.0/styles",
+                os.path.expanduser("~/.local/share/gtksourceview-5/styles"),
+                os.path.expanduser("~/.local/share/gtksourceview-3.0/styles"),
+            ]
+        )
         for scheme_id in manager.get_scheme_ids():
             scheme = manager.get_scheme(scheme_id)
-            self._scheme_combo.append(scheme_id, scheme.get_name())
+            self._scheme_combo.append(scheme_id, scheme.get_name() or scheme_id)
+            self._scheme_ids.append(scheme_id)
         self._scheme_combo.set_active(0)
         editor_page.append(self._scheme_combo)
 
         notebook.append_page(editor_page, Gtk.Label(label="Editor"))
+
+        # --- Terminal tab ---
+        terminal_page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+        set_margin(terminal_page, 16)
+
+        terminal_scheme_label = Gtk.Label(label="Terminal Color Theme", halign=Gtk.Align.START)
+        terminal_scheme_label.add_css_class("heading")
+        terminal_page.append(terminal_scheme_label)
+
+        self._terminal_scheme_combo = Gtk.ComboBoxText()
+        self._terminal_theme_ids = []  # parallel list
+
+        for theme_id, theme_name in ResultsPanel.get_theme_names():
+            self._terminal_scheme_combo.append(theme_id, theme_name)
+            self._terminal_theme_ids.append(theme_id)
+
+        terminal_page.append(self._terminal_scheme_combo)
+
+        # Terminal font
+        terminal_font_label = Gtk.Label(label="Terminal Font", halign=Gtk.Align.START)
+        terminal_font_label.add_css_class("heading")
+        terminal_font_label.set_margin_top(8)
+        terminal_page.append(terminal_font_label)
+
+        terminal_font_dialog = Gtk.FontDialog()
+        terminal_font_dialog.set_title("Select Terminal Font")
+        self._terminal_font_button = Gtk.FontDialogButton(dialog=terminal_font_dialog)
+        terminal_page.append(self._terminal_font_button)
+
+        notebook.append_page(terminal_page, Gtk.Label(label="Terminal"))
 
         # --- General tab ---
         general_page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
@@ -128,8 +177,12 @@ class PreferencesDialog(Gtk.Window):
         main_box.append(button_box)
         self.set_child(main_box)
 
+    # =================================================================
+    # Load settings & snapshot originals
+    # =================================================================
+
     def _load_settings(self):
-        """Load saved settings into widgets."""
+        """Load saved settings into widgets and snapshot original values."""
         editor = self._settings.get_section("editor")
         general = self._settings.get_section("general")
 
@@ -138,6 +191,11 @@ class PreferencesDialog(Gtk.Window):
         font_desc = Pango.FontDescription.from_string(font_str)
         self._font_button.set_font_desc(font_desc)
 
+        # Terminal font
+        terminal_font_str = editor.get("terminal_font", "Monospace 10")
+        terminal_font_desc = Pango.FontDescription.from_string(terminal_font_str)
+        self._terminal_font_button.set_font_desc(terminal_font_desc)
+
         # Tab width
         self._tab_spin.set_value(editor.get("tab_width", 4))
 
@@ -145,90 +203,162 @@ class PreferencesDialog(Gtk.Window):
         self._spaces_check.set_active(editor.get("spaces_instead_of_tabs", True))
         self._line_numbers_check.set_active(editor.get("show_line_numbers", True))
         self._highlight_line_check.set_active(editor.get("highlight_current_line", True))
-
-        # Autocomplete
         self._autocomplete_check.set_active(editor.get("autocomplete_enabled", True))
 
-        # Color scheme
+        # Editor color scheme — use parallel ID list (GTK4 StringList fix)
         scheme_id = editor.get("color_scheme", "classic")
-        model = self._scheme_combo.get_model()
-        for i in range(len(model)):
-            if model[i][0] == scheme_id:
-                self._scheme_combo.set_active(i)
-                break
+        try:
+            idx = self._scheme_ids.index(scheme_id)
+            self._scheme_combo.set_active(idx)
+        except ValueError:
+            self._scheme_combo.set_active(0)
+
+        # Terminal theme — use parallel ID list (GTK4 StringList fix)
+        terminal_theme = editor.get("terminal_scheme", "dark")
+        try:
+            idx = self._terminal_theme_ids.index(terminal_theme)
+            self._terminal_scheme_combo.set_active(idx)
+        except ValueError:
+            self._terminal_scheme_combo.set_active(0)
 
         # General
         self._confirm_close_check.set_active(general.get("confirm_close", True))
         self._restore_session_check.set_active(general.get("restore_session", False))
 
-    def _on_apply(self, button):
-        """Save settings and apply to editor."""
-        # Save font
+        # Snapshot for change detection
+        self._snapshot_originals()
+
+    def _snapshot_originals(self):
+        """Capture current widget values so _on_apply can compare."""
         font_desc = self._font_button.get_font_desc()
-        if font_desc:
-            self._settings.set("editor", "font", font_desc.to_string())
+        terminal_font_desc = self._terminal_font_button.get_font_desc()
 
-        # Save other editor settings
-        self._settings.set("editor", "tab_width", int(self._tab_spin.get_value()))
-        self._settings.set("editor", "spaces_instead_of_tabs", self._spaces_check.get_active())
-        self._settings.set("editor", "show_line_numbers", self._line_numbers_check.get_active())
-        self._settings.set(
-            "editor", "highlight_current_line", self._highlight_line_check.get_active()
-        )
+        self._originals = {
+            "font": font_desc.to_string() if font_desc else None,
+            "terminal_font": terminal_font_desc.to_string() if terminal_font_desc else None,
+            "tab_width": int(self._tab_spin.get_value()),
+            "spaces_instead_of_tabs": self._spaces_check.get_active(),
+            "show_line_numbers": self._line_numbers_check.get_active(),
+            "highlight_current_line": self._highlight_line_check.get_active(),
+            "autocomplete_enabled": self._autocomplete_check.get_active(),
+            "color_scheme": self._scheme_combo.get_active_id(),
+            "terminal_scheme": self._terminal_scheme_combo.get_active_id(),
+            "confirm_close": self._confirm_close_check.get_active(),
+            "restore_session": self._restore_session_check.get_active(),
+        }
 
-        # Save autocomplete
-        autocomplete_enabled = self._autocomplete_check.get_active()
-        self._settings.set("editor", "autocomplete_enabled", autocomplete_enabled)
+    # =================================================================
+    # Apply (delta-only)
+    # =================================================================
 
-        scheme_id = self._scheme_combo.get_active_id()
-        if scheme_id:
-            self._settings.set("editor", "color_scheme", scheme_id)
+    def _on_apply(self, button):
+        """Save and apply only settings that actually changed."""
+        window = self.get_transient_for()
 
-        # Save general settings
-        self._settings.set("general", "confirm_close", self._confirm_close_check.get_active())
-        self._settings.set("general", "restore_session", self._restore_session_check.get_active())
+        # Read current values
+        font_desc = self._font_button.get_font_desc()
+        terminal_font_desc = self._terminal_font_button.get_font_desc()
+
+        current = {
+            "font": font_desc.to_string() if font_desc else None,
+            "terminal_font": terminal_font_desc.to_string() if terminal_font_desc else None,
+            "tab_width": int(self._tab_spin.get_value()),
+            "spaces_instead_of_tabs": self._spaces_check.get_active(),
+            "show_line_numbers": self._line_numbers_check.get_active(),
+            "highlight_current_line": self._highlight_line_check.get_active(),
+            "autocomplete_enabled": self._autocomplete_check.get_active(),
+            "color_scheme": self._scheme_combo.get_active_id(),
+            "terminal_scheme": self._terminal_scheme_combo.get_active_id(),
+            "confirm_close": self._confirm_close_check.get_active(),
+            "restore_session": self._restore_session_check.get_active(),
+        }
+
+        # Determine what changed
+        changed = {
+            key: val
+            for key, val in current.items()
+            if val != self._originals.get(key)
+        }
+
+        if not changed:
+            logger.debug("Preferences: nothing changed, skipping save")
+            self.close()
+            return
+
+        logger.info(f"Preferences changed: {list(changed.keys())}")
+
+        # Persist only changed keys
+        for key, val in changed.items():
+            if key in ("confirm_close", "restore_session"):
+                self._settings.set("general", key, val)
+            else:
+                self._settings.set("editor", key, val)
 
         self._settings.save()
 
-        # Apply to live editor (all tabs)
+        # Apply editor side-effects only for changed editor keys
         if self._editor:
-            font_family = font_desc.get_family() if font_desc else "Monospace"
-            font_size = (font_desc.get_size() // Pango.SCALE) if font_desc else 12
+            changed_editor = {
+                k: v for k, v in changed.items()
+                if k not in ("confirm_close", "restore_session", "terminal_font", "terminal_scheme")
+            }
+            changed_terminal = {
+                k: v for k, v in changed.items()
+                if k in ("terminal_font", "terminal_scheme")
+            }
 
-            for tab in self._editor._tabs:
-                view = tab._view
-                buffer = view.get_buffer()
+            if changed_editor:
+                font_family = font_desc.get_family() if font_desc else "Monospace"
+                font_size = (font_desc.get_size() // Pango.SCALE) if font_desc else 12
 
-                view.set_tab_width(int(self._tab_spin.get_value()))
-                view.set_insert_spaces_instead_of_tabs(self._spaces_check.get_active())
-                view.set_show_line_numbers(self._line_numbers_check.get_active())
-                view.set_highlight_current_line(self._highlight_line_check.get_active())
+                for tab in self._editor._tabs:
+                    view = tab._view
+                    buffer = view.get_buffer()
 
-                # Apply font via CSS
-                css = f"""
-                textview {{
-                    font-family: {font_family};
-                    font-size: {font_size}pt;
-                }}
-                """
-                provider = Gtk.CssProvider()
-                provider.load_from_data(css.encode())
-                view.get_style_context().add_provider(
-                    provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+                    if "tab_width" in changed_editor:
+                        view.set_tab_width(current["tab_width"])
+                    if "spaces_instead_of_tabs" in changed_editor:
+                        view.set_insert_spaces_instead_of_tabs(current["spaces_instead_of_tabs"])
+                    if "show_line_numbers" in changed_editor:
+                        view.set_show_line_numbers(current["show_line_numbers"])
+                    if "highlight_current_line" in changed_editor:
+                        view.set_highlight_current_line(current["highlight_current_line"])
+
+                    if "font" in changed_editor:
+                        css = (
+                            "textview {"
+                            f"  font-family: {font_family};"
+                            f"  font-size: {font_size}pt;"
+                            "}"
+                        )
+                        provider = Gtk.CssProvider()
+                        provider.load_from_data(css.encode())
+                        view.get_style_context().add_provider(
+                            provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+                        )
+
+                    if "color_scheme" in changed_editor and current["color_scheme"]:
+                        manager = GtkSource.StyleSchemeManager.get_default()
+                        scheme = manager.get_scheme(current["color_scheme"])
+                        if scheme:
+                            buffer.set_style_scheme(scheme)
+
+                if "autocomplete_enabled" in changed_editor:
+                    from src.ui.editor_tabs import EditorTab
+                    EditorTab.set_autocomplete_enabled(current["autocomplete_enabled"])
+
+                logger.info(
+                    f"Editor preferences applied to {len(self._editor._tabs)} tabs: "
+                    f"{list(changed_editor.keys())}"
                 )
 
-                # Apply color scheme
-                if scheme_id:
-                    manager = GtkSource.StyleSchemeManager.get_default()
-                    scheme = manager.get_scheme(scheme_id)
-                    if scheme:
-                        buffer.set_style_scheme(scheme)
+            if changed_terminal and window and hasattr(window, "results"):
+                if "terminal_font" in changed_terminal and window.results.terminal:
+                    window.results.terminal.set_font(terminal_font_desc)
+                if "terminal_scheme" in changed_terminal and current["terminal_scheme"]:
+                    window.results.apply_terminal_scheme(current["terminal_scheme"])
+                logger.info(f"Terminal preferences applied: {list(changed_terminal.keys())}")
 
-            # Apply autocomplete setting globally
-            from src.ui.editor_tabs import EditorTab
-
-            EditorTab.set_autocomplete_enabled(autocomplete_enabled)
-
-            logger.info(f"Preferences applied to {len(self._editor._tabs)} editor tabs")
-
+        # Update snapshot so next Apply is also delta-only
+        self._snapshot_originals()
         self.close()

@@ -54,6 +54,14 @@ class MainWindow(WindowActionsMixin, WindowDialogsMixin, Gtk.ApplicationWindow):
         self._current_file = None
         self._last_result = None
 
+        # Apply terminal color scheme from settings
+        from src.utils.settings import Settings
+
+        settings = Settings()
+        editor = settings.get_section("editor")
+        terminal_scheme = editor.get("terminal_scheme", "classic")
+        self.results.apply_terminal_scheme(terminal_scheme)
+
         self._build_layout()
         self._load_css()
         self._restore_window_state()

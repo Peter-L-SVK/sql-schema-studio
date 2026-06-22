@@ -11,11 +11,13 @@
 from __future__ import annotations
 
 import logging
+import os
+
 import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Vte", "3.91")
-from gi.repository import Gtk, Vte, GLib
+from gi.repository import Gtk, Vte, GLib, GtkSource
 
 from src.config import RESULTS_ROW_LIMIT
 
@@ -43,6 +45,98 @@ class LogHandler(logging.Handler):
 
 class ResultsPanel(Gtk.Box):
     """Query results display panel with Results, Log, and Terminal tabs."""
+
+    # Terminal color themes
+    TERMINAL_THEMES = {
+        "dark": {
+            "name": "Dark",
+            "fg": "#D3D7CF",
+            "bg": "#1E1E1E",
+            "palette": [
+                "#000000", "#CC0000", "#4E9A06", "#C4A000",
+                "#3465A4", "#75507B", "#06989A", "#D3D7CF",
+                "#555753", "#EF2929", "#8AE234", "#FCE94F",
+                "#729FCF", "#AD7FA8", "#34E2E2", "#EEEEEC"
+            ]
+        },
+        "light": {
+            "name": "Light",
+            "fg": "#000000",
+            "bg": "#FFFFFF",
+            "palette": [
+                "#000000", "#CC0000", "#4E9A06", "#C4A000",
+                "#3465A4", "#75507B", "#06989A", "#D3D7CF",
+                "#555753", "#EF2929", "#8AE234", "#FCE94F",
+                "#729FCF", "#AD7FA8", "#34E2E2", "#EEEEEC"
+            ]
+        },
+        "tango-dark": {
+            "name": "Tango Dark",
+            "fg": "#EEEEEC",
+            "bg": "#2E3436",
+            "palette": [
+                "#2E3436", "#CC0000", "#4E9A06", "#C4A000",
+                "#3465A4", "#75507B", "#06989A", "#D3D7CF",
+                "#555753", "#EF2929", "#8AE234", "#FCE94F",
+                "#729FCF", "#AD7FA8", "#34E2E2", "#EEEEEC"
+            ]
+        },
+        "tango-light": {
+            "name": "Tango Light",
+            "fg": "#2E3436",
+            "bg": "#EEEEEC",
+            "palette": [
+                "#2E3436", "#CC0000", "#4E9A06", "#C4A000",
+                "#3465A4", "#75507B", "#06989A", "#D3D7CF",
+                "#555753", "#EF2929", "#8AE234", "#FCE94F",
+                "#729FCF", "#AD7FA8", "#34E2E2", "#EEEEEC"
+            ]
+        },
+        "solarized-dark": {
+            "name": "Solarized Dark",
+            "fg": "#839496",
+            "bg": "#002B36",
+            "palette": [
+                "#073642", "#DC322F", "#859900", "#B58900",
+                "#268BD2", "#D33682", "#2AA198", "#EEE8D5",
+                "#002B36", "#CB4B16", "#586E75", "#657B83",
+                "#839496", "#6C71C4", "#93A1A1", "#FDF6E3"
+            ]
+        },
+        "solarized-light": {
+            "name": "Solarized Light",
+            "fg": "#657B83",
+            "bg": "#FDF6E3",
+            "palette": [
+                "#073642", "#DC322F", "#859900", "#B58900",
+                "#268BD2", "#D33682", "#2AA198", "#EEE8D5",
+                "#002B36", "#CB4B16", "#586E75", "#657B83",
+                "#839496", "#6C71C4", "#93A1A1", "#FDF6E3"
+            ]
+        },
+        "monokai": {
+            "name": "Monokai",
+            "fg": "#F8F8F2",
+            "bg": "#272822",
+            "palette": [
+                "#272822", "#F92672", "#A6E22E", "#FD971F",
+                "#66D9EF", "#AE81FF", "#A1EFE4", "#F8F8F2",
+                "#75715E", "#F92672", "#A6E22E", "#FD971F",
+                "#66D9EF", "#AE81FF", "#A1EFE4", "#F9F8F5"
+            ]
+        },
+        "nord": {
+            "name": "Nord",
+            "fg": "#D8DEE9",
+            "bg": "#2E3440",
+            "palette": [
+                "#2E3440", "#BF616A", "#A3BE8C", "#EBCB8B",
+                "#81A1C1", "#B48EAD", "#88C0D0", "#E5E9F0",
+                "#4C566A", "#BF616A", "#A3BE8C", "#EBCB8B",
+                "#81A1C1", "#B48EAD", "#8FBCBB", "#ECEFF4"
+            ]
+        }
+    }
 
     def __init__(self):
         super().__init__(orientation=Gtk.Orientation.VERTICAL)
@@ -87,7 +181,8 @@ class ResultsPanel(Gtk.Box):
 
         log_buffer = self._log_view.get_buffer()
         log_buffer.set_text(
-            f"[{datetime.now().strftime('%H:%M:%S')}] Session started\n" f"[{'='*40}]\n"
+            f"[{datetime.now().strftime('%H:%M:%S')}] Session started\n"
+            f"[{'='*40}]\n"
         )
         log_scroll.set_child(self._log_view)
         log_box.append(log_scroll)
@@ -105,10 +200,43 @@ class ResultsPanel(Gtk.Box):
         self._log_handler = LogHandler(self)
         logging.getLogger().addHandler(self._log_handler)
 
+        # Store current theme
+        self._current_theme = "dark"
+
     def _on_notebook_switch(self, notebook, page, page_num):
         """Initialize terminal when user switches to its tab."""
         if page_num == 2 and self._terminal is None:
             self._init_terminal()
+
+    def apply_terminal_scheme(self, theme_id: str = "dark"):
+        """Apply a terminal color theme."""
+        if self._terminal is None:
+            # Store theme for later initialization
+            self._current_theme = theme_id
+            return
+
+        from gi.repository import Gdk
+
+        # Get the theme from TERMINAL_THEMES only
+        theme = self.TERMINAL_THEMES.get(theme_id)
+        if theme is None:
+            theme = self.TERMINAL_THEMES["dark"]
+
+        self._current_theme = theme_id
+
+        fg = Gdk.RGBA()
+        fg.parse(theme["fg"])
+
+        bg = Gdk.RGBA()
+        bg.parse(theme["bg"])
+
+        palette = []
+        for color_str in theme["palette"]:
+            color = Gdk.RGBA()
+            color.parse(color_str)
+            palette.append(color)
+
+        self._terminal.set_colors(fg, bg, palette)
 
     def _init_terminal(self):
         """Initialize the VTE terminal widget."""
@@ -132,7 +260,6 @@ class ResultsPanel(Gtk.Box):
                 if error:
                     print(f"Terminal failed to start: {error}")
 
-            #  11 arguments total (child_setup_data present, child_setup_data_destroy NOT)
             self._terminal.spawn_async(
                 Vte.PtyFlags.DEFAULT,  # pty_flags
                 None,  # working_directory
@@ -148,10 +275,19 @@ class ResultsPanel(Gtk.Box):
             )
 
             self._terminal_box.append(self._terminal)
+
+            # Apply the current theme
+            self.apply_terminal_scheme(self._current_theme)
+
         except Exception as e:
             label = Gtk.Label(label=f"Terminal not available: {e}")
             label.set_wrap(True)
             self._terminal_box.append(label)
+
+    @classmethod
+    def get_theme_names(cls):
+        """Get list of (theme_id, display_name) tuples for all themes."""
+        return [(theme_id, theme["name"]) for theme_id, theme in cls.TERMINAL_THEMES.items()]
 
     # =====================================================================
     # Public API
