@@ -274,11 +274,7 @@ class PreferencesDialog(Gtk.Window):
         }
 
         # Determine what changed
-        changed = {
-            key: val
-            for key, val in current.items()
-            if val != self._originals.get(key)
-        }
+        changed = {key: val for key, val in current.items() if val != self._originals.get(key)}
 
         if not changed:
             logger.debug("Preferences: nothing changed, skipping save")
@@ -299,12 +295,12 @@ class PreferencesDialog(Gtk.Window):
         # Apply editor side-effects only for changed editor keys
         if self._editor:
             changed_editor = {
-                k: v for k, v in changed.items()
+                k: v
+                for k, v in changed.items()
                 if k not in ("confirm_close", "restore_session", "terminal_font", "terminal_scheme")
             }
             changed_terminal = {
-                k: v for k, v in changed.items()
-                if k in ("terminal_font", "terminal_scheme")
+                k: v for k, v in changed.items() if k in ("terminal_font", "terminal_scheme")
             }
 
             if changed_editor:
@@ -345,6 +341,7 @@ class PreferencesDialog(Gtk.Window):
 
                 if "autocomplete_enabled" in changed_editor:
                     from src.ui.editor_tabs import EditorTab
+
                     EditorTab.set_autocomplete_enabled(current["autocomplete_enabled"])
 
                 logger.info(
