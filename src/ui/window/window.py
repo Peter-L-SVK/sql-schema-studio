@@ -141,6 +141,7 @@ class MainWindow(WindowActionsMixin, WindowDialogsMixin, Gtk.ApplicationWindow):
         self._save_window_state()
 
         from src.utils.settings import Settings
+
         settings = Settings()
         confirm_close = settings.get("general", "confirm_close", True)
 
@@ -171,8 +172,6 @@ class MainWindow(WindowActionsMixin, WindowDialogsMixin, Gtk.ApplicationWindow):
 
         self._do_close()
         return False
-
-
 
     def _do_close(self):
         """Actually close the window after checks."""
