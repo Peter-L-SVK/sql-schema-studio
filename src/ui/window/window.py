@@ -139,7 +139,12 @@ class MainWindow(WindowActionsMixin, WindowDialogsMixin, Gtk.ApplicationWindow):
     def _on_close_request(self, window):
         """Handle window close — check for unsaved changes first."""
         self._save_window_state()
-        if hasattr(self, "editor") and self.editor.has_unsaved_changes():
+
+        from src.utils.settings import Settings
+        settings = Settings()
+        confirm_close = settings.get("general", "confirm_close", True)
+
+        if confirm_close and hasattr(self, "editor") and self.editor.has_unsaved_changes():
             unsaved = self.editor.get_unsaved_tabs()
             dialog = Gtk.AlertDialog()
             dialog.set_message(
@@ -166,6 +171,8 @@ class MainWindow(WindowActionsMixin, WindowDialogsMixin, Gtk.ApplicationWindow):
 
         self._do_close()
         return False
+
+
 
     def _do_close(self):
         """Actually close the window after checks."""
