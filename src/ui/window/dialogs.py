@@ -26,7 +26,6 @@ class WindowDialogsMixin:
     statusbar: Any
     browser: Any
     db_connector: Any
-    _current_file: str | None
     _last_result: tuple | None
 
     def _on_file_open(self):
@@ -55,15 +54,20 @@ class WindowDialogsMixin:
                 with open(path, "r") as f:
                     content = f.read()
                 self.editor.set_text(content)
-                self._current_file = path
+                tab = self.editor.get_active_tab()
+                if tab:
+                    tab.file_path = path
+                    tab_name = os.path.basename(path)
+                    self.editor.rename_tab(tab, tab_name)
                 self.statusbar.set_connection(f"Opened: {os.path.basename(path)}")
                 logger.info(f"Opened file: {path}")
         except Exception as e:
             logger.error(f"Failed to open file: {e}")
 
     def _on_file_save(self):
-        if hasattr(self, "_current_file") and self._current_file:
-            self._save_to_file(self._current_file)
+        tab = self.editor.get_active_tab()
+        if tab and tab.file_path:
+            self._save_to_file(tab.file_path)
         else:
             self._on_file_save_as()
 
@@ -87,7 +91,6 @@ class WindowDialogsMixin:
             if file:
                 path = file.get_path()
                 self._save_to_file(path)
-                self._current_file = path
         except Exception as e:
             logger.error(f"Failed to save file: {e}")
 
@@ -98,6 +101,7 @@ class WindowDialogsMixin:
         tab = self.editor.get_active_tab()
         if tab:
             tab._view.get_buffer().set_modified(False)
+            tab.file_path = path
         self.statusbar.set_connection(f"Saved: {os.path.basename(path)}")
 
     def _on_export_csv(self):

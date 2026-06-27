@@ -51,7 +51,6 @@ class MainWindow(WindowActionsMixin, WindowDialogsMixin, Gtk.ApplicationWindow):
         self.results = ResultsPanel()
         self.statusbar = StatusBar()
         self._query_history = QueryHistory()
-        self._current_file = None
         self._last_result = None
 
         # Apply terminal color scheme from settings
@@ -65,6 +64,7 @@ class MainWindow(WindowActionsMixin, WindowDialogsMixin, Gtk.ApplicationWindow):
         self._build_layout()
         self._load_css()
         self._restore_window_state()
+        GLib.idle_add(self._restore_session)
 
     def _build_layout(self):
         """Assemble the window layout"""
@@ -176,6 +176,7 @@ class MainWindow(WindowActionsMixin, WindowDialogsMixin, Gtk.ApplicationWindow):
     def _do_close(self):
         """Actually close the window after checks."""
         self._save_window_state()
+        self._save_session()
         if self.db_connector.is_connected:
             try:
                 self.db_connector.disconnect()
@@ -185,13 +186,12 @@ class MainWindow(WindowActionsMixin, WindowDialogsMixin, Gtk.ApplicationWindow):
         self.get_application().quit()
 
     def _save_all_tabs(self):
-        """Save all unsaved tabs."""
         for tab in self.editor._tabs:
             if tab._modified:
                 idx = self.editor._tabs.index(tab)
                 self.editor._notebook.set_current_page(idx)
-                if hasattr(self, "_current_file") and self._current_file:
-                    self._save_to_file(self._current_file)
+                if tab.file_path:
+                    self._save_to_file(tab.file_path)
                 else:
                     self._on_file_save_as()
 
@@ -204,3 +204,52 @@ class MainWindow(WindowActionsMixin, WindowDialogsMixin, Gtk.ApplicationWindow):
         tab = self.editor.get_active_tab()
         if tab:
             self.editor.close_tab(tab)
+
+    def _save_session(self):
+        """Save list of open tab file paths to settings."""
+        from src.utils.settings import Settings
+
+        settings = Settings()
+        tabs_paths = []
+        for tab in self.editor._tabs:
+            tabs_paths.append(tab.file_path)  # None for unsaved tabs
+        settings.set("session", "tabs", tabs_paths)
+        settings.save()
+
+    def _restore_session(self):
+        """Restore previously open tabs if session restore is enabled."""
+        from src.utils.settings import Settings
+
+        settings = Settings()
+        general = settings.get_section("general")
+        if not general.get("restore_session", False):
+            return False
+
+        tabs = settings.get("session", "tabs", [])
+        if not tabs:
+            return False
+
+        # Filter to valid files only
+        valid_paths = [p for p in tabs if p and os.path.isfile(p)]
+        if not valid_paths:
+            return False
+
+        # Reuse the default empty tab for the first file (avoids close_tab infinite loop)
+        first_path = valid_paths[0]
+        first_tab = self.editor._tabs[0]
+        with open(first_path, "r") as f:
+            content = f.read()
+        first_tab.set_text(content)
+        first_tab.file_path = first_path
+        self.editor.rename_tab(first_tab, os.path.basename(first_path))
+
+        # Add tabs for remaining files
+        for file_path in valid_paths[1:]:
+            tab = self.editor.add_tab()
+            with open(file_path, "r") as f:
+                content = f.read()
+            tab.set_text(content)
+            tab.file_path = file_path
+            self.editor.rename_tab(tab, os.path.basename(file_path))
+
+        return False

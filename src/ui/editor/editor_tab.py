@@ -74,6 +74,7 @@ class EditorTab(Gtk.Box):
 
         self._modified: bool = False
         self._original_title: str = title
+        self._file_path = None  # path to associated file, None for untitled
 
         buffer = self._view.get_buffer()
         buffer.connect("modified-changed", self._on_modified_changed)
@@ -357,3 +358,11 @@ class EditorTab(Gtk.Box):
             self._parent_editor.rename_tab(self, f"• {self._original_title}")
         else:
             self._parent_editor.rename_tab(self, self._original_title)
+
+    @property
+    def file_path(self):
+        return self._file_path
+
+    @file_path.setter
+    def file_path(self, path):
+        self._file_path = path
