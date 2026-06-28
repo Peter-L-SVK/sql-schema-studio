@@ -78,10 +78,16 @@ class DatabaseBrowser(Gtk.Box):
         name_col.set_expand(True)
         self._tree.append_column(name_col)
 
-        # Click handling
+        # Left-click handling
         click = Gtk.GestureClick()
         click.connect("pressed", self._on_clicked)
         self._tree.add_controller(click)
+
+        # Right-click context menu
+        right_click = Gtk.GestureClick()
+        right_click.set_button(3)  # right mouse button
+        right_click.connect("pressed", self._on_right_click)
+        self._tree.add_controller(right_click)
 
         # Selection
         selection = self._tree.get_selection()
@@ -110,6 +116,229 @@ class DatabaseBrowser(Gtk.Box):
         filter_box.append(btn_clear)
 
         self.append(filter_box)
+
+    # ------------------------------------------------------------------
+    # Right-click context menu — forecasting
+    # ------------------------------------------------------------------
+
+    def _on_right_click(self, gesture, n_press, x, y):
+        """Show context menu on right-click."""
+        result = self._tree.get_path_at_pos(int(x), int(y))
+        if not result:
+            return
+
+        path, col, cx, cy = result
+        tree_iter = self._store.get_iter(path)
+        item_type = self._store.get_value(tree_iter, 2)
+
+        if item_type not in ("BASE TABLE", "VIEW"):
+            return
+
+        schema = self._store.get_value(tree_iter, 3)
+        table = self._store.get_value(tree_iter, 1)
+
+        popover = Gtk.Popover()
+        popover.set_parent(self._tree)
+        popover.set_has_arrow(True)
+        popover.set_pointing_to(
+            Gdk.Rectangle()
+        )  # position handled by set_offset or set_pointing_to
+
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+
+        header = Gtk.Label()
+        header.set_markup(f"<b>Analyze: {schema}.{table}</b>")
+        header.set_halign(Gtk.Align.START)
+        header.set_margin_start(8)
+        header.set_margin_end(8)
+        header.set_margin_top(6)
+        header.set_margin_bottom(6)
+        vbox.append(header)
+
+        sep = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        vbox.append(sep)
+
+        for func_id, label, icon in [
+            ("percentile_bands", "📊 Percentile Bands", "dialog-information-symbolic"),
+            ("trend_forecast", "📈 Trend Forecast", "go-up-symbolic"),
+            ("anomaly_detect", "🔍 Anomaly Detection", "edit-find-symbolic"),
+            ("moving_average", "📉 Moving Average", "go-previous-symbolic"),
+            ("exponential_forecast", "🔄 Exp. Smoothing", "view-refresh-symbolic"),
+        ]:
+            btn = Gtk.Button(label=label, halign=Gtk.Align.FILL)
+            btn.set_has_frame(False)
+            btn.set_margin_start(4)
+            btn.set_margin_end(4)
+            btn.connect(
+                "clicked",
+                lambda b, fid=func_id: self._run_forecast(schema, table, fid, popover),
+            )
+            vbox.append(btn)
+
+        popover.set_child(vbox)
+        popover.popup()
+
+    def _run_forecast(self, schema, table, func_id, popover):
+        """Run a forecasting function on the selected table and show results."""
+        popover.popdown()
+
+        db = self._window.db_connector
+        if not db.is_connected:
+            self._window.statusbar.set_connection("⚠ Not connected to database")
+            return
+
+        self._window.statusbar.set_connection(
+            f"⏳ Running {func_id.replace('_', ' ')} on {schema}.{table}..."
+        )
+
+        conn_string = db._get_conn_string()
+
+        def do_analysis():
+            try:
+                import psycopg2
+
+                conn = psycopg2.connect(conn_string)
+                cur = conn.cursor()
+
+                # Find first numeric column
+                cur.execute(
+                    """
+                    SELECT column_name, data_type
+                    FROM information_schema.columns
+                    WHERE table_schema = %s AND table_name = %s
+                      AND data_type IN ('integer', 'bigint', 'smallint',
+                                        'numeric', 'real', 'double precision', 'money')
+                    ORDER BY ordinal_position
+                    LIMIT 1
+                    """,
+                    (schema, table),
+                )
+                row = cur.fetchone()
+                if not row:
+                    conn.close()
+                    return {"error": f"No numeric columns found in {schema}.{table}"}
+
+                column, dtype = row
+                qualified = f'{schema}."{table}"'
+
+                cur.execute(f'SELECT "{column}" FROM {qualified} WHERE "{column}" IS NOT NULL')
+                data = [r[0] for r in cur.fetchall()]
+                conn.close()
+
+                if not data:
+                    return {"error": f"No non-NULL values in {qualified}.{column}"}
+
+                import polars as pl
+
+                df = pl.DataFrame({column: data}, schema={column: pl.Float64})
+
+                return {
+                    "schema": schema,
+                    "table": table,
+                    "column": column,
+                    "dtype": dtype,
+                    "row_count": len(data),
+                    "func_id": func_id,
+                    "df": df,
+                    "data": data,
+                }
+            except Exception as e:
+                return {"error": str(e)}
+
+        def on_loaded(result):
+            if "error" in result:
+                self._window.results.show_text(f"Forecast Error\n{'─' * 50}\n{result['error']}")
+                self._window.statusbar.set_connection("❌ Forecast failed")
+                return
+
+            import polars as pl
+
+            column = result["column"]
+            df = result["df"]
+            func_id = result["func_id"]
+            qualified = f"{result['schema']}.{result['table']}"
+
+            try:
+                from src.hooks.python_hooks.forecasting import (
+                    anomaly_detect,
+                    exponential_forecast,
+                    moving_average,
+                    percentile_bands,
+                    trend_forecast,
+                )
+
+                if func_id == "percentile_bands":
+                    bands = percentile_bands(df, column)
+                    text = f"Percentile Bands: {qualified}.{column}\n" f"{'─' * 50}\n"
+                    for k, v in bands.items():
+                        text += f"  {k:<6}: {v:>14.4f}\n"
+
+                elif func_id == "trend_forecast":
+                    t = trend_forecast(df, column, column, periods=5)
+                    text = (
+                        f"Trend Forecast: {qualified}.{column}\n"
+                        f"{'─' * 50}\n"
+                        f"  Slope:      {t['slope']:>14.4f}\n"
+                        f"  Intercept:  {t['intercept']:>14.4f}\n"
+                        f"  R²:         {t['r_squared']:>14.4f}\n\n"
+                        f"  Next 5 predictions:\n"
+                    )
+                    for i, p in enumerate(t["predictions"]):
+                        text += f"    Period {i + 1}: {p:>12.4f}\n"
+
+                elif func_id == "anomaly_detect":
+                    adf = anomaly_detect(df, column)
+                    anom = adf.filter(pl.col(f"{column}_anomaly")).height
+                    total = result["row_count"]
+                    text = (
+                        f"Anomaly Detection: {qualified}.{column}\n"
+                        f"{'─' * 50}\n"
+                        f"  Method:      IQR (1.5×)\n"
+                        f"  Total rows:  {total}\n"
+                        f"  Anomalies:   {anom}\n"
+                        f"  Rate:        {anom / total * 100:.2f}%\n"
+                    )
+
+                elif func_id == "moving_average":
+                    madf = moving_average(df, column, window=7)
+                    text = (
+                        f"Moving Average (7-period): {qualified}.{column}\n"
+                        f"{'─' * 70}\n"
+                        f"  {'Original':>14}  {'MA(7)':>14}\n"
+                        f"  {'─' * 14}  {'─' * 14}\n"
+                    )
+                    for r in madf.tail(10).rows():
+                        orig = r[0] if r[0] is not None else 0.0
+                        ma = r[1] if r[1] is not None else float("nan")
+                        text += f"  {orig:>14.4f}  {ma:>14.4f}\n"
+
+                elif func_id == "exponential_forecast":
+                    efdf = exponential_forecast(df, column, span=12)
+                    text = (
+                        f"Exponential Smoothing (span=12): {qualified}.{column}\n"
+                        f"{'─' * 70}\n"
+                        f"  {'Original':>14}  {'ETS(12)':>14}\n"
+                        f"  {'─' * 14}  {'─' * 14}\n"
+                    )
+                    for r in efdf.tail(10).rows():
+                        orig = r[0] if r[0] is not None else 0.0
+                        ets = r[1] if r[1] is not None else float("nan")
+                        text += f"  {orig:>14.4f}  {ets:>14.4f}\n"
+
+                self._window.results.show_text(text)
+                self._window.statusbar.set_connection(
+                    f"✅ {func_id.replace('_', ' ')}: {qualified}.{column}"
+                )
+
+            except Exception as e:
+                self._window.results.show_text(f"Forecast Error\n{'─' * 50}\n{str(e)}")
+                self._window.statusbar.set_connection("❌ Forecast failed")
+
+        run_async(do_analysis, on_loaded)
+
+    # ------------------------------------------------------------------
+    # Refresh / filter / tree management
+    # ------------------------------------------------------------------
 
     def refresh(self):
         """Reload all objects from database"""
@@ -140,21 +369,22 @@ class DatabaseBrowser(Gtk.Box):
                 results = db.execute_sync(
                     "SELECT schema_name FROM information_schema.schemata "
                     "WHERE schema_name != ALL(%s) "
-                    "ORDER BY CASE WHEN schema_name = 'public' THEN 0 ELSE 1 END, schema_name",
+                    "ORDER BY CASE WHEN schema_name = 'public' THEN 0 "
+                    "ELSE 1 END, schema_name",
                     (list(EXCLUDED_SCHEMAS),),
                 )
                 schemas = [r["schema_name"] for r in results]
 
                 all_data = []
-                for schema in schemas:
+                for s in schemas:
                     tables = db.execute_sync(
                         "SELECT table_name, table_type "
                         "FROM information_schema.tables "
                         "WHERE table_schema = %s "
                         "ORDER BY table_name",
-                        (schema,),
+                        (s,),
                     )
-                    all_data.append((schema, tables))
+                    all_data.append((s, tables))
 
                 return all_data
             except Exception as e:
@@ -172,20 +402,21 @@ class DatabaseBrowser(Gtk.Box):
             if not root_iter:
                 return
 
-            for schema, tables in all_data:
-                schema_iter = self._store.append(root_iter, ["📂", schema, "schema", schema, True])
-                self._all_items.append((schema_iter, schema, "schema", schema))
+            for s, tables in all_data:
+                schema_iter = self._store.append(root_iter, ["📂", s, "schema", s, True])
+                self._all_items.append((schema_iter, s, "schema", s))
 
                 for table in tables:
                     icon = "📋" if table["table_type"] == "BASE TABLE" else "👁"
                     table_iter = self._store.append(
-                        schema_iter, [icon, table["table_name"], table["table_type"], schema, True]
+                        schema_iter,
+                        [icon, table["table_name"], table["table_type"], s, True],
                     )
                     self._all_items.append(
-                        (table_iter, table["table_name"], table["table_type"], schema)
+                        (table_iter, table["table_name"], table["table_type"], s)
                     )
 
-                if schema == "public":
+                if s == "public":
                     path = self._store.get_path(schema_iter)
                     if path:
                         self._tree.expand_row(path, False)
@@ -208,11 +439,9 @@ class DatabaseBrowser(Gtk.Box):
         self._store.clear()
 
         if not search:
-            # No filter — show everything from cache
             self._rebuild_tree(self._all_items)
             return
 
-        # Filter — show matching items and their parents
         filtered = []
         matching_schemas = set()
 
@@ -247,7 +476,6 @@ class DatabaseBrowser(Gtk.Box):
             elif itype in ("BASE TABLE", "VIEW"):
                 root = self._store.get_iter_first()
                 if root:
-                    # Find or create schema parent
                     parent = None
                     child = self._store.iter_children(root)
                     while child:
@@ -261,7 +489,8 @@ class DatabaseBrowser(Gtk.Box):
 
                     if parent:
                         self._store.append(
-                            parent, [self._get_icon(itype), name, itype, schema, True]
+                            parent,
+                            [self._get_icon(itype), name, itype, schema, True],
                         )
 
         self._tree.expand_all()
@@ -270,7 +499,6 @@ class DatabaseBrowser(Gtk.Box):
             self._tree.collapse_row(self._store.get_path(root))
 
     def _get_icon(self, itype):
-        """Return icon for item type"""
         icons = {
             "server": "🖥",
             "schema": "📂",
@@ -280,11 +508,9 @@ class DatabaseBrowser(Gtk.Box):
         return icons.get(itype, "📄")
 
     def _find_parent_iter(self, schema):
-        """Find the server iter"""
         return self._store.get_iter_first()
 
     def _find_schema_iter(self, schema_name):
-        """Find or create a schema iter under the server"""
         root = self._store.get_iter_first()
         if not root:
             return None
@@ -298,11 +524,9 @@ class DatabaseBrowser(Gtk.Box):
                 return child
             child = self._store.iter_next(child)
 
-        # Create it if not found
         return self._store.append(root, ["📂", schema_name, "schema", schema_name, True])
 
     def _on_clear_filter(self, button):
-        """Clear the filter entry"""
         self._filter_entry.set_text("")
 
     def _on_clicked(self, gesture, n_press, x, y):
@@ -318,12 +542,10 @@ class DatabaseBrowser(Gtk.Box):
         schema = self._store.get_value(tree_iter, 3)
 
         if n_press == 2 and item_type in ("BASE TABLE", "VIEW"):
-            # Double click — execute SELECT directly
             query = f"SELECT * FROM {schema}.{item_name} LIMIT 100;"
             self._window.editor.set_text(query)
             self._window._on_run_clicked()
         elif item_type in ("BASE TABLE", "VIEW"):
-            # Single click — show structure
             self._show_structure(schema, item_name)
 
     def _on_selection_changed(self, selection):

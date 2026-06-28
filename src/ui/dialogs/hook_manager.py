@@ -272,12 +272,52 @@ class HookManagerDialog(Gtk.Window):
         text = f"<b>Hook:</b> {hook_name}\n\n"
 
         if isinstance(data, dict):
-            if data.get("status") == "error":
-                text += f"<span color='red'><b>Error:</b> {data.get('message', 'Unknown error')}</span>\n"
+            # ── Error (check both "error" key and "status":"error") ──
+            if "error" in data or data.get("status") == "error":
+                err_msg = data.get("error", data.get("message", "Unknown error"))
+                text += f"<span color='red'><b>Status:</b> ❌ Error</span>\n" f"{err_msg}\n"
+
+            # ── Forecasting hook output ──
+            elif "percentiles" in data or "table" in data:
+                text += "<span color='green'><b>Status:</b> ✅ OK</span>\n"
+                text += f"<b>Table:</b> {data.get('table', 'N/A')}\n"
+                text += f"<b>Column:</b> {data.get('column', 'N/A')}"
+                if data.get("type"):
+                    text += f" ({data['type']})"
+                text += "\n"
+                text += f"<b>Rows:</b> {data.get('row_count', 'N/A')}\n\n"
+
+                p = data.get("percentiles", {})
+                if p:
+                    text += "<b>Percentile Bands:</b>\n"
+                    for k in ("p10", "p25", "p50", "p75", "p90", "iqr"):
+                        if k in p:
+                            text += f"  {k:<6}: {p[k]:>14.4f}\n"
+                    text += "\n"
+
+                t = data.get("trend")
+                if t:
+                    text += (
+                        f"<b>Trend Forecast (3 periods):</b>\n"
+                        f"  Slope:      {t.get('slope', 0):>14.4f}\n"
+                        f"  Intercept:  {t.get('intercept', 0):>14.4f}\n"
+                        f"  R²:         {t.get('r_squared', 0):>14.4f}\n\n"
+                    )
+
+                if "anomalies" in data:
+                    total = data.get("row_count", 1)
+                    anom = data["anomalies"]
+                    rate = anom / total * 100 if total else 0
+                    text += f"<b>Anomalies detected:</b> {anom} " f"({rate:.2f}%)\n"
+
+            # ── Original Auto-Vacuum / Index Advisor format ──
             else:
                 text += "<span color='green'><b>Status:</b> OK</span>\n"
-                text += f"<b>Tables analyzed:</b> {data.get('tables_analyzed', 'N/A')}\n"
-                text += f"<b>Recommendations:</b> {data.get('recommendations_count', len(data.get('recommendations', [])))}\n\n"
+                text += f"<b>Tables analyzed:</b> " f"{data.get('tables_analyzed', 'N/A')}\n"
+                text += (
+                    f"<b>Recommendations:</b> "
+                    f"{data.get('recommendations_count', len(data.get('recommendations', [])))}\n\n"
+                )
 
                 recommendations = data.get("recommendations", [])
                 if recommendations:
