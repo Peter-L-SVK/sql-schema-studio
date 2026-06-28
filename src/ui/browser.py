@@ -15,7 +15,7 @@ logger = get_logger(__name__)
 import gi
 
 gi.require_version("Gtk", "4.0")
-from gi.repository import Gtk, Gdk
+from gi.repository import Gtk, Gdk, GLib
 from src.config import EXCLUDED_SCHEMAS, BROWSER_PANEL_WIDTH
 from src.utils.gtk_helpers import run_async
 
@@ -78,14 +78,15 @@ class DatabaseBrowser(Gtk.Box):
         name_col.set_expand(True)
         self._tree.append_column(name_col)
 
-        # Left-click handling
+        # Left-click handling — button 1 only
         click = Gtk.GestureClick()
+        click.set_button(1)
         click.connect("pressed", self._on_clicked)
         self._tree.add_controller(click)
 
-        # Right-click context menu
+        # Right-click context menu — button 3 only
         right_click = Gtk.GestureClick()
-        right_click.set_button(3)  # right mouse button
+        right_click.set_button(3)
         right_click.connect("pressed", self._on_right_click)
         self._tree.add_controller(right_click)
 
@@ -108,6 +109,7 @@ class DatabaseBrowser(Gtk.Box):
         self._filter_entry.set_hexpand(True)
         self._filter_entry.connect("changed", self._on_filter_changed)
         filter_box.append(self._filter_entry)
+        self._active_popover = None
 
         # Clear filter button
         btn_clear = Gtk.Button.new_from_icon_name("edit-clear-symbolic")
@@ -137,12 +139,25 @@ class DatabaseBrowser(Gtk.Box):
         schema = self._store.get_value(tree_iter, 3)
         table = self._store.get_value(tree_iter, 1)
 
+        # Dismiss any existing popover cleanly — GTK4 handles teardown
+        # after popdown(), no unparent() needed.
+        if self._active_popover is not None:
+            self._active_popover.popdown()
+            self._active_popover = None
+
         popover = Gtk.Popover()
+        self._active_popover = popover
         popover.set_parent(self._tree)
         popover.set_has_arrow(True)
-        popover.set_pointing_to(
-            Gdk.Rectangle()
-        )  # position handled by set_offset or set_pointing_to
+        popover.set_autohide(True)
+
+        # Point to the clicked row so GTK4 anchors the popover correctly.
+        rect = Gdk.Rectangle()
+        rect.x = int(x)
+        rect.y = int(y)
+        rect.width = 1
+        rect.height = 1
+        popover.set_pointing_to(rect)
 
         vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
 
@@ -158,6 +173,8 @@ class DatabaseBrowser(Gtk.Box):
         sep = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
         vbox.append(sep)
 
+        # Store forecast parameters as plain Python attributes on each
+        # button — no closures, no late-binding, no lambda pitfalls.
         for func_id, label, icon in [
             ("percentile_bands", "📊 Percentile Bands", "dialog-information-symbolic"),
             ("trend_forecast", "📈 Trend Forecast", "go-up-symbolic"),
@@ -169,23 +186,49 @@ class DatabaseBrowser(Gtk.Box):
             btn.set_has_frame(False)
             btn.set_margin_start(4)
             btn.set_margin_end(4)
-            btn.connect(
-                "clicked",
-                lambda b, fid=func_id: self._run_forecast(schema, table, fid, popover),
-            )
+            btn._forecast_schema = schema
+            btn._forecast_table = table
+            btn._forecast_func_id = func_id
+            btn.connect("clicked", self._on_forecast_btn_clicked)
             vbox.append(btn)
 
         popover.set_child(vbox)
+        popover.connect("closed", self._on_popover_closed)
         popover.popup()
 
-    def _run_forecast(self, schema, table, func_id, popover):
-        """Run a forecasting function on the selected table and show results."""
-        popover.popdown()
+        # Claim the event sequence so GTK4 does not route the button-
+        # release event into the popover's child widgets, which would
+        # trigger "Broken accounting" warnings and a phantom grab.
+        sequence = gesture.get_current_sequence()
+        if sequence is not None:
+            gesture.set_sequence_state(sequence, Gtk.EventSequenceState.CLAIMED)
 
+    def _on_popover_closed(self, popover):
+        """GTK4 already destroys the popover after the dismiss animation —
+        we just drop our reference so Python can garbage-collect it."""
+        if self._active_popover is popover:
+            self._active_popover = None
+
+    def _on_forecast_btn_clicked(self, btn):
+        """Read forecast parameters from button attributes and defer work
+        via GLib.idle_add so the popover dismiss animation completes
+        before we touch the results panel."""
+        schema = btn._forecast_schema
+        table = btn._forecast_table
+        func_id = btn._forecast_func_id
+        GLib.idle_add(self._run_forecast_idle, schema, table, func_id)
+
+    def _run_forecast_idle(self, schema, table, func_id):
+        """GLib.idle_add callback — runs once and removes itself."""
+        self._run_forecast(schema, table, func_id)
+        return False
+
+    def _run_forecast(self, schema, table, func_id):
+        """Run a forecasting function on the selected table and show results."""
         db = self._window.db_connector
         if not db.is_connected:
             self._window.statusbar.set_connection("⚠ Not connected to database")
-            return
+            return False
 
         self._window.statusbar.set_connection(
             f"⏳ Running {func_id.replace('_', ' ')} on {schema}.{table}..."
@@ -200,7 +243,11 @@ class DatabaseBrowser(Gtk.Box):
                 conn = psycopg2.connect(conn_string)
                 cur = conn.cursor()
 
-                # Find first numeric column
+                # Find first meaningful numeric column — skip surrogate
+                # keys (id, serial, *_id) and prefer real/numeric types
+                # over integers.  The '%%' escapes the percent for
+                # psycopg2's parameter parser so the LIKE pattern reaches
+                # PostgreSQL as '%\_id' (literal underscore after slash).
                 cur.execute(
                     """
                     SELECT column_name, data_type
@@ -208,7 +255,20 @@ class DatabaseBrowser(Gtk.Box):
                     WHERE table_schema = %s AND table_name = %s
                       AND data_type IN ('integer', 'bigint', 'smallint',
                                         'numeric', 'real', 'double precision', 'money')
-                    ORDER BY ordinal_position
+                      AND column_name NOT IN ('id', 'serial')
+                      AND column_name NOT LIKE '%%\\_id' ESCAPE '\\'
+                    ORDER BY
+                      CASE data_type
+                        WHEN 'numeric'          THEN 1
+                        WHEN 'real'             THEN 2
+                        WHEN 'double precision' THEN 3
+                        WHEN 'money'            THEN 4
+                        WHEN 'integer'          THEN 5
+                        WHEN 'bigint'           THEN 6
+                        WHEN 'smallint'         THEN 7
+                        ELSE 8
+                      END,
+                      ordinal_position
                     LIMIT 1
                     """,
                     (schema, table),
@@ -221,8 +281,13 @@ class DatabaseBrowser(Gtk.Box):
                 column, dtype = row
                 qualified = f'{schema}."{table}"'
 
-                cur.execute(f'SELECT "{column}" FROM {qualified} WHERE "{column}" IS NOT NULL')
-                data = [r[0] for r in cur.fetchall()]
+                cur.execute(f'SELECT "{column}" FROM {qualified} ' f'WHERE "{column}" IS NOT NULL')
+                raw_rows = cur.fetchall()
+                data = []
+                for r in raw_rows:
+                    if r is None or len(r) < 1:
+                        continue
+                    data.append(r[0])
                 conn.close()
 
                 if not data:
@@ -242,8 +307,14 @@ class DatabaseBrowser(Gtk.Box):
                     "df": df,
                     "data": data,
                 }
-            except Exception as e:
-                return {"error": str(e)}
+            except Exception:
+                import traceback
+
+                return {
+                    "error": (
+                        f"tuple index out of range\n\n" f"Full traceback:\n{traceback.format_exc()}"
+                    )
+                }
 
         def on_loaded(result):
             if "error" in result:
@@ -274,10 +345,13 @@ class DatabaseBrowser(Gtk.Box):
                         text += f"  {k:<6}: {v:>14.4f}\n"
 
                 elif func_id == "trend_forecast":
-                    # Add row index as x-axis when only one column exists
                     idx_col = "_row_idx"
                     df_with_idx = df.with_columns(
-                        pl.Series(idx_col, range(1, df.height + 1), dtype=pl.Float64)
+                        pl.Series(
+                            idx_col,
+                            range(1, df.height + 1),
+                            dtype=pl.Float64,
+                        )
                     )
                     t = trend_forecast(df_with_idx, idx_col, column, periods=5)
                     text = (
@@ -312,9 +386,9 @@ class DatabaseBrowser(Gtk.Box):
                         f"  {'Original':>14}  {'MA(7)':>14}\n"
                         f"  {'─' * 14}  {'─' * 14}\n"
                     )
-                    for r in madf.tail(10).rows():
-                        orig = r[0] if r[0] is not None else 0.0
-                        ma = r[1] if r[1] is not None else float("nan")
+                    for r in madf.tail(10).iter_rows():
+                        orig = float(r[0]) if r[0] is not None else 0.0
+                        ma = float(r[1]) if r[1] is not None else float("nan")
                         text += f"  {orig:>14.4f}  {ma:>14.4f}\n"
 
                 elif func_id == "exponential_forecast":
@@ -325,9 +399,9 @@ class DatabaseBrowser(Gtk.Box):
                         f"  {'Original':>14}  {'ETS(12)':>14}\n"
                         f"  {'─' * 14}  {'─' * 14}\n"
                     )
-                    for r in efdf.tail(10).rows():
-                        orig = r[0] if r[0] is not None else 0.0
-                        ets = r[1] if r[1] is not None else float("nan")
+                    for r in efdf.tail(10).iter_rows():
+                        orig = float(r[0]) if r[0] is not None else 0.0
+                        ets = float(r[1]) if r[1] is not None else float("nan")
                         text += f"  {orig:>14.4f}  {ets:>14.4f}\n"
 
                 self._window.results.show_text(text)
@@ -335,11 +409,25 @@ class DatabaseBrowser(Gtk.Box):
                     f"✅ {func_id.replace('_', ' ')}: {qualified}.{column}"
                 )
 
-            except Exception as e:
-                self._window.results.show_text(f"Forecast Error\n{'─' * 50}\n{str(e)}")
+            except Exception:
+                import traceback
+
+                self._window.results.show_text(
+                    f"Forecast Error\n{'─' * 50}\n"
+                    f"{traceback.format_exc()}\n\n"
+                    f"-- Debug Info --\n"
+                    f"func_id     : {func_id}\n"
+                    f"table       : {qualified}\n"
+                    f"column      : {column}\n"
+                    f"df.height   : {df.height}\n"
+                    f"df.columns  : {df.columns}\n"
+                    f"df.head(3)  : {df.head(3)}\n"
+                    f"dtype       : {result.get('dtype', 'unknown')}"
+                )
                 self._window.statusbar.set_connection("❌ Forecast failed")
 
         run_async(do_analysis, on_loaded)
+        return False
 
     # ------------------------------------------------------------------
     # Refresh / filter / tree management
