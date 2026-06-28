@@ -274,7 +274,12 @@ class DatabaseBrowser(Gtk.Box):
                         text += f"  {k:<6}: {v:>14.4f}\n"
 
                 elif func_id == "trend_forecast":
-                    t = trend_forecast(df, column, column, periods=5)
+                    # Add row index as x-axis when only one column exists
+                    idx_col = "_row_idx"
+                    df_with_idx = df.with_columns(
+                        pl.Series(idx_col, range(1, df.height + 1), dtype=pl.Float64)
+                    )
+                    t = trend_forecast(df_with_idx, idx_col, column, periods=5)
                     text = (
                         f"Trend Forecast: {qualified}.{column}\n"
                         f"{'─' * 50}\n"

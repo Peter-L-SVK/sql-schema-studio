@@ -73,11 +73,7 @@ class ForecastingHook(BaseHook):
             return {"error": str(e)}
 
     def execute_sync(self, conn_string: str) -> Dict[str, Any]:
-        """Sync entry point — query the DB and run forecasting.
-
-        Called by Hook Manager when user clicks Run with an active
-        database connection.
-        """
+        """Sync entry point — query the DB and run forecasting."""
         import psycopg2
 
         try:
@@ -88,14 +84,28 @@ class ForecastingHook(BaseHook):
         try:
             cur = conn.cursor()
 
-            # Find user tables with numeric columns
+            # Find user tables with numeric columns — prefer real/numeric over integer,
+            # and skip obvious ID/serial columns
             cur.execute("""
                 SELECT table_schema, table_name, column_name, data_type
                 FROM information_schema.columns
                 WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
-                  AND data_type IN ('integer', 'bigint', 'smallint',
-                                    'numeric', 'real', 'double precision', 'money')
-                ORDER BY table_schema, table_name, ordinal_position
+                  AND data_type IN ('numeric', 'real', 'double precision', 'money',
+                                    'integer', 'bigint', 'smallint')
+                  AND column_name NOT IN ('id', 'serial')
+                  AND column_name NOT LIKE '%\\_id' ESCAPE '\\'
+                ORDER BY table_schema, table_name,
+                  CASE data_type
+                    WHEN 'numeric'          THEN 1
+                    WHEN 'real'             THEN 2
+                    WHEN 'double precision' THEN 3
+                    WHEN 'money'            THEN 4
+                    WHEN 'integer'          THEN 5
+                    WHEN 'bigint'           THEN 6
+                    WHEN 'smallint'         THEN 7
+                    ELSE 8
+                  END,
+                  ordinal_position
             """)
             rows = cur.fetchall()
             if not rows:
@@ -127,7 +137,12 @@ class ForecastingHook(BaseHook):
             }
 
             if len(data) >= 3:
-                result["trend"] = trend_forecast(df, column, column, periods=3)
+                # Add row index as x-axis for trend
+                idx_col = "_row_idx"
+                df_with_idx = df.with_columns(
+                    pl.Series(idx_col, range(1, len(data) + 1), dtype=pl.Float64)
+                )
+                result["trend"] = trend_forecast(df_with_idx, idx_col, column, periods=3)
 
             anomaly_df = anomaly_detect(df, column)
             result["anomalies"] = anomaly_df.filter(pl.col(f"{column}_anomaly")).height
