@@ -239,3 +239,28 @@ def _r_squared(x, y, coeffs):
     ss_res = np.sum((y - y_pred) ** 2)
     ss_tot = np.sum((y - np.mean(y)) ** 2)
     return 1 - (ss_res / ss_tot)
+
+
+def correlation_matrix(df: pl.DataFrame) -> dict:
+    """Pearson correlation across all numeric columns."""
+    numeric_cols = [c for c, t in zip(df.columns, df.dtypes) if t in (pl.Float64, pl.Int64)]
+    n = len(numeric_cols)
+    if n < 2:
+        return {"error": "Need at least 2 numeric columns"}
+
+    matrix = np.corrcoef(np.column_stack([df[c].to_numpy() for c in numeric_cols]).T)
+
+    return {
+        "columns": numeric_cols,
+        "matrix": matrix.tolist(),
+        "top_pairs": _top_correlated(numeric_cols, matrix),
+    }
+
+
+def _top_correlated(cols, matrix, top_n=5):
+    pairs = []
+    for i in range(len(cols)):
+        for j in range(i + 1, len(cols)):
+            pairs.append((cols[i], cols[j], abs(float(matrix[i][j]))))
+    pairs.sort(key=lambda x: x[2], reverse=True)
+    return [{"col1": p[0], "col2": p[1], "r": p[2]} for p in pairs[:top_n]]

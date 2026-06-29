@@ -192,6 +192,21 @@ class DatabaseBrowser(Gtk.Box):
             btn.connect("clicked", self._on_forecast_btn_clicked)
             vbox.append(btn)
 
+        # Correlation Matrix — separate section since it needs all numeric
+        # columns, not just the "best" one.
+        sep2 = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        vbox.append(sep2)
+
+        btn_corr = Gtk.Button(label="📊 Correlation Matrix", halign=Gtk.Align.FILL)
+        btn_corr.set_has_frame(False)
+        btn_corr.set_margin_start(4)
+        btn_corr.set_margin_end(4)
+        btn_corr._forecast_schema = schema
+        btn_corr._forecast_table = table
+        btn_corr._forecast_func_id = "correlation_matrix"
+        btn_corr.connect("clicked", self._on_forecast_btn_clicked)
+        vbox.append(btn_corr)
+
         popover.set_child(vbox)
         popover.connect("closed", self._on_popover_closed)
         popover.popup()
@@ -243,6 +258,74 @@ class DatabaseBrowser(Gtk.Box):
                 conn = psycopg2.connect(conn_string)
                 cur = conn.cursor()
 
+                # ── Correlation Matrix: fetch ALL numeric columns ──
+                if func_id == "correlation_matrix":
+                    cur.execute(
+                        """
+                        SELECT column_name
+                        FROM information_schema.columns
+                        WHERE table_schema = %s AND table_name = %s
+                          AND data_type IN ('integer', 'bigint', 'smallint',
+                                            'numeric', 'real', 'double precision', 'money')
+                          AND column_name NOT IN ('id', 'serial')
+                          AND column_name NOT LIKE '%%\\_id' ESCAPE '\\'
+                        ORDER BY ordinal_position
+                        """,
+                        (schema, table),
+                    )
+                    col_rows = cur.fetchall()
+                    if not col_rows:
+                        conn.close()
+                        return {"error": f"No numeric columns in {schema}.{table}"}
+
+                    columns = [r[0] for r in col_rows]
+                    if len(columns) < 2:
+                        conn.close()
+                        return {
+                            "error": (
+                                f"Need at least 2 numeric columns for a "
+                                f"correlation matrix; {schema}.{table} has "
+                                f"{len(columns)} "
+                                f"({columns[0] if columns else 'none'})."
+                            )
+                        }
+
+                    qualified = f'{schema}."{table}"'
+                    col_expr = ", ".join(f'"{c}"' for c in columns)
+                    cur.execute(f"SELECT {col_expr} FROM {qualified}")
+                    raw_rows = cur.fetchall()
+                    conn.close()
+
+                    if not raw_rows:
+                        return {"error": f"No data in {qualified}"}
+
+                    import polars as pl
+
+                    data_map = {}
+                    for i, c in enumerate(columns):
+                        vals: list[float | None] = []
+                        for r in raw_rows:
+                            if r is None or len(r) <= i:
+                                vals.append(None)
+                            else:
+                                v = r[i]
+                                vals.append(float(v) if v is not None else None)
+                        data_map[c] = vals
+
+                    df = pl.DataFrame(data_map)
+
+                    return {
+                        "schema": schema,
+                        "table": table,
+                        "columns": columns,
+                        "dtype": "numeric",
+                        "row_count": len(raw_rows),
+                        "func_id": func_id,
+                        "df": df,
+                        "data": None,
+                    }
+
+                # ── Single-column forecast ──
                 # Find first meaningful numeric column — skip surrogate
                 # keys (id, serial, *_id) and prefer real/numeric types
                 # over integers.  The '%%' escapes the percent for
@@ -324,10 +407,46 @@ class DatabaseBrowser(Gtk.Box):
 
             import polars as pl
 
-            column = result["column"]
-            df = result["df"]
             func_id = result["func_id"]
+            df = result["df"]
             qualified = f"{result['schema']}.{result['table']}"
+
+            # ── Correlation Matrix ──
+            if func_id == "correlation_matrix":
+                columns = result["columns"]
+                n = len(columns)
+
+                # Compute Pearson correlation matrix via Polars
+                corr_df = df.select(pl.all().cast(pl.Float64))
+                corr_matrix = corr_df.corr()
+
+                # Pretty-print as a triangular grid
+                col_width = max(max(len(c) for c in columns), 10)
+
+                lines = [
+                    f"Correlation Matrix: {qualified}",
+                    f"  ({n} columns × {result['row_count']} rows)",
+                    "",
+                    "─" * ((col_width + 2) * (n + 1)),
+                    f"  {'':>{col_width}}" + "".join(f"  {c:>{col_width}}" for c in columns),
+                    f"  {'─' * col_width}" + f"  {'─' * col_width}" * n,
+                ]
+                for i, ci in enumerate(columns):
+                    row_str = f"  {ci:>{col_width}}"
+                    for j in range(n):
+                        val = corr_matrix[i, j]
+                        row_str += f"  {val:>{col_width}.4f}"
+                    lines.append(row_str)
+
+                text = "\n".join(lines)
+                self._window.results.show_text(text)
+                self._window.statusbar.set_connection(
+                    f"✅ Correlation matrix: {qualified} ({n} columns)"
+                )
+                return
+
+            # ── Single-column forecasts ──
+            column = result["column"]
 
             try:
                 from src.hooks.python_hooks.forecasting import (
