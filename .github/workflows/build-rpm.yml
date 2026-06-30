@@ -44,6 +44,9 @@ jobs:
           pip install --upgrade pip
           pip install build
 
+      - name: Install project dependencies
+        run: pip install .
+
       - name: Build RPM
         run: |
           chmod +x scripts/packaging/build_rpm.sh

@@ -46,6 +46,9 @@ jobs:
           pip install --upgrade pip
           pip install build
 
+      - name: Install project dependencies
+        run: pip install .
+
       - name: Build DEB
         run: |
           chmod +x scripts/packaging/build_deb.sh
