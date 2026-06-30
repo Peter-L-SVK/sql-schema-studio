@@ -29,7 +29,7 @@ Searching with only whole expressions on
 ![inspect table](8.png)
 Inspect table by left click on it  
 
-![list table](9.png)
+![list table](4.png)
 List table by left double click on it  
 
 ![hook manager](11.png)
