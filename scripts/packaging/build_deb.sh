@@ -16,8 +16,8 @@ mkdir -p ${BUILD_DIR}/${DEB_NAME}/usr/bin
 mkdir -p ${BUILD_DIR}/${DEB_NAME}/usr/lib/python3/dist-packages
 
 # Copy Python source files as package
-mkdir -p ${BUILD_DIR}/${DEB_NAME}/usr/lib/python3/dist-packages/sql_schema_studio
-cp -r src/* ${BUILD_DIR}/${DEB_NAME}/usr/lib/python3/dist-packages/sql_schema_studio/
+mkdir -p ${BUILD_DIR}/${DEB_NAME}/usr/lib/python3/dist-packages/src
+cp -r src/* ${BUILD_DIR}/${DEB_NAME}/usr/lib/python3/dist-packages/src/
 
 # Copy hooks
 mkdir -p ${BUILD_DIR}/${DEB_NAME}/usr/lib/python3/dist-packages/sql_schema_studio/hooks/python_hooks
@@ -61,7 +61,7 @@ fi
 cat > ${BUILD_DIR}/${DEB_NAME}/usr/bin/sql-schema-studio << 'LAUNCHER'
 #!/bin/bash
 # SQL Schema Studio Launcher
-exec python3 -m sql_schema_studio.main "$@"
+exec python3 -m src.main "$@"
 LAUNCHER
 chmod +x ${BUILD_DIR}/${DEB_NAME}/usr/bin/sql-schema-studio
 
