@@ -85,7 +85,7 @@ Depends: python3 (>= 3.12),
          gir1.2-gtk-4.0,
          gir1.2-gtksource-5,
          libvte-2.91-gtk4-dev       
-Recommends: python3-pipx
+Recommends: pipx
 Suggests: python3-faker, python3-kbcstorage
 Maintainer: Peter Leukanič <peter@leukanic.eu>
 Description: Intelligent PostgreSQL Management Platform
@@ -132,6 +132,7 @@ echo "✅ DEB built: ${DEB_NAME}.deb"
 echo "Install with: sudo dpkg -i ${DEB_NAME}.deb"
 echo "If dependencies fail, run: sudo apt --fix-broken install"
 echo ""
-echo "Optional dependencies (install after package):"
-echo "  pipx install faker kbcstorage"
+echo " Other dependencies (install after package):"
+echo "  pip install polars  --break-system-packages"
+echo "  pipx install faker kbcstorage scikit-learn --include-deps"
 echo "  sudo apt install python3-faker python3-kbcstorage"

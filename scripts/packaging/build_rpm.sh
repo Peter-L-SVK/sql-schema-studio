@@ -94,12 +94,10 @@ Requires:       python3-gobject
 Requires:       python3-sqlparse
 Requires:       python3-keyring
 Requires:       python3-numpy
-Requires:       python3-pandas
 Requires:       python3-scikit-learn
 Requires:       python3-matplotlib
 Requires:       python3-cairo
 Requires:       python3-paramiko
-Requires:       python3-kbcstorage
 Requires:       gtk4
 Requires:       gtksourceview5
 Requires:	vte291-gtk4
