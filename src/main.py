@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.8 - Main Entry Point (GPLv3)
+# SQL Schema Studio 0.9 - Main Entry Point (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.

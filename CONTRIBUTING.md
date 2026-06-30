@@ -41,8 +41,8 @@ All source files must include the project header:
 
 ```python
 # ----------------------------------------------------------------------
-# SQL Schema Studio - [Component Name] (GPLv3)
-# Copyright (C) 2025-2026 Peter Leukanič
+# SQL Schema Studio [vX.X] - [Component Name] (GPLv3)
+# Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
 # Feel free to distribute and modify.
