@@ -194,6 +194,7 @@ class EditorTabs(Gtk.Box):
             buffer.remove_tag(tab._search_highlight_tag, start, end)
 
     def _do_highlight(self, search_text):
+        self._search_debounce_id = 0
         self._current_search_text = search_text
         self._highlight_all_matches(search_text)
         return False
@@ -254,8 +255,9 @@ class EditorTabs(Gtk.Box):
         self._search_text(search_text, forward=False)
 
     def _on_search_changed(self, entry):
-        if hasattr(self, "_search_debounce_id") and self._search_debounce_id:
+        if self._search_debounce_id:
             GLib.source_remove(self._search_debounce_id)
+            self._search_debounce_id = 0
         self._search_debounce_id = GLib.timeout_add(300, self._do_highlight, entry.get_text())
 
     def _get_search_flags(self):
@@ -272,7 +274,54 @@ class EditorTabs(Gtk.Box):
         cursor_iter = buffer.get_iter_at_mark(buffer.get_insert())
         if forward and buffer.get_has_selection():
             cursor_iter = buffer.get_iter_at_mark(buffer.get_selection_bound())
+
         flags = self._get_search_flags()
+
+        # ── Whole-word: use regex to find the next/previous match ──
+        if self._whole_word_check.get_active():
+            pattern = r"\b" + re.escape(search_text) + r"\b"
+            re_flags = re.IGNORECASE if not self._case_check.get_active() else 0
+            try:
+                regex = re.compile(pattern, re_flags)
+            except re.error:
+                return
+
+            full_text = buffer.get_text(
+                buffer.get_start_iter(), buffer.get_end_iter(), False
+            )
+            cursor_offset = cursor_iter.get_offset()
+
+            if forward:
+                m = regex.search(full_text, cursor_offset)
+            else:
+                # Search backwards from cursor — find last match before cursor
+                m = None
+                for match in regex.finditer(full_text):
+                    if match.start() >= cursor_offset:
+                        break
+                    m = match
+
+            if m:
+                match_start = buffer.get_iter_at_offset(m.start())
+                match_end = buffer.get_iter_at_offset(m.end())
+                buffer.select_range(match_start, match_end)
+                tab._view.scroll_to_iter(match_start, 0.0, True, 0.0, 0.0)
+            else:
+                # Wrap around
+                if forward:
+                    m = regex.search(full_text)
+                else:
+                    m = None
+                    for match in regex.finditer(full_text):
+                        m = match  # keep last match
+                if m:
+                    match_start = buffer.get_iter_at_offset(m.start())
+                    match_end = buffer.get_iter_at_offset(m.end())
+                    buffer.select_range(match_start, match_end)
+                    tab._view.scroll_to_iter(match_start, 0.0, True, 0.0, 0.0)
+            return
+
+        # ── Partial match: use GTK's built-in search (unchanged) ──
         if forward:
             found = cursor_iter.forward_search(search_text, flags, None)
         else:
@@ -292,9 +341,6 @@ class EditorTabs(Gtk.Box):
                 match_start, match_end = found
                 buffer.select_range(match_start, match_end)
                 tab._view.scroll_to_iter(match_start, 0.0, True, 0.0, 0.0)
-                self._window.statusbar.set_message(f"Search wrapped: '{search_text}'")
-            else:
-                self._window.statusbar.set_message(f"Text '{search_text}' not found")
 
     def _on_replace(self):
         tab = self.get_active_tab()
@@ -327,21 +373,26 @@ class EditorTabs(Gtk.Box):
         start = buffer.get_start_iter()
         end = buffer.get_end_iter()
         text = buffer.get_text(start, end, False)
-        if self._case_check.get_active():
-            pattern = re.escape(search)
-            count = text.count(search)
-            new_text = text.replace(search, replace)
+
+        # Build pattern respecting whole-word and case
+        if self._whole_word_check.get_active():
+            pattern = r"\b" + re.escape(search) + r"\b"
         else:
             pattern = re.escape(search)
+
+        if self._case_check.get_active():
+            count = len(re.findall(pattern, text))
+            new_text = re.sub(pattern, replace, text)
+        else:
             count = len(re.findall(pattern, text, re.IGNORECASE))
-            new_text = re.sub(pattern, replace, text, flags=re.IGNORECASE)
+            new_text = re.sub(
+                pattern, replace, text, flags=re.IGNORECASE
+            )
         if count > 0:
             buffer.set_text(new_text)
             self._window.statusbar.set_message(f"Replaced {count} occurrences")
             if self._search_revealer.get_reveal_child():
-                self._highlight_all_matches(search)
-        else:
-            self._window.statusbar.set_message(f"Text '{search}' not found")
+                self._highlight_all_matches(self._search_entry.get_text())
 
     def _build_search_bar(self):
         search_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
