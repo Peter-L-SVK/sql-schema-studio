@@ -286,9 +286,7 @@ class EditorTabs(Gtk.Box):
             except re.error:
                 return
 
-            full_text = buffer.get_text(
-                buffer.get_start_iter(), buffer.get_end_iter(), False
-            )
+            full_text = buffer.get_text(buffer.get_start_iter(), buffer.get_end_iter(), False)
             cursor_offset = cursor_iter.get_offset()
 
             if forward:
@@ -385,9 +383,7 @@ class EditorTabs(Gtk.Box):
             new_text = re.sub(pattern, replace, text)
         else:
             count = len(re.findall(pattern, text, re.IGNORECASE))
-            new_text = re.sub(
-                pattern, replace, text, flags=re.IGNORECASE
-            )
+            new_text = re.sub(pattern, replace, text, flags=re.IGNORECASE)
         if count > 0:
             buffer.set_text(new_text)
             self._window.statusbar.set_message(f"Replaced {count} occurrences")
