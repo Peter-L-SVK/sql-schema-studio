@@ -113,6 +113,8 @@ recommendations. Extend with Python and Perl hooks for custom automation.
 # Install build dependencies
 sudo dnf install rpm-build rpmdevtools rpmlint python3-devel vte291-gtk4
 
+pip install polars
+
 # Clone and build
 git clone https://github.com/Peter-L-SVK/sql-schema-studio.git
 cd sql-schema-studio
@@ -133,10 +135,11 @@ sudo apt install -y python3-psycopg2 python3-gi python3-gi-cairo \
   python3-scikit-learn python3-matplotlib python3-cairo python3-paramiko \
   gir1.2-gtk-4.0 gir1.2-gtksource-5 libvte-2.91-gtk4-dev \
   python3-pipx
-  
-# Install dependencies with pipx
-pipx install faker kbcstorage scikit-learn
 
+pip install polars  --break-system-packages
+
+# Install dependencies with pipx
+pipx install faker kbcstorage scikit-learn --include-deps
 
 # Clone and build
 git clone https://github.com/Peter-L-SVK/sql-schema-studio.git
@@ -166,13 +169,15 @@ sudo apt install -y python3-psycopg2 python3-gi python3-gi-cairo \
   python3-sqlparse python3-keyring python3-numpy \
   python3-scikit-learn python3-matplotlib python3-cairo python3-paramiko \
   gir1.2-gtk-4.0 gir1.2-gtksource-5 libvte-2.91-gtk4-dev \
-  python3-pipx
+  pipx
+
+pip install polars  --break-system-packages
 
 # Install pipx if not already installed (it's in the apt command above)
 # pipx ensures isolated Python package installations
 
 # Install dependencies with pipx
-pipx install faker kbcstorage scikit-learn
+pipx install faker kbcstorage scikit-learn --include-deps
 
 # Clone and install from source
 git clone https://github.com/Peter-L-SVK/sql-schema-studio.git
@@ -186,7 +191,7 @@ python3 -m src.main
 
 ```bash
 sudo dnf install python3-gobject gtk4 gtksourceview5 libadwaita cairo python3-cairo \
-  python3-polars python3-paramiko python3-faker python3-kbcstorage vte291-gtk4
+  python3-paramiko python3-faker python3-kbcstorage vte291-gtk4
 
 git clone https://github.com/Peter-L-SVK/sql-schema-studio.git
 cd sql-schema-studio
@@ -209,13 +214,15 @@ sudo apt install -y python3-psycopg2 python3-gi python3-gi-cairo \
   python3-sqlparse python3-keyring python3-numpy \
   python3-matplotlib python3-cairo python3-paramiko \
   gir1.2-gtk-4.0 gir1.2-gtksource-5 libvte-2.91-gtk4-dev \
-  python3-pipx postgresql postgresql-client 
+  pipx postgresql postgresql-client 
+
+pip install polars  --break-system-packages
 
 # Install pipx if not already installed
 # pipx ensures isolated Python package installations
 
 # Install dependencies with pipx
-pipx install faker kbcstorage scikit-learn
+pipx install faker kbcstorage scikit-learn --include-deps
 
 # (Optional) Start local PostgreSQL
 sudo service postgresql start

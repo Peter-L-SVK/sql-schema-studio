@@ -94,12 +94,10 @@ Requires:       python3-gobject
 Requires:       python3-sqlparse
 Requires:       python3-keyring
 Requires:       python3-numpy
-Requires:       python3-pandas
 Requires:       python3-scikit-learn
 Requires:       python3-matplotlib
 Requires:       python3-cairo
 Requires:       python3-paramiko
-Requires:       python3-kbcstorage
 Requires:       gtk4
 Requires:       gtksourceview5
 Requires:	vte291-gtk4
@@ -123,8 +121,8 @@ Features:
 
 %install
 # Create Python package directory - use absolute path
-mkdir -p %{buildroot}/usr/lib/python3/dist-packages/sql_schema_studio
-cp -r src/* %{buildroot}/usr/lib/python3/dist-packages/sql_schema_studio/
+mkdir -p %{buildroot}/usr/lib/python3/dist-packages/src
+cp -r src/* %{buildroot}/usr/lib/python3/dist-packages/src/
 
 # Remove __pycache__
 find %{buildroot} -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
@@ -158,12 +156,12 @@ fi
 mkdir -p %{buildroot}/usr/bin
 cat > %{buildroot}/usr/bin/sql-schema-studio << 'LAUNCHER_EOF'
 #!/bin/bash
-exec python3 -m sql_schema_studio.main "$@"
+exec python3 -m src.main "$@"
 LAUNCHER_EOF
 chmod 755 %{buildroot}/usr/bin/sql-schema-studio
 
 %files
-/usr/lib/python3/dist-packages/sql_schema_studio/
+/usr/lib/python3/dist-packages/src/
 /usr/bin/sql-schema-studio
 /usr/share/icons/hicolor/scalable/apps/sql-schema-studio.svg
 /usr/share/applications/sql-schema-studio.desktop

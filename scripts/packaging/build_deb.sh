@@ -16,12 +16,8 @@ mkdir -p ${BUILD_DIR}/${DEB_NAME}/usr/bin
 mkdir -p ${BUILD_DIR}/${DEB_NAME}/usr/lib/python3/dist-packages
 
 # Copy Python source files as package
-mkdir -p ${BUILD_DIR}/${DEB_NAME}/usr/lib/python3/dist-packages/sql_schema_studio
-cp -r src/* ${BUILD_DIR}/${DEB_NAME}/usr/lib/python3/dist-packages/sql_schema_studio/
-
-# Copy hooks
-mkdir -p ${BUILD_DIR}/${DEB_NAME}/usr/lib/python3/dist-packages/sql_schema_studio/hooks/python_hooks
-cp -r src/hooks/* ${BUILD_DIR}/${DEB_NAME}/usr/lib/python3/dist-packages/sql_schema_studio/hooks/ 2>/dev/null || true
+mkdir -p ${BUILD_DIR}/${DEB_NAME}/usr/lib/python3/dist-packages/src
+cp -r src/* ${BUILD_DIR}/${DEB_NAME}/usr/lib/python3/dist-packages/src/
 
 # Remove __pycache__ if any
 find ${BUILD_DIR}/${DEB_NAME} -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
@@ -61,7 +57,7 @@ fi
 cat > ${BUILD_DIR}/${DEB_NAME}/usr/bin/sql-schema-studio << 'LAUNCHER'
 #!/bin/bash
 # SQL Schema Studio Launcher
-exec python3 -m sql_schema_studio.main "$@"
+exec python3 -m src.main "$@"
 LAUNCHER
 chmod +x ${BUILD_DIR}/${DEB_NAME}/usr/bin/sql-schema-studio
 
@@ -85,7 +81,7 @@ Depends: python3 (>= 3.12),
          gir1.2-gtk-4.0,
          gir1.2-gtksource-5,
          libvte-2.91-gtk4-dev       
-Recommends: python3-pipx
+Recommends: pipx
 Suggests: python3-faker, python3-kbcstorage
 Maintainer: Peter Leukanič <peter@leukanic.eu>
 Description: Intelligent PostgreSQL Management Platform
@@ -132,6 +128,7 @@ echo "✅ DEB built: ${DEB_NAME}.deb"
 echo "Install with: sudo dpkg -i ${DEB_NAME}.deb"
 echo "If dependencies fail, run: sudo apt --fix-broken install"
 echo ""
-echo "Optional dependencies (install after package):"
-echo "  pipx install faker kbcstorage"
+echo " Other dependencies (install after package):"
+echo "  pip install polars  --break-system-packages"
+echo "  pipx install faker kbcstorage scikit-learn --include-deps"
 echo "  sudo apt install python3-faker python3-kbcstorage"
