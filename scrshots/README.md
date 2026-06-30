@@ -8,14 +8,23 @@
 
 ![preferences dialog](18.png)
 
-![schema manager1](10.png)
+![preferences dialog2](30.png)
 
+![schema designer1](6.png)
 
+![schema designer2](10.png)
 
-![schema manager3](6.png)
+![schema designer3](29.png)
+Color choosing menu  
 
 ![sql generated](7.png)
 SQL schema generated  
+
+![ai_index advisor applied](24.png)
+Exaple of auto-complete
+
+![search and replace](26.png)
+Searching with only whole expressions on  
 
 ![inspect table](8.png)
 Inspect table by left click on it  
@@ -29,8 +38,14 @@ List table by left double click on it
 
 ![deletion](13.png)
 
-![corrupted creation](14.png)
-Creation of wrong table by purpose  
+![ai db_ analytics tools](25.png)
+Db analytics tools powered by statistical engine
+
+![analytics menu](23.png)
+Data sciecne analytics menu on right-click
+
+![correlation matrix applied](14.png)
+correlation matrix applied from rigt-click menu  
 
 ![ai_index advisor applied](15.png)
 Applying AI Index Advisor  
@@ -51,4 +66,4 @@ Anomaly detector finished
 Log parser in action  
 
 ![exporting all to json](22.png)
-After exporting all 
+After exporting all  
