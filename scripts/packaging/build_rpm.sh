@@ -124,6 +124,11 @@ Features:
 mkdir -p %{buildroot}/usr/lib/python3/dist-packages/src
 cp -r src/* %{buildroot}/usr/lib/python3/dist-packages/src/
 
+# Ensure __init__.py exists if it doesn't
+if [ ! -f "%{buildroot}/usr/lib/python3/dist-packages/src/__init__.py" ]; then
+    touch %{buildroot}/usr/lib/python3/dist-packages/src/__init__.py
+fi
+
 # Remove __pycache__
 find %{buildroot} -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
 
@@ -131,6 +136,18 @@ find %{buildroot} -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || t
 mkdir -p %{buildroot}/usr/share/icons/hicolor/scalable/apps/
 if [ -f "src/resources/ui/icons/logo.svg" ]; then
     cp src/resources/ui/icons/logo.svg %{buildroot}/usr/share/icons/hicolor/scalable/apps/sql-schema-studio.svg
+elif [ -f "src/resources/ui/icons/sql-schema-studio.svg" ]; then
+    cp src/resources/ui/icons/sql-schema-studio.svg %{buildroot}/usr/share/icons/hicolor/scalable/apps/sql-schema-studio.svg
+else
+    # Create a simple placeholder icon if no icon exists
+    cat > %{buildroot}/usr/share/icons/hicolor/scalable/apps/sql-schema-studio.svg << 'SVG_EOF'
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <rect width="100" height="100" rx="20" fill="#2d3748"/>
+  <text x="50" y="55" font-family="Arial" font-size="40" font-weight="bold" fill="#48bb78" text-anchor="middle">SQL</text>
+  <text x="50" y="75" font-family="Arial" font-size="12" fill="#a0aec0" text-anchor="middle">Schema Studio</text>
+</svg>
+SVG_EOF
+    echo "WARNING: No icon found, using placeholder"
 fi
 
 # Install desktop file
@@ -138,6 +155,7 @@ mkdir -p %{buildroot}/usr/share/applications/
 if [ -f "src/resources/desktop/sql-schema-studio.desktop" ]; then
     cp src/resources/desktop/sql-schema-studio.desktop %{buildroot}/usr/share/applications/
 else
+    # Fallback desktop file
     cat > %{buildroot}/usr/share/applications/sql-schema-studio.desktop << 'DESKTOP_EOF'
 [Desktop Entry]
 Name=SQL Schema Studio
@@ -149,14 +167,31 @@ Type=Application
 Categories=Development;Database;IDE;
 StartupWMClass=SQL Schema Studio
 MimeType=text/x-sql;
+Keywords=postgresql;database;sql;schema;designer;analytics;
 DESKTOP_EOF
 fi
 
 # Create launcher script
 mkdir -p %{buildroot}/usr/bin
 cat > %{buildroot}/usr/bin/sql-schema-studio << 'LAUNCHER_EOF'
-#!/bin/bash
-exec python3 -m src.main "$@"
+#!/usr/bin/env python3
+import sys
+import os
+
+# Add the dist-packages directory to sys.path
+dist_packages = '/usr/lib/python3/dist-packages'
+if os.path.exists(dist_packages):
+    sys.path.insert(0, dist_packages)
+
+# Try to import and run main
+try:
+    from src.main import main
+    sys.exit(main())
+except ImportError as e:
+    print(f"Error: Could not import SQL Schema Studio module", file=sys.stderr)
+    print(f"Details: {e}", file=sys.stderr)
+    print(f"Python path: {sys.path}", file=sys.stderr)
+    sys.exit(1)
 LAUNCHER_EOF
 chmod 755 %{buildroot}/usr/bin/sql-schema-studio
 
