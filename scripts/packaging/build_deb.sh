@@ -19,10 +19,6 @@ mkdir -p ${BUILD_DIR}/${DEB_NAME}/usr/lib/python3/dist-packages
 mkdir -p ${BUILD_DIR}/${DEB_NAME}/usr/lib/python3/dist-packages/src
 cp -r src/* ${BUILD_DIR}/${DEB_NAME}/usr/lib/python3/dist-packages/src/
 
-# Copy hooks
-mkdir -p ${BUILD_DIR}/${DEB_NAME}/usr/lib/python3/dist-packages/sql_schema_studio/hooks/python_hooks
-cp -r src/hooks/* ${BUILD_DIR}/${DEB_NAME}/usr/lib/python3/dist-packages/sql_schema_studio/hooks/ 2>/dev/null || true
-
 # Remove __pycache__ if any
 find ${BUILD_DIR}/${DEB_NAME} -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
 

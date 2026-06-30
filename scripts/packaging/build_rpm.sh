@@ -161,7 +161,7 @@ LAUNCHER_EOF
 chmod 755 %{buildroot}/usr/bin/sql-schema-studio
 
 %files
-/usr/lib/python3/dist-packages/sql_schema_studio/
+/usr/lib/python3/dist-packages/src/
 /usr/bin/sql-schema-studio
 /usr/share/icons/hicolor/scalable/apps/sql-schema-studio.svg
 /usr/share/applications/sql-schema-studio.desktop
