@@ -210,6 +210,7 @@ class Plugin(BaseHook):
                 workers = pool._max_workers
                 chunk_size = count // workers
                 futures = []
+                chunks = []
                 for i in range(workers):
                     start = i * chunk_size
                     end = start + chunk_size if i < workers - 1 else count
