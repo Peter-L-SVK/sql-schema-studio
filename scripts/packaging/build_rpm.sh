@@ -88,19 +88,24 @@ Source0:        %{name}-%{version}.tar.gz
 BuildArch:      noarch
 BuildRequires:  python3-devel
 
+# System-level dependencies (available as RPMs)
 Requires:       python3 >= 3.12
+Requires:       gtk4
+Requires:       gtksourceview5
+Requires:       vte291-gtk4
+
+# Python packages available as RPMs (optional - some may not be available)
+# These are here for convenience but not strictly required
+# since the launcher will handle missing Python packages
 Requires:       python3-psycopg2
 Requires:       python3-gobject
 Requires:       python3-sqlparse
 Requires:       python3-keyring
 Requires:       python3-numpy
-Requires:       python3-scikit-learn
 Requires:       python3-matplotlib
 Requires:       python3-cairo
 Requires:       python3-paramiko
-Requires:       gtk4
-Requires:       gtksourceview5
-Requires:	vte291-gtk4
+Requires:       python3-scikit-learn
 
 %description
 SQL Schema Studio is a GTK4 desktop application for PostgreSQL database
@@ -124,13 +129,17 @@ Features:
 mkdir -p %{buildroot}/usr/lib/python3/dist-packages/src
 cp -r src/* %{buildroot}/usr/lib/python3/dist-packages/src/
 
-# Ensure __init__.py exists if it doesn't
+# Ensure __init__.py exists
 if [ ! -f "%{buildroot}/usr/lib/python3/dist-packages/src/__init__.py" ]; then
     touch %{buildroot}/usr/lib/python3/dist-packages/src/__init__.py
 fi
 
 # Remove __pycache__
 find %{buildroot} -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+
+# Copy pyproject.toml for dependency management
+mkdir -p %{buildroot}/usr/share/sql-schema-studio/
+cp pyproject.toml %{buildroot}/usr/share/sql-schema-studio/
 
 # Install icon
 mkdir -p %{buildroot}/usr/share/icons/hicolor/scalable/apps/
@@ -139,7 +148,6 @@ if [ -f "src/resources/ui/icons/logo.svg" ]; then
 elif [ -f "src/resources/ui/icons/sql-schema-studio.svg" ]; then
     cp src/resources/ui/icons/sql-schema-studio.svg %{buildroot}/usr/share/icons/hicolor/scalable/apps/sql-schema-studio.svg
 else
-    # Create a simple placeholder icon if no icon exists
     cat > %{buildroot}/usr/share/icons/hicolor/scalable/apps/sql-schema-studio.svg << 'SVG_EOF'
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
   <rect width="100" height="100" rx="20" fill="#2d3748"/>
@@ -147,7 +155,6 @@ else
   <text x="50" y="75" font-family="Arial" font-size="12" fill="#a0aec0" text-anchor="middle">Schema Studio</text>
 </svg>
 SVG_EOF
-    echo "WARNING: No icon found, using placeholder"
 fi
 
 # Install desktop file
@@ -155,7 +162,6 @@ mkdir -p %{buildroot}/usr/share/applications/
 if [ -f "src/resources/desktop/sql-schema-studio.desktop" ]; then
     cp src/resources/desktop/sql-schema-studio.desktop %{buildroot}/usr/share/applications/
 else
-    # Fallback desktop file
     cat > %{buildroot}/usr/share/applications/sql-schema-studio.desktop << 'DESKTOP_EOF'
 [Desktop Entry]
 Name=SQL Schema Studio
@@ -171,17 +177,71 @@ Keywords=postgresql;database;sql;schema;designer;analytics;
 DESKTOP_EOF
 fi
 
-# Create launcher script
+# Create launcher script with dependency checking
 mkdir -p %{buildroot}/usr/bin
 cat > %{buildroot}/usr/bin/sql-schema-studio << 'LAUNCHER_EOF'
 #!/usr/bin/env python3
 import sys
 import os
+import tomllib
 
 # Add the dist-packages directory to sys.path
 dist_packages = '/usr/lib/python3/dist-packages'
 if os.path.exists(dist_packages):
     sys.path.insert(0, dist_packages)
+
+def get_dependencies_from_pyproject():
+    """Extract dependencies from pyproject.toml."""
+    pyproject_path = '/usr/share/sql-schema-studio/pyproject.toml'
+    if not os.path.exists(pyproject_path):
+        return []
+    
+    with open(pyproject_path, 'rb') as f:
+        data = tomllib.load(f)
+    return data.get('project', {}).get('dependencies', [])
+
+def get_import_name(package_name):
+    """Map package names to their import names."""
+    # Extract base package name without version specifiers
+    base_name = package_name.split('>')[0].split('<')[0].split('=')[0].split('[')[0].strip()
+    
+    # Map package names to import names
+    import_map = {
+        'PyGObject': 'gi',
+        'pycairo': 'cairo',
+        'scikit-learn': 'sklearn',
+        'psycopg': 'psycopg',
+    }
+    return import_map.get(base_name, base_name)
+
+def check_packages():
+    """Check for required packages and guide user on installation."""
+    dependencies = get_dependencies_from_pyproject()
+    if not dependencies:
+        return
+    
+    missing = []
+    for dep in dependencies:
+        import_name = get_import_name(dep)
+        try:
+            __import__(import_name)
+        except ImportError:
+            missing.append(dep)
+    
+    if missing:
+        print("\n" + "="*60)
+        print("⚠️  Missing Python packages detected!")
+        print("="*60)
+        print("\nThe following packages are required but not installed:")
+        for pkg in missing:
+            print(f"  • {pkg}")
+        print("\nTo install them, run:")
+        print("  sql-schema-studio-install-deps")
+        print("\n" + "="*60 + "\n")
+        sys.exit(1)
+
+# Run the check
+check_packages()
 
 # Try to import and run main
 try:
@@ -195,11 +255,80 @@ except ImportError as e:
 LAUNCHER_EOF
 chmod 755 %{buildroot}/usr/bin/sql-schema-studio
 
+# Create dependency installer script
+cat > %{buildroot}/usr/bin/sql-schema-studio-install-deps << 'INSTALL_EOF'
+#!/bin/bash
+# SQL Schema Studio - Dependency Installer
+
+echo "SQL Schema Studio - Python Dependency Installer"
+echo "================================================"
+echo ""
+
+PYPROJECT="/usr/share/sql-schema-studio/pyproject.toml"
+
+if [ ! -f "$PYPROJECT" ]; then
+    echo "❌ pyproject.toml not found at: $PYPROJECT"
+    exit 1
+fi
+
+echo "📋 Using dependencies from: $PYPROJECT"
+echo ""
+
+# Check for pip3
+if ! command -v pip3 &> /dev/null; then
+    echo "❌ pip3 not found. Please install python3-pip:"
+    echo "   sudo dnf install python3-pip"
+    exit 1
+fi
+
+echo "Available installation methods:"
+echo "  1) pip --user (user-only installation - recommended)"
+echo "  2) sudo pip (system-wide installation)"
+echo ""
+read -p "Choose method (1/2): " METHOD
+
+case $METHOD in
+    1)
+        echo "Installing dependencies with pip --user..."
+        pip3 install --user -r <(python3 -c "
+import tomllib
+with open('$PYPROJECT', 'rb') as f:
+    data = tomllib.load(f)
+deps = data.get('project', {}).get('dependencies', [])
+for dep in deps:
+    print(dep)
+")
+        ;;
+    2)
+        echo "Installing dependencies system-wide..."
+        sudo pip3 install -r <(python3 -c "
+import tomllib
+with open('$PYPROJECT', 'rb') as f:
+    data = tomllib.load(f)
+deps = data.get('project', {}).get('dependencies', [])
+for dep in deps:
+    print(dep)
+")
+        ;;
+    *)
+        echo "Invalid choice. Exiting."
+        exit 1
+        ;;
+esac
+
+echo ""
+echo "✅ Dependencies installed successfully!"
+echo "You can now run: sql-schema-studio"
+INSTALL_EOF
+chmod 755 %{buildroot}/usr/bin/sql-schema-studio-install-deps
+
 %files
 /usr/lib/python3/dist-packages/src/
 /usr/bin/sql-schema-studio
+/usr/bin/sql-schema-studio-install-deps
 /usr/share/icons/hicolor/scalable/apps/sql-schema-studio.svg
 /usr/share/applications/sql-schema-studio.desktop
+/usr/share/sql-schema-studio/pyproject.toml
 %doc README.md LICENSE
 
 %changelog
@@ -238,6 +367,9 @@ if [ $? -eq 0 ]; then
     echo ""
     echo "Install with:"
     echo "  sudo dnf install $PROJECT_ROOT/sql-schema-studio-${VERSION}-1.*.rpm"
+    echo ""
+    echo "After installation, install Python dependencies:"
+    echo "  sql-schema-studio-install-deps"
 else
     echo ""
     echo "❌ RPM build failed!"
