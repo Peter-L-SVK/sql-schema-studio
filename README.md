@@ -107,26 +107,27 @@ More detailed plans in [ROADMAP](https://github.com/Peter-L-SVK/sql-schema-studi
 - VTE/terminal 
 - Developed on Fedora 43 Cinnamon and tested on Fedora 43 KDE Plasma 6
 
-
 ## Installation from Packages
 
 ### Fedora / RHEL (RPM)
 
 ```bash
 # Install build dependencies
-sudo dnf install rpm-build rpmdevtools rpmlint python3-devel vte291-gtk4
+sudo dnf install rpm-build rpmdevtools rpmlint python3-devel \
+  gtk4 gtksourceview5 vte291-gtk4
 
-pip install polars
-
-# Clone and build
+# Clone the repository
 git clone https://github.com/Peter-L-SVK/sql-schema-studio.git
 cd sql-schema-studio
 
 # Build RPM package
 ./scripts/packaging/build_rpm.sh
 
-# Install
-sudo dnf install ~/rpmbuild/RPMS/noarch/sql-schema-studio-*.rpm
+# Install the RPM
+sudo dnf install sql-schema-studio-*.rpm
+
+# After installation, install Python dependencies
+sql-schema-studio-install-deps
 ```
 
 ### Debian / Ubuntu / Mint (DEB) / WSL2
@@ -135,26 +136,34 @@ sudo dnf install ~/rpmbuild/RPMS/noarch/sql-schema-studio-*.rpm
 # Install build dependencies
 sudo apt install -y python3-psycopg2 python3-gi python3-gi-cairo \
   python3-sqlparse python3-keyring python3-numpy \
-  python3-scikit-learn python3-matplotlib python3-cairo python3-paramiko \
-  gir1.2-gtk-4.0 gir1.2-gtksource-5 libvte-2.91-gtk4-dev \
+  python3-matplotlib python3-cairo python3-paramiko \
+  gir1.2-gtk-4.0 gir1.2-gtksource-5 gir1.2-vte-2.91 \
   python3-pipx
 
-pip install polars  --break-system-packages
-
-# Install dependencies with pipx
-pipx install faker kbcstorage scikit-learn --include-deps
-
-# Clone and build
+# Clone the repository
 git clone https://github.com/Peter-L-SVK/sql-schema-studio.git
 cd sql-schema-studio
 
 # Build DEB package
 ./scripts/packaging/build_deb.sh
 
-# Install
+# Install the DEB package
 sudo dpkg -i sql-schema-studio_*.deb
 sudo apt --fix-broken install
+
+# After installation, install Python dependencies
+sql-schema-studio-install-deps
 ```
+
+### Post-Installation
+
+After installing the RPM or DEB package, run the dependency installer to install required Python packages:
+
+```bash
+sql-schema-studio-install-deps
+```
+
+This will guide you through installing the required Python dependencies (polars, scikit-learn, faker, kbcstorage, etc.) using your preferred method (pipx, pip --user, or system-wide).
 
 ### Run
 
@@ -170,21 +179,19 @@ sql-schema-studio
 sudo apt update
 sudo apt install -y python3-psycopg2 python3-gi python3-gi-cairo \
   python3-sqlparse python3-keyring python3-numpy \
-  python3-scikit-learn python3-matplotlib python3-cairo python3-paramiko \
-  gir1.2-gtk-4.0 gir1.2-gtksource-5 libvte-2.91-gtk4-dev \
+  python3-matplotlib python3-cairo python3-paramiko \
+  gir1.2-gtk-4.0 gir1.2-gtksource-5 gir1.2-vte-2.91 \
   pipx
 
-pip install polars  --break-system-packages
-
-# Install pipx if not already installed (it's in the apt command above)
-# pipx ensures isolated Python package installations
-
-# Install dependencies with pipx
-pipx install faker kbcstorage scikit-learn --include-deps
-
-# Clone and install from source
+# Clone the repository
 git clone https://github.com/Peter-L-SVK/sql-schema-studio.git
 cd sql-schema-studio
+
+# Install Python dependencies from pyproject.toml
+pipx install -e . --include-deps
+
+# Or use pip (user-only)
+pip install --user -e .
 
 # Run the application
 python3 -m src.main
@@ -193,12 +200,16 @@ python3 -m src.main
 ### Fedora / CentOS / RedHat
 
 ```bash
-sudo dnf install python3-gobject gtk4 gtksourceview5 libadwaita cairo python3-cairo \
-  python3-paramiko python3-faker python3-kbcstorage vte291-gtk4
+sudo dnf install python3-gobject gtk4 gtksourceview5 libadwaita \
+  cairo python3-cairo python3-paramiko vte291-gtk4 python3-pip
 
 git clone https://github.com/Peter-L-SVK/sql-schema-studio.git
 cd sql-schema-studio
+
+# Install Python dependencies from pyproject.toml
 pip install --user -e .
+
+# Run the application
 python3 -m src.main
 ```
 
@@ -216,23 +227,18 @@ sudo apt update && sudo apt upgrade -y
 sudo apt install -y python3-psycopg2 python3-gi python3-gi-cairo \
   python3-sqlparse python3-keyring python3-numpy \
   python3-matplotlib python3-cairo python3-paramiko \
-  gir1.2-gtk-4.0 gir1.2-gtksource-5 libvte-2.91-gtk4-dev \
+  gir1.2-gtk-4.0 gir1.2-gtksource-5 gir1.2-vte-2.91 \
   pipx postgresql postgresql-client 
 
-pip install polars  --break-system-packages
+# Clone the repository
+git clone https://github.com/Peter-L-SVK/sql-schema-studio.git
+cd sql-schema-studio
 
-# Install pipx if not already installed
-# pipx ensures isolated Python package installations
-
-# Install dependencies with pipx
-pipx install faker kbcstorage scikit-learn --include-deps
+# Install Python dependencies from pyproject.toml
+pipx install -e . --include-deps
 
 # (Optional) Start local PostgreSQL
 sudo service postgresql start
-
-# Clone and install from source
-git clone https://github.com/Peter-L-SVK/sql-schema-studio.git
-cd sql-schema-studio
 
 # Run the application
 python3 -m src.main
@@ -270,56 +276,62 @@ python3 -m mypy src/
 ## Dependency Breakdown
 
 ### Required System Packages (installed via apt/dnf)
-These are essential for the application to run:
+These are essential for the application to run and are available in system repositories:
 - **PostgreSQL client**: `python3-psycopg2` - Database connectivity
-- **GTK4 GUI**: `python3-gi`, `python3-gi-cairo`, `gir1.2-gtk-4.0`, `gir1.2-gtksource-5` - GUI framework
+- **GTK4 GUI**: `python3-gi`, `python3-gi-cairo`, `gir1.2-gtk-4.0`, `gir1.2-gtksource-5`, `gir1.2-vte-2.91` - GUI framework
 - **SQL parsing**: `python3-sqlparse` - SQL parsing and formatting
-- **Data processing**: `polars`, `python3-numpy`, `python3-scikit-learn` - Analytics engine
+- **Data processing**: `python3-numpy` - Core data structures
 - **Visualization**: `python3-matplotlib`, `python3-cairo` - Charts and graphs
 - **SSH tunneling**: `python3-paramiko` - Secure remote connections
-- **Terminal**: `libvte-2.91-gtk4-dev` - Embedded terminal widget
 - **Keyring**: `python3-keyring` - Secure password storage
 
-### Optional Packages (install via pipx or apt)
-These add extra features but aren't required:
-- **Synthetic data**: `faker` - Generate test data (pipx install faker)
-- **Keboola integration**: `kbcstorage` - Cloud data platform (pipx install kbcstorage)
+### Python Packages (installed via pip/pipx)
+These are installed by `sql-schema-studio-install-deps` or during development installation:
+- **Data processing**: `polars` - High-performance analytics engine
+- **Machine Learning**: `scikit-learn` - ML predictions for vacuum advisor
+- **Synthetic data**: `faker` - Generate test data
+- **Cloud integration**: `kbcstorage` - Keboola cloud platform
+- **Database driver**: `psycopg[binary]` - Modern PostgreSQL driver
+- **Data generation**: Additional packages as needed
 
 ## Installation Troubleshooting
 
 ### Common Issues
 
-**1. "ModuleNotFoundError: No module named 'sklearn'"**
+**1. "Missing Python packages detected"**
 ```bash
-# Fix: Install scikit-learn
-sudo apt install python3-scikit-learn  # Debian/Ubuntu
-sudo dnf install python3-scikit-learn  # Fedora
+# Run the dependency installer
+sql-schema-studio-install-deps
 ```
 
-**2. "ModuleNotFoundError: No module named 'faker'"**
+**2. "ModuleNotFoundError: No module named 'sklearn'"**
 ```bash
-# Fix: Install faker via pipx
-pipx install faker
-# Or via apt (if available)
-sudo apt install python3-faker
+# Fix: Install scikit-learn via the dependency installer
+sql-schema-studio-install-deps
 ```
 
-**3. "ModuleNotFoundError: No module named 'kbcstorage'"**
+**3. "ModuleNotFoundError: No module named 'faker'"**
 ```bash
-# Fix: Install kbcstorage via pipx
-pipx install kbcstorage
+# Fix: Install via the dependency installer
+sql-schema-studio-install-deps
 ```
 
-**4. GTK4 or GtkSourceView not found**
+**4. "ModuleNotFoundError: No module named 'polars'"**
+```bash
+# Fix: Install via the dependency installer
+sql-schema-studio-install-deps
+```
+
+**5. GTK4 or GtkSourceView not found**
 ```bash
 # Debian/Ubuntu
-sudo apt install gir1.2-gtk-4.0 gir1.2-gtksource-5 libvte-2.91-gtk4-dev
+sudo apt install gir1.2-gtk-4.0 gir1.2-gtksource-5 gir1.2-vte-2.91
 
 # Fedora
 sudo dnf install gtk4 gtksourceview5 vte291-gtk4
 ```
 
-**5. WSL2 GUI not working**
+**6. WSL2 GUI not working**
 ```bash
 # Ensure WSLg is enabled (Windows 11)
 wsl --update
@@ -327,6 +339,17 @@ wsl --update
 # For Windows 10, install an X server like VcXsrv
 # and set DISPLAY environment variable
 export DISPLAY=$(ip route list default | awk '{print $3}'):0
+```
+
+**7. pipx not found**
+```bash
+# Debian/Ubuntu
+sudo apt install pipx
+pipx ensurepath
+
+# Fedora
+sudo dnf install pipx
+pipx ensurepath
 ```
 
 ## Architecture
@@ -366,5 +389,3 @@ Also discussion on repo is allowed.
 ## License
 
 GNU General Public License v3 or later. See [LICENSE](LICENSE).
-
----

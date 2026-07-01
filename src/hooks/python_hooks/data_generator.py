@@ -203,28 +203,36 @@ class Plugin(BaseHook):
             # Multi-CPU mode for large datasets
             if use_multi_cpu and count > 1000:
                 from src.hooks.python_hooks.data_generator import _generate_chunk as worker
-                from src.core.worker_pool import get_pool
+                from src.core.worker_pool import get_pool, _reset_pool
+                import concurrent.futures
 
                 pool = get_pool()
                 workers = pool._max_workers
                 chunk_size = count // workers
                 futures = []
+                chunks = []
                 for i in range(workers):
                     start = i * chunk_size
                     end = start + chunk_size if i < workers - 1 else count
                     futures.append(
-                        pool.submit(
-                            worker,
-                            conn_string,
-                            table_name,
-                            col_names,
-                            preset,
-                            end - start,
-                        )
+                        pool.submit(worker, conn_string, table_name, col_names, preset, end - start)
                     )
 
-                total = sum(f.result() for f in futures)
+                try:
+                    total = sum(f.result() for f in futures)
+                except concurrent.futures.process.BrokenProcessPool:
+                    # A worker died — recreate pool and try once more
+                    logger.warning("Worker pool broken, recreating and retrying...")
+                    _reset_pool()
+                    pool = get_pool()
+                    futures = [
+                        pool.submit(worker, conn_string, table_name, col_names, preset, end - start)
+                        for start, end in chunks  # recompute chunks
+                    ]
+                    total = sum(f.result() for f in futures)
+
                 conn.close()
+
             else:
                 # Single-CPU mode
                 placeholders = ", ".join(["%s"] * len(col_names))
@@ -279,49 +287,50 @@ def _generate_chunk(
 ) -> int:
     """Generate a chunk of data in a separate process.
 
-    This function is designed to be called by ProcessPoolExecutor for
-    parallel data generation across multiple CPU cores.
-
-    Args:
-        conn_string: PostgreSQL connection string
-        table_name: Name of the table to insert into
-        col_names: List of column names
-        preset: Name of the data preset
-        count: Number of rows to generate
-
-    Returns:
-        Number of rows successfully inserted
+    Returns number of rows inserted, or 0 on failure.
+    Must never raise — worker processes that crash poison the pool.
     """
-    import psycopg
-    from faker import Faker
+    import sys
+    import traceback
 
-    # Get preset configuration
-    preset_config = PRESETS[preset]
-    columns: Dict[str, str] = preset_config["columns"]
-    params: Dict[str, Any] = preset_config.get("params", {})
-    fake = Faker()
+    try:
+        import psycopg
+        from faker import Faker
 
-    conn = psycopg.connect(conn_string)
-    conn.autocommit = True
-    cur = conn.cursor()
+        preset_config = PRESETS[preset]
+        columns: Dict[str, str] = preset_config["columns"]
+        params: Dict[str, Any] = preset_config.get("params", {})
+        fake = Faker()
 
-    placeholders = ", ".join(["%s"] * len(col_names))
-    col_list = ", ".join(col_names)
+        conn = psycopg.connect(conn_string)
+        conn.autocommit = True
+        cur = conn.cursor()
 
-    for _ in range(count):
-        # Build row using column definitions
-        row: List[Any] = []
-        for col in col_names:
-            faker_method = columns[col]
-            params_for_col = params.get(col, {})
-            # Get the faker method and call it with parameters
-            method = getattr(fake, faker_method)
-            if params_for_col:
-                row.append(method(**params_for_col))
-            else:
-                row.append(method())
+        placeholders = ", ".join(["%s"] * len(col_names))
+        col_list = ", ".join(col_names)
 
-        cur.execute(f"INSERT INTO {table_name} ({col_list}) VALUES ({placeholders})", tuple(row))
+        rows_inserted = 0
+        for _ in range(count):
+            row: List[Any] = []
+            for col in col_names:
+                faker_method = columns[col]
+                params_for_col = params.get(col, {})
+                method = getattr(fake, faker_method)
+                if params_for_col:
+                    row.append(method(**params_for_col))
+                else:
+                    row.append(method())
 
-    conn.close()
-    return count
+            cur.execute(
+                f"INSERT INTO {table_name} ({col_list}) VALUES ({placeholders})",
+                row,
+            )
+            rows_inserted += 1
+
+        conn.close()
+        return rows_inserted
+
+    except Exception:
+        # Print to stderr so it's visible in terminal; worker must not die
+        traceback.print_exc(file=sys.stderr)
+        return 0

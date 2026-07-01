@@ -30,7 +30,7 @@ Searching with only whole expressions on
 Inspect table by left click on it  
 
 ![list table](4.png)
-List table by left double click on it  
+List content by left double click  
 
 ![hook manager](11.png)
 
@@ -52,9 +52,6 @@ Applying AI Index Advisor
 
 ![insert values](16.png)
 Insertion of values to it.  
-
-![doubleclick dialog](17.png)
-List content by left double click  
 
 ![auto_vacuum advisor](19.png)
 Auto vacuum hook in action  
