@@ -298,10 +298,10 @@ def get_pool() -> WorkerPool:
 
 def _reset_pool() -> None:
     """Force-shutdown and recreate the global worker pool."""
-    global _worker_pool
-    if _worker_pool is not None:
+    global _pool
+    if _pool is not None:
         try:
-            _worker_pool._pool.shutdown(wait=False, cancel_futures=True)
+            _pool._pool.shutdown(wait=False, cancel_futures=True)
         except Exception:
             pass
-        _worker_pool = None
+        _pool = None
