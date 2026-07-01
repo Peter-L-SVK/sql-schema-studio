@@ -73,6 +73,8 @@ recommendations. Extend with Python and Perl hooks for custom automation.
 
 ## Planned
 
+More detailed plans in [ROADMAP](https://github.com/Peter-L-SVK/sql-schema-studio/blob/main/ROADMAP.md)  
+
 ### v1.0.0
 - Migration generator with up/down SQL diffs
 - FK Editor dialog (ON DELETE/ON UPDATE cascade rules)
@@ -102,6 +104,7 @@ recommendations. Extend with Python and Perl hooks for custom automation.
 - GTK 4 and GtkSourceView 5
 - PostgreSQL 12 or later
 - Perl 5.30 or later (optional, for Perl hooks)
+- VTE/terminal 
 - Developed on Fedora 43 Cinnamon and tested on Fedora 43 KDE Plasma 6
 
 
@@ -271,10 +274,10 @@ These are essential for the application to run:
 - **PostgreSQL client**: `python3-psycopg2` - Database connectivity
 - **GTK4 GUI**: `python3-gi`, `python3-gi-cairo`, `gir1.2-gtk-4.0`, `gir1.2-gtksource-5` - GUI framework
 - **SQL parsing**: `python3-sqlparse` - SQL parsing and formatting
-- **Data processing**: `python3-numpy`, `python3-pandas`, `python3-scikit-learn` - Analytics engine
+- **Data processing**: `polars`, `python3-numpy`, `python3-scikit-learn` - Analytics engine
 - **Visualization**: `python3-matplotlib`, `python3-cairo` - Charts and graphs
 - **SSH tunneling**: `python3-paramiko` - Secure remote connections
-- **Terminal**: `gir1.2-vte-3.91` - Embedded terminal widget
+- **Terminal**: `libvte-2.91-gtk4-dev` - Embedded terminal widget
 - **Keyring**: `python3-keyring` - Secure password storage
 
 ### Optional Packages (install via pipx or apt)
@@ -338,8 +341,8 @@ src/
 ├── ui/                         GTK4 interface (window, browser, editor, designer)
 │   ├── editor/                 Multi tabed editor with autocomplete
 │   ├── dialogs/                Connection, about, preferences, column editor, hooks
-│   ├── schema_designer/	    Grafical schema designer
-│   └── window/                 Application window with it's tools
+│   ├── schema_designer/	      Graphical schema designer
+│   └── window/                 Application window with its tools
 ├── models/                     Table, column, and relationship data models
 ├── hooks/                      Plugin system with Python and Perl executors
 │   ├── python/                 Python hook runtime

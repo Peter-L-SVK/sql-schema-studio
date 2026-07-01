@@ -25,12 +25,12 @@
 ### Multi-Tab System
 - [x] Tabbed SQL editor (Ctrl+T, Ctrl+W, drag tabs)
 - [x] Unsaved changes indicator (•)
-- [ ] Restore open tabs on startup
+- [x] Restore open tabs on startup
 - [x] Tabbed results panel
 
 ### Schema Designer
 - [x] Color schemes — blue, green, orange, red, purple, gray
-- [x] Bidirectional FK with cascade rules (ON DELETE/ON UPDATE)
+- [ ] Bidirectional FK with cascade rules (ON DELETE/ON UPDATE)
 - [ ] FK Editor dialog (direction, rules)
 - [ ] Directional arrows (↔, →, ←)
 - [x] Zoom and pan for canvas
