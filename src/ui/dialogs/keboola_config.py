@@ -251,7 +251,7 @@ class KeboolaConfigDialog(Gtk.Window):
     def _do_test_connection(self, token, api_url, button):
         """Perform connection test (runs in main thread)."""
         try:
-            from keboola.storage_client import Client
+            from kbcstorage.client import Client
 
             client = Client(token, api_url)
             buckets = client.buckets.list()
@@ -271,7 +271,7 @@ class KeboolaConfigDialog(Gtk.Window):
 
         except ImportError:
             self._status_label.set_markup(
-                '<span foreground="red">✗ Keboola client not installed. Run: pip install keboola-storage-client</span>'
+                '<span foreground="red">✗ Keboola client not installed. Run: pip install kbcstorage</span>'
             )
         except Exception as e:
             self._status_label.set_markup(
