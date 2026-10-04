@@ -26,19 +26,17 @@ class PythonHookExecutor:
         self._metrics: Dict[str, List[float]] = {}
 
     async def load_hook(self, hook_path: Path) -> BaseHook:
-        """Dynamic import with validation"""
+        """Dynamic import with validation."""
         spec = importlib.util.spec_from_file_location(hook_path.stem, hook_path)  # type: ignore[attr-defined]
         module = importlib.util.module_from_spec(spec)  # type: ignore[attr-defined]
         spec.loader.exec_module(module)
 
         hook_instance = module.Plugin()
-
+        
         if hook_instance.validate():
             metadata = hook_instance.get_metadata()
             self._loaded_hooks[metadata["name"]] = hook_instance
-            hook_instance = module.Plugin()
-            # Add assertion to narrow the type:
-            assert isinstance(hook_instance, BaseHook)
+            return hook_instance
 
         raise ValueError(f"Hook validation failed: {hook_path}")
 
