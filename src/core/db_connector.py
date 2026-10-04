@@ -232,7 +232,7 @@ class DatabaseConnector:
 
         self._active_tunnel = tunnel
         return conn_string
-
+    
     def execute_sync(self, query: str, params: tuple | None = None) -> list[dict[str, Any]]:
         """Execute a query from a background thread using a direct sync connection"""
         conn_string = self._get_conn_string()
@@ -246,6 +246,16 @@ class DatabaseConnector:
                     rows = cur.fetchall()
                     return [dict(zip(columns, row)) for row in rows]
                 return []
+
+    async def execute(self, query: str, params: tuple | None = None) -> list[dict[str, Any]]:
+        """Async wrapper around execute_sync for use with asyncio.
+    
+        Runs the blocking execute_sync in a thread pool executor so it doesn't
+        block the asyncio event loop.
+        """
+        import asyncio
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, lambda: self.execute_sync(query, params))
 
     def get_schemas(self) -> List[str]:
         results = self.execute_sync(
