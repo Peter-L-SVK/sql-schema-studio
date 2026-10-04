@@ -260,38 +260,19 @@ class ConnectionDialog(Gtk.Dialog):
         self._set_busy(True)
 
         def test():
+            tunnel = None
             try:
-                tunnel = None
-
                 if profile.use_ssh:
                     from src.core.ssh_tunnel import (
                         SSHTunnelConfig,
                         get_postgres_conn_string_with_ssh,
                     )
-
-                    ssh_config = SSHTunnelConfig(
-                        enabled=True,
-                        ssh_host=profile.ssh_host,
-                        ssh_port=profile.ssh_port,
-                        ssh_user=profile.ssh_user,
-                        ssh_password=profile.ssh_password,
-                        ssh_key_path=profile.ssh_key_path,
-                        remote_host=profile.ssh_remote_host,
-                        remote_port=profile.ssh_remote_port,
-                    )
-                    db_config = {
-                        "host": profile.host,
-                        "port": profile.port,
-                        "database": profile.database,
-                        "username": profile.username,
-                        "password": profile.password,
-                    }
+                    ssh_config = SSHTunnelConfig(...)
+                    db_config = {...}
                     conn_string, tunnel, error = get_postgres_conn_string_with_ssh(
                         ssh_config, db_config
                     )
                     if error:
-                        if tunnel:
-                            tunnel.stop()
                         return False, f"SSH: {error}"
                 else:
                     conn_string = (
@@ -299,17 +280,15 @@ class ConnectionDialog(Gtk.Dialog):
                         f"dbname={profile.database} user={profile.username} "
                         f"password={profile.password}"
                     )
-
-                conn = psycopg.connect(conn_string)
-                conn.execute("SELECT 1")
-                conn.close()
-                if tunnel:
-                    tunnel.stop()
+                    
+                with psycopg.connect(conn_string) as conn:
+                    conn.execute("SELECT 1")
                 return True, "Connection successful!"
             except Exception as e:
+                return False, str(e)
+            finally:
                 if tunnel:
                     tunnel.stop()
-                return False, str(e)
 
         def on_done(result):
             self._set_busy(False)
