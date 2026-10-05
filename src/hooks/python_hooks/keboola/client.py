@@ -12,6 +12,15 @@ Storage API (buckets, tables, files) is handled by the official
 `kbcstorage` client so we get sliced-file stitching and error handling
 for free. Configuration and Queue API (transformations, jobs) are
 handled by `requests` because kbcstorage does not expose them.
+
+Notes from real-world testing:
+  * Queue API lives on a separate host: connection.* → queue.*
+  * In branch context, `state` must not be sent on config update.
+  * Input/output mapping lives under `configuration.storage`, NOT
+    directly under `configuration`.
+  * Input tables reject `primary_key` (that's an output-only field).
+  * Output tables reject `column_types` (that's an input-only field).
+  * kbcstorage's Tables.create() has no `incremental` kwarg.
 """
 
 from __future__ import annotations
@@ -19,7 +28,7 @@ from __future__ import annotations
 import subprocess
 import time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import requests
 
@@ -33,9 +42,7 @@ try:
     from kbcstorage.client import Client as KbcStorageClient
 except ImportError:
     KbcStorageClient = None  # type: ignore[assignment,misc]
-    logger.warning(
-        "kbcstorage not installed. Run: pip install kbcstorage"
-    )
+    logger.warning("kbcstorage not installed. Run: pip install kbcstorage")
 
 
 class KeboolaError(Exception):
@@ -80,7 +87,9 @@ class KeboolaClient:
             r.raise_for_status()
             return r.json()
         except requests.HTTPError as e:
-            raise KeboolaError(f"Token verification failed: {e.response.status_code}") from e
+            raise KeboolaError(
+                f"Token verification failed: {e.response.status_code}"
+            ) from e
         except requests.RequestException as e:
             raise KeboolaError(f"Network error: {e}") from e
 
@@ -91,8 +100,9 @@ class KeboolaClient:
     def upload_csv(self, bucket: str, table_name: str, csv_path: str) -> dict:
         """Upload CSV as a table. Creates or replaces the table.
 
-        kbcstorage handles incremental uploads, primary keys, and the
-        multipart file transfer for us.
+        Note: kbcstorage's Tables.create() does not accept an `incremental`
+        parameter. For a full replace (the default), we simply call create()
+        without it. If the table already exists, Keboola will replace it.
         """
         path = Path(csv_path)
         if not path.exists():
@@ -103,7 +113,6 @@ class KeboolaClient:
                 name=table_name,
                 bucket_id=bucket,
                 file_path=str(path),
-                incremental=False,  # full replace
             )
             logger.info(f"Uploaded {csv_path} → {bucket}.{table_name}")
             return table
@@ -111,11 +120,7 @@ class KeboolaClient:
             raise KeboolaError(f"Upload failed: {e}") from e
 
     def download_table_csv(self, table_id: str, output_dir: str) -> str:
-        """Download a table as CSV into output_dir.
-
-        kbcstorage auto-stitches sliced files. Returns the path of the
-        main exported file (first file in the directory after export).
-        """
+        """Download a table as CSV into output_dir."""
         out = Path(output_dir)
         out.mkdir(parents=True, exist_ok=True)
 
@@ -127,15 +132,29 @@ class KeboolaClient:
         except Exception as e:
             raise KeboolaError(f"Download failed: {e}") from e
 
-        # kbcstorage names the file after the table, e.g. "out_cleaned_data.csv"
         table_short = table_id.split(".")[-1]
-        candidates = sorted(out.glob(f"{table_short}*.csv"))
-        if not candidates:
-            # Fallback: pick the newest .csv in the dir
-            candidates = sorted(out.glob("*.csv"), key=lambda p: p.stat().st_mtime, reverse=True)
+
+        # Try multiple patterns — Keboola's export names vary by API version
+        patterns = [
+            f"{table_short}*.csv",   # out_cleaned_data.csv
+            f"{table_short}*",       # out_cleaned_data (no extension)
+            "*.csv",                  # any CSV
+            "*",                      # any file
+        ]
+        candidates: list[Path] = []
+        for pattern in patterns:
+            candidates = sorted(
+                out.glob(pattern),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True,
+            )
+            # Filter to files only (skip directories)
+            candidates = [c for c in candidates if c.is_file()]
+            if candidates:
+                break
 
         if not candidates:
-            raise KeboolaError(f"No CSV found after export in {output_dir}")
+            raise KeboolaError(f"No file found after export in {output_dir}")
 
         logger.info(f"Downloaded {table_id} → {candidates[0]}")
         return str(candidates[0])
@@ -145,8 +164,67 @@ class KeboolaClient:
     # ==================================================================
 
     def _component_url(self, component_id: str, config_id: str | None = None) -> str:
-        base = f"{self.api_url}/v2/storage/branch/default/components/{component_id}/configs"
+        base = (
+            f"{self.api_url}/v2/storage/branch/default/components/"
+            f"{component_id}/configs"
+        )
         return f"{base}/{config_id}" if config_id else base
+
+    @staticmethod
+    def _build_input_storage(input_table: str) -> dict:
+        """Build a single input table mapping.
+
+        Allowed fields for input.tables[]:
+            source, destination, where_column, where_operator, where_values,
+            columns, column_types, changed_since, days, limit, load_type,
+            overwrite, use_view, source_branch_id, file_type,
+            keep_internal_timestamp_column
+
+        NOT allowed: primary_key (output-only).
+        """
+        input_short = input_table.split(".")[-1]
+        return {
+            "tables": [
+                {
+                    "source": input_table,
+                    "destination": input_short,
+                    "where_column": "",
+                    "where_operator": "eq",
+                    "where_values": [],
+                    "columns": [],
+                    "column_types": [],
+                }
+            ]
+        }
+
+    @staticmethod
+    def _build_output_storage(output_table: str) -> dict:
+        """Build a single output table mapping.
+
+        Allowed fields for output.tables[]:
+            source, destination, primary_key, write_always, delimiter,
+            enclosure, columns, has_header, incremental, schema,
+            distribution_key, deduplication_strategy, delete_where,
+            delete_where_column, delete_where_operator, delete_where_values,
+            description, manifest_type, metadata, column_metadata,
+            table_metadata, tags, unload_strategy
+
+        NOT allowed: column_types (input-only).
+        """
+        output_short = output_table.split(".")[-1]
+        return {
+            "tables": [
+                {
+                    "source": output_short,
+                    "destination": output_table,
+                    "primary_key": [],
+                    "write_always": False,
+                    "delimiter": ",",
+                    "enclosure": '"',
+                    "columns": [],
+                }
+            ]
+        }
 
     def create_transformation(
         self,
@@ -156,7 +234,11 @@ class KeboolaClient:
         input_table: str,
         output_table: str,
     ) -> dict:
-        """Create a new transformation config. Returns the created config."""
+        """Create a new transformation config. Returns the created config.
+
+        Note: Keboola expects input/output mapping under
+        `configuration.storage`, NOT directly under `configuration`.
+        """
         eng = get_engine(engine)
         component_id = eng["component_id"]
 
@@ -171,24 +253,16 @@ class KeboolaClient:
                             "codes": [
                                 {
                                     "name": "SQL",
-                                    "script": sql_script.splitlines(),
+                                    "script": [sql_script],
                                 }
                             ],
                         }
                     ]
                 },
-                "input": [
-                    {
-                        "source": input_table,
-                        "destination": input_table.split(".")[-1],
-                    }
-                ],
-                "output": [
-                    {
-                        "source": output_table.split(".")[-1],
-                        "destination": output_table,
-                    }
-                ],
+                "storage": {
+                    "input": self._build_input_storage(input_table),
+                    "output": self._build_output_storage(output_table),
+                },
             },
         }
 
@@ -219,15 +293,18 @@ class KeboolaClient:
     ) -> dict:
         """Update an existing transformation config.
 
-        Only the SQL script (and optionally the name/mappings) is changed.
-        Other fields (existing input/output mapping, block structure) are
-        preserved by fetching the config first and patching it.
+        Note: In branch context, `state` must be stripped from the payload.
+        Input/output mapping lives under `configuration.storage`, NOT
+        directly under `configuration`.
         """
         eng = get_engine(engine)
         component_id = eng["component_id"]
 
         # Fetch current config so we don't destroy anything
         current = self._get_transformation(component_id, config_id)
+
+        # Branch context forbids sending `state` on update
+        current.pop("state", None)
 
         cfg = current.get("configuration", {})
         params = cfg.setdefault("parameters", {})
@@ -238,25 +315,32 @@ class KeboolaClient:
         codes = blocks[0].setdefault("codes", [])
         if not codes:
             codes.append({"name": "SQL", "script": []})
-        codes[0]["script"] = sql_script.splitlines()
+        codes[0]["script"] = [sql_script]
 
         if name is not None:
             current["name"] = name
 
+        # Rebuild storage.input / storage.output under the right key
+        storage = cfg.setdefault("storage", {})
+
+        # Clean up legacy top-level `input` / `output` keys written by older
+        # versions. Keboola rejects them at job runtime ("Unrecognized options
+        # input, output under configuration"). Because we PUT back the whole
+        # fetched config, they would otherwise survive every update forever.
+        # Migrate them into `storage` only if storage lacks that side.
+        for key in ("input", "output"):
+            legacy = cfg.pop(key, None)
+            if legacy is not None and key not in storage:
+                storage[key] = (
+                    legacy if isinstance(legacy, dict) else {"tables": legacy}
+                )
+                logger.info(f"Migrated legacy configuration.{key} → storage.{key}")
+
         if input_table is not None:
-            cfg["input"] = [
-                {
-                    "source": input_table,
-                    "destination": input_table.split(".")[-1],
-                }
-            ]
+            storage["input"] = self._build_input_storage(input_table)
+
         if output_table is not None:
-            cfg["output"] = [
-                {
-                    "source": output_table.split(".")[-1],
-                    "destination": output_table,
-                }
-            ]
+            storage["output"] = self._build_output_storage(output_table)
 
         url = self._component_url(component_id, config_id)
         try:
@@ -288,13 +372,28 @@ class KeboolaClient:
     # ==================================================================
 
     def trigger_job(self, engine: str, config_id: str) -> dict:
-        """Trigger a transformation job. Returns the job record."""
+        """Trigger a transformation job via the Queue API.
+
+        Note: The Queue API lives on a different host than the Storage API.
+        For a regional stack like us-east4.gcp, the Queue host is
+        https://queue.us-east4.gcp.keboola.com
+        """
         eng = get_engine(engine)
         component_id = eng["component_id"]
 
-        url = f"{self._component_url(component_id, config_id)}/jobs"
+        # Derive the Queue host from the Storage API URL
+        # connection.us-east4.gcp.keboola.com -> queue.us-east4.gcp.keboola.com
+        queue_host = self.api_url.replace("connection.", "queue.")
+        url = f"{queue_host}/jobs"
+
+        payload = {
+            "mode": "run",
+            "component": component_id,
+            "config": config_id,
+        }
+
         try:
-            r = self.session.post(url, json={"mode": "run"}, timeout=15)
+            r = self.session.post(url, json=payload, timeout=15)
             r.raise_for_status()
             job = r.json()
             logger.info(f"Triggered job id={job.get('id')} for config={config_id}")
@@ -311,7 +410,10 @@ class KeboolaClient:
         Returns the final job record. If timeout expires, returns a
         synthetic record with status="timeout".
         """
-        url = f"{self.api_url}/v2/storage/jobs/{job_id}"
+        # Queue jobs must be polled on the Queue host, not the Storage API
+        # (/v2/storage/jobs only knows Storage jobs and would never resolve).
+        queue_host = self.api_url.replace("connection.", "queue.")
+        url = f"{queue_host}/jobs/{job_id}"
         start = time.time()
         while time.time() - start < timeout:
             try:
