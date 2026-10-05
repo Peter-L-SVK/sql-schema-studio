@@ -197,6 +197,10 @@ class HookManagerDialog(Gtk.Window):
                 self._show_generator_dialog(hook)
                 return
 
+            if hook_name == "Keboola Normalizer":
+                self._run_keboola_pipeline(hook)
+                return
+
             if hook and hasattr(hook, "execute_sync"):
                 # Sync hook (new style)
                 conn_string = ""
@@ -592,3 +596,60 @@ class HookManagerDialog(Gtk.Window):
         main_box.append(button_box)
         dialog.set_child(main_box)
         dialog.present()
+
+    def _run_keboola_pipeline(self, hook):
+        """Run the Keboola transformation pipeline."""
+        from src.hooks.python_hooks.keboola.profiles import ProfileManager
+
+        manager = ProfileManager()
+        if not manager.active_name:
+            self._show_error(
+                "Keboola Normalizer",
+                "No Keboola profile configured. Click 'Configure' to create one.",
+            )
+            return
+
+        # Ask for the CSV file
+        dialog = Gtk.FileDialog()
+        dialog.set_title("Select CSV to clean")
+
+        filter_csv = Gtk.FileFilter()
+        filter_csv.set_name("CSV Files (*.csv)")
+        filter_csv.add_pattern("*.csv")
+
+        from gi.repository import Gio
+
+        filter_store = Gio.ListStore.new(Gtk.FileFilter)
+        filter_store.append(filter_csv)
+        dialog.set_filters(filter_store)
+
+        def on_open(dialog, result):
+            try:
+                file = dialog.open_finish(result)
+                if not file:
+                    return
+                csv_path = file.get_path()
+                self._start_keboola_run(csv_path)
+            except Exception as e:
+                logger.error(f"CSV picker failed: {e}")
+
+        dialog.open(self, None, on_open)
+
+
+    def _start_keboola_run(self, csv_path: str):
+        """Open the runner dialog and connect it to the config dialog."""
+        from src.ui.dialogs.keboola_runner import KeboolaRunnerDialog
+        from src.ui.dialogs.keboola_config import KeboolaConfigDialog
+        from src.hooks.registry import PluginRegistry
+
+        registry = PluginRegistry()
+        registry.discover_plugins()
+        hook = registry.list_hooks().get("Keboola Normalizer")
+
+        # Non-modal config dialog opened alongside so user can see the report
+        config_dialog = KeboolaConfigDialog(self, hook)
+        config_dialog.present()
+
+        runner = KeboolaRunnerDialog(self, csv_path)
+        runner.set_report_callback(config_dialog.show_report)
+        runner.present()
