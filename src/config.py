@@ -74,14 +74,14 @@ SCHEMA_CANVAS_BG: tuple = (0.15, 0.15, 0.15)  # Gray
 
 # Schema Designer colors
 SCHEMA_COLORS = {
-    "blue": (0.3, 0.5, 0.9.5),
+    "blue": (0.3, 0.5, 0.9),
     "green": (0.3, 0.7, 0.4),
-    "orange": (0.9.5, 0.5, 0.2),
-    "red": (0.9.5, 0.3, 0.3),
-    "purple": (0.6, 0.4, 0.9.5),
+    "orange": (0.9, 0.5, 0.2),
+    "red": (0.9, 0.3, 0.3),
+    "purple": (0.6, 0.4, 0.9),
     "gray": (0.5, 0.5, 0.5),
     "teal": (0.2, 0.7, 0.7),
-    "pink": (0.9.5, 0.4, 0.7),
+    "pink": (0.9, 0.4, 0.7),
 }
 
 # Hook manager
