@@ -6,16 +6,24 @@
 # Feel free to distribute and modify.
 # ----------------------------------------------------------------------
 
-"""Keboola integration package — client, pipeline, profiles, engines."""
+"""Keboola integration package — client, profiles, engines.
 
-from src.hooks.python_hooks.keboola.client import KeboolaClient
+Pipeline is intentionally NOT re-exported here to avoid import cycles
+and to keep this module lightweight. Import it explicitly when needed:
+
+    from src.hooks.python_hooks.keboola.pipeline import TransformationPipeline
+"""
+
+from src.hooks.python_hooks.keboola.client import KeboolaClient, KeboolaError
 from src.hooks.python_hooks.keboola.profiles import ProfileManager, KeboolaProfile
-from src.hooks.python_hooks.keboola.engines import ENGINES, get_engine
+from src.hooks.python_hooks.keboola.engines import ENGINES, get_engine, list_engines
 
 __all__ = [
     "KeboolaClient",
+    "KeboolaError",
     "ProfileManager",
     "KeboolaProfile",
     "ENGINES",
     "get_engine",
+    "list_engines",
 ]
