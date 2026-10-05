@@ -18,6 +18,7 @@ gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk, Gdk, GLib
 from src.config import EXCLUDED_SCHEMAS, BROWSER_PANEL_WIDTH
 from src.core.schema_cache import SchemaCache
+from src.ui.results.panels import ResultsPanel
 from src.utils.gtk_helpers import run_async
 
 
@@ -841,18 +842,18 @@ class DatabaseBrowser(Gtk.Box):
             )
             return
 
+        # Find the widest column name for alignment
+        max_name = max(len(c["column_name"]) for c in columns)
+
         text = f"Table: {schema}.{table}\n{'─' * 50}\n"
         for col in columns:
-            dtype = col["data_type"]
-            if col.get("character_maximum_length"):
-                dtype += f"({col['character_maximum_length']})"
-            elif col.get("numeric_precision"):
-                scale = col.get("numeric_scale")
-                if scale:
-                    dtype += f"({col['numeric_precision']},{scale})"
-                else:
-                    dtype += f"({col['numeric_precision']})"
-            null = "NULL" if col["is_nullable"] == "YES" else "NOT NULL"
-            text += f"  {col['column_name']:<25} {dtype:<18} {null}\n"
+            dtype = ResultsPanel.format_data_type(
+                data_type=col["data_type"],
+                length=col.get("character_maximum_length"),
+                precision=col.get("numeric_precision"),
+                scale=col.get("numeric_scale"),
+            )
+            null = "NOT NULL" if col["is_nullable"] == "NO" else "NULL"
+            text += f"  {col['column_name']:<{max_name}}  {dtype:<18}  {null}\n"
 
         self._window.results.show_text(text)

@@ -39,9 +39,10 @@ class LogHandler(logging.Handler):
         try:
             msg = self.format(record)
             GLib.idle_add(self._panel._log, msg)
-        except Exception:
-            pass
-
+        except Exception as e:
+            # Write to stderr so we don't lose the failure silently
+            import sys
+            print(f"LogHandler.emit failed: {e}", file=sys.stderr)
 
 class ResultsPanel(Gtk.Box):
     """Query results display panel with Results, Log, and Terminal tabs."""
@@ -105,9 +106,17 @@ class ResultsPanel(Gtk.Box):
 
         self._notebook.connect("switch-page", self._on_notebook_switch)
 
-        # Attach log handler to root logger
+        # Attach log handler to the application logger (not root).
+        # The sql_schema_studio logger is already set to DEBUG in src/__init__.py,
+        # so INFO/DEBUG messages from our own modules land in the Log tab.
+        # Attaching to root would also capture noise from third-party libraries
+        # (google.protobuf, paramiko, ...), which we don't want.
         self._log_handler = LogHandler(self)
-        logging.getLogger().addHandler(self._log_handler)
+        self._log_handler.setLevel(logging.DEBUG)
+
+        app_logger = logging.getLogger("sql_schema_studio")
+        app_logger.setLevel(logging.DEBUG)
+        app_logger.addHandler(self._log_handler)
 
         # Store current theme
         self._current_theme = "dark"
@@ -215,58 +224,119 @@ class ResultsPanel(Gtk.Box):
         buffer.set_text(f"ERROR: {message}\n\nTime: {elapsed:.3f}s")
 
     def show_query_result(self, columns, rows, elapsed, row_limit=RESULTS_ROW_LIMIT):
-        """Display query results as formatted table in Results tab."""
+        """Display query results as a fixed-width table in the Results tab.
+
+        Every cell is padded to the column's max content width (capped at
+        40 chars). The `│` separators therefore line up perfectly under a
+        monospace font, matching the row above and below.
+        """
         self._notebook.set_current_page(0)
 
-        col_widths = []
+        # --- 1. Compute column widths (no padding included) ---
+        #    Cap at 40 chars so a single huge value doesn't blow the layout.
+        MAX_CELL = 40
+        col_widths: list[int] = []
         for i, col in enumerate(columns):
-            max_width = len(str(col))
+            width = len(str(col))
             for row in rows[:row_limit]:
                 val = str(row[i]) if row[i] is not None else "NULL"
-                max_width = max(max_width, min(len(val), 40))
-            col_widths.append(max_width + 2)
+                width = max(width, min(len(val), MAX_CELL))
+            col_widths.append(width)
 
-        text = self._build_separator("┌", "┬", "┐", col_widths, "─")
+        # --- 2. Build a single row with consistent padding ---
+        def make_row(values) -> str:
+            cells = []
+            for i, val in enumerate(values):
+                val_str = str(val) if val is not None else "NULL"
+                if len(val_str) > MAX_CELL:
+                    val_str = val_str[: MAX_CELL - 3] + "..."
+                # 1 space of padding on each side, plus the content left-justified
+                cells.append(f" {val_str:<{col_widths[i]}} ")
+            return "│" + "│".join(cells) + "│"
 
-        text += "│"
-        for i, col in enumerate(columns):
-            text += f" {col:<{col_widths[i]}} │"
-        text += "\n"
+        # --- 3. Build a separator row that matches column widths ---
+        def make_sep(left: str, mid: str, right: str) -> str:
+            parts = ["─" * (w + 2) for w in col_widths]  # +2 for padding
+            return left + mid.join(parts) + right
 
-        text += self._build_separator("├", "┼", "┤", col_widths, "─")
+        # --- 4. Assemble the table ---
+        lines: list[str] = []
+        lines.append(make_sep("┌", "┬", "┐"))
+        lines.append(make_row(columns))
+        lines.append(make_sep("├", "┼", "┤"))
 
         for row in rows[:row_limit]:
-            text += "│"
-            for i, val in enumerate(row):
-                val_str = str(val) if val is not None else "NULL"
-                if len(val_str) > 40:
-                    val_str = val_str[:37] + "..."
-                text += f" {val_str:<{col_widths[i]}} │"
-            text += "\n"
+            lines.append(make_row(row))
 
-        text += self._build_separator("└", "┴", "┘", col_widths, "─")
+        lines.append(make_sep("└", "┴", "┘"))
 
-        text += f"\n{len(rows)} row(s) returned"
+        # --- 5. Footer ---
+        lines.append("")
+        lines.append(f"{len(rows)} row(s) returned")
         if len(rows) > row_limit:
-            text += f" (showing first {row_limit})"
-        text += f"\nTime: {elapsed:.3f}s"
+            lines.append(f"(showing first {row_limit})")
+        lines.append(f"Time: {elapsed:.3f}s")
+
+        text = "\n".join(lines)
 
         buffer = self._result_view.get_buffer()
         buffer.set_text(text)
 
     def _log(self, message: str):
-        """Append message to Log tab with auto-scroll."""
-        buffer = self._log_view.get_buffer()
-        end = buffer.get_end_iter()
-        buffer.insert(end, f"{message}\n")
-        self._log_view.scroll_to_iter(end, 0.0, False, 0.0, 0.0)
+        """Append message to Log tab with auto-scroll.
 
-    def _build_separator(self, left: str, mid: str, right: str, widths: list, char: str) -> str:
-        """Build a table separator line."""
-        parts = [char * (w + 2) for w in widths]
-        return left + mid.join(parts) + right + "\n"
+        Called from LogHandler.emit via GLib.idle_add, so this always runs
+        on the GTK main thread.
+        """
+        try:
+            buffer = self._log_view.get_buffer()
+            end = buffer.get_end_iter()
+            buffer.insert(end, f"{message}\n")
+            self._log_view.scroll_to_iter(end, 0.0, False, 0.0, 0.0)
+        except Exception as e:
+            # Never let a logging failure crash the app
+            print(f"LogHandler write failed: {e}", file=sys.stderr)
+        return False  # one-shot idle callback
 
-    @property
-    def terminal(self):
-        """Get the terminal widget, or None if not initialized."""
-        return self._terminal
+    # =====================================================================
+    # Table structure formatting (used by browser when showing columns)
+    # =====================================================================
+
+    @staticmethod
+    def format_data_type(
+        data_type: str,
+        length: int | None = None,
+        precision: int | None = None,
+        scale: int | None = None,
+    ) -> str:
+        """Return a compact, PostgreSQL-style type string.
+
+        Examples:
+            integer, NULL, NULL        → "integer"
+            character varying, 50      → "varchar(50)"
+            numeric, NULL, 10, 2       → "numeric(10,2)"
+            timestamp without time zone→ "timestamp"
+        """
+        # Shorten common verbose PostgreSQL type names
+        short = {
+            "character varying": "varchar",
+            "character": "char",
+            "timestamp without time zone": "timestamp",
+            "timestamp with time zone": "timestamptz",
+            "time without time zone": "time",
+            "time with time zone": "timetz",
+            "double precision": "double",
+            "boolean": "boolean",
+            "integer": "integer",
+            "bigint": "bigint",
+            "smallint": "smallint",
+        }
+        base = short.get(data_type, data_type)
+
+        if length is not None:
+            return f"{base}({length})"
+        if precision is not None:
+            if scale:
+                return f"{base}({precision},{scale})"
+            return f"{base}({precision})"
+        return base
