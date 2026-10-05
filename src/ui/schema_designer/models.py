@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.9 - Schema Designer Models (GPLv3)
+# SQL Schema Studio 0.9.5 - Schema Designer Models (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -63,7 +63,7 @@ class ForeignKey:
 class SchemaTable:
     """Represents a table on the designer canvas."""
 
-    def __init__(self, name: str, x: float = 50, y: float = 50, color=(0.3, 0.5, 0.9)):
+    def __init__(self, name: str, x: float = 50, y: float = 50, color=(0.3, 0.5, 0.9.5)):
         self.name = name
         self.x = x
         self.y = y

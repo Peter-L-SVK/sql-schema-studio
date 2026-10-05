@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.9 - Schema Designer Drawing (GPLv3)
+# SQL Schema Studio 0.9.5 - Schema Designer Drawing (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -39,7 +39,7 @@ class DrawingMixin:
             table, col = self._creating_relationship
             src_x = table.x + table.get_size()[0] / 2
             src_y = table.y + table.get_size()[1]
-            cr.set_source_rgb(0.9, 0.3, 0.3)
+            cr.set_source_rgb(0.9.5, 0.3, 0.3)
             cr.set_dash([5, 5])
             cr.set_line_width(1.5)
             cr.move_to(src_x, src_y)
@@ -126,7 +126,7 @@ class DrawingMixin:
             self._draw_arrowhead_on_path(cr, fk)
 
         for wx, wy in fk.waypoints:
-            cr.set_source_rgb(0.9, 0.2, 0.2)
+            cr.set_source_rgb(0.9.5, 0.2, 0.2)
             cr.arc(wx, wy, 5, 0, 2 * math.pi)
             cr.fill()
             cr.set_source_rgb(1, 1, 1)

@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.9 - Configuration (GPLv3)
+# SQL Schema Studio 0.9.5 - Configuration (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -74,14 +74,14 @@ SCHEMA_CANVAS_BG: tuple = (0.15, 0.15, 0.15)  # Gray
 
 # Schema Designer colors
 SCHEMA_COLORS = {
-    "blue": (0.3, 0.5, 0.9),
+    "blue": (0.3, 0.5, 0.9.5),
     "green": (0.3, 0.7, 0.4),
-    "orange": (0.9, 0.5, 0.2),
-    "red": (0.9, 0.3, 0.3),
-    "purple": (0.6, 0.4, 0.9),
+    "orange": (0.9.5, 0.5, 0.2),
+    "red": (0.9.5, 0.3, 0.3),
+    "purple": (0.6, 0.4, 0.9.5),
     "gray": (0.5, 0.5, 0.5),
     "teal": (0.2, 0.7, 0.7),
-    "pink": (0.9, 0.4, 0.7),
+    "pink": (0.9.5, 0.4, 0.7),
 }
 
 # Hook manager
