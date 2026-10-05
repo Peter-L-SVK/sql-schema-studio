@@ -266,6 +266,23 @@ class DatabaseConnector:
         )
         return [r["schema_name"] for r in results]
 
+    def get_table_columns(self, schema: str, table: str) -> list[dict[str, Any]]:
+        """Fetch column metadata for a table.
+
+        Uses information_schema.columns, ordered by ordinal_position.
+        Returns an empty list if the table has no columns (shouldn't happen).
+        """
+        return self.execute_sync(
+            """
+            SELECT column_name, data_type, is_nullable,
+            character_maximum_length, numeric_precision, numeric_scale
+            FROM information_schema.columns
+            WHERE table_schema = %s AND table_name = %s
+            ORDER BY ordinal_position
+            """,
+            (schema, table),
+        )
+
     def get_tables(self, schema: str = "public") -> List[Dict]:
         return self.execute_sync(
             "SELECT table_name, table_type "

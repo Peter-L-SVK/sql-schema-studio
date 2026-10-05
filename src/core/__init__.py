@@ -5,3 +5,7 @@
 # This is free software with NO WARRANTY.
 # Feel free to distribute and modify.
 # ----------------------------------------------------------------------
+
+from src.core.schema_cache import SchemaCache
+
+__all__ = ["SchemaCache"]

@@ -17,6 +17,7 @@ import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk, Gdk, GLib
 from src.config import EXCLUDED_SCHEMAS, BROWSER_PANEL_WIDTH
+from src.core.schema_cache import SchemaCache
 from src.utils.gtk_helpers import run_async
 
 
@@ -116,6 +117,9 @@ class DatabaseBrowser(Gtk.Box):
         btn_clear.set_tooltip_text("Clear filter")
         btn_clear.connect("clicked", self._on_clear_filter)
         filter_box.append(btn_clear)
+
+        # Structure cache — see schema_cache.py for details
+        self._schema_cache = SchemaCache(ttl_seconds=300)
 
         self.append(filter_box)
 
@@ -754,10 +758,33 @@ class DatabaseBrowser(Gtk.Box):
         schema = self._store.get_value(tree_iter, 3)
 
         if n_press == 2 and item_type in ("BASE TABLE", "VIEW"):
+            # Build a preview query — do NOT run it automatically.
             query = f"SELECT * FROM {schema}.{item_name} LIMIT 100;"
-            self._window.editor.set_text(query)
-            self._window._on_run_clicked()
+
+            # Reuse the active tab if it's empty, otherwise open a new one.
+            editor = self._window.editor
+            active_tab = editor.get_active_tab()
+            active_text = active_tab.get_text().strip() if active_tab else ""
+
+            if active_tab is not None and not active_text:
+                editor.set_text(query)
+                new_title = f"{item_name} — preview"
+                active_tab._original_title = new_title
+                editor.rename_tab(active_tab, new_title)
+            else:
+                tab = editor.add_tab(
+                    title=f"{item_name} — preview",
+                    content=query,
+                )
+                tab._view.grab_focus()
+
+            self._window.statusbar.set_message(
+                f"Preview for {schema}.{item_name} loaded. Press F5 to run."
+            )
+            logger.info(f"Loaded preview query for {schema}.{item_name} (not executed)")
+
         elif item_type in ("BASE TABLE", "VIEW"):
+            # Single click — show structure (cached)
             self._show_structure(schema, item_name)
 
     def _on_selection_changed(self, selection):
@@ -768,32 +795,27 @@ class DatabaseBrowser(Gtk.Box):
             self._window.statusbar.set_connection(f"Selected: {name} ({itype})")
 
     def _show_structure(self, schema, table):
+        """Show table columns. Uses cache when possible."""
+        # 1. Try cache first
+        cached = self._schema_cache.get(schema, table)
+        if cached is not None:
+            logger.debug(f"Cache hit for structure of {schema}.{table}")
+            self._display_structure(schema, table, cached)
+            return
+
+        # 2. Cache miss — fetch from DB in background
+        logger.debug(f"Cache miss for structure of {schema}.{table}")
         db = self._window.db_connector
 
         def get_cols():
-            return db.execute_sync(
-                """
-                SELECT column_name, data_type, is_nullable,
-                       character_maximum_length
-                FROM information_schema.columns
-                WHERE table_schema = %s AND table_name = %s
-                ORDER BY ordinal_position
-            """,
-                (schema, table),
-            )
+            return db.get_table_columns(schema, table)
 
         def display(columns):
-            if not columns:
-                return
-            text = f"Table: {schema}.{table}\n{'─' * 50}\n"
-            for col in columns:
-                dtype = col["data_type"]
-                if col["character_maximum_length"]:
-                    dtype += f"({col['character_maximum_length']})"
-                null = "NULL" if col["is_nullable"] == "YES" else "NOT NULL"
-                text += f"  {col['column_name']:<25} {dtype:<18} {null}\n"
-
-            self._window.results.show_text(text)
+            if columns is None:
+                columns = []
+            # Store in cache (even if empty — avoids repeated fetch of missing table)
+            self._schema_cache.put(schema, table, columns)
+            self._display_structure(schema, table, columns)
 
         run_async(get_cols, display)
 
@@ -810,3 +832,27 @@ class DatabaseBrowser(Gtk.Box):
         table_name = self._store.get_value(tree_iter, 1)
 
         return Gdk.ContentProvider.new_for_value(f"{schema}.{table_name}")
+
+    def _display_structure(self, schema, table, columns):
+        """Render column metadata in the results panel."""
+        if not columns:
+            self._window.results.show_text(
+                f"Table: {schema}.{table}\n{'─' * 50}\n(no columns)"
+            )
+            return
+
+        text = f"Table: {schema}.{table}\n{'─' * 50}\n"
+        for col in columns:
+            dtype = col["data_type"]
+            if col.get("character_maximum_length"):
+                dtype += f"({col['character_maximum_length']})"
+            elif col.get("numeric_precision"):
+                scale = col.get("numeric_scale")
+                if scale:
+                    dtype += f"({col['numeric_precision']},{scale})"
+                else:
+                    dtype += f"({col['numeric_precision']})"
+            null = "NULL" if col["is_nullable"] == "YES" else "NOT NULL"
+            text += f"  {col['column_name']:<25} {dtype:<18} {null}\n"
+
+        self._window.results.show_text(text)
