@@ -120,7 +120,16 @@ class KeboolaClient:
             raise KeboolaError(f"Upload failed: {e}") from e
 
     def download_table_csv(self, table_id: str, output_dir: str) -> str:
-        """Download a table as CSV into output_dir."""
+        """Download a table as CSV into output_dir.
+
+        kbcstorage auto-stitches sliced files. Returns the path of the
+        main exported file.
+
+        Keboola's export_to_file names the file after the table, but the
+        exact name varies by API version — sometimes 'out_cleaned_data.csv',
+        sometimes 'out_cleaned_data' without an extension. We try a series
+        of patterns and pick the newest matching file.
+        """
         out = Path(output_dir)
         out.mkdir(parents=True, exist_ok=True)
 
@@ -134,30 +143,33 @@ class KeboolaClient:
 
         table_short = table_id.split(".")[-1]
 
-        # Try multiple patterns — Keboola's export names vary by API version
-        patterns = [
-            f"{table_short}*.csv",   # out_cleaned_data.csv
-            f"{table_short}*",       # out_cleaned_data (no extension)
-            "*.csv",                  # any CSV
-            "*",                      # any file
-        ]
+        # Try patterns in order — stop at the first one that finds a file.
+        # Sorting by mtime ensures we get the freshest export if multiple
+        # files happen to match.
         candidates: list[Path] = []
-        for pattern in patterns:
+        for pattern in (f"{table_short}*.csv", f"{table_short}*", "*.csv", "*"):
             candidates = sorted(
-                out.glob(pattern),
+                [p for p in out.glob(pattern) if p.is_file()],
                 key=lambda p: p.stat().st_mtime,
                 reverse=True,
             )
-            # Filter to files only (skip directories)
-            candidates = [c for c in candidates if c.is_file()]
             if candidates:
                 break
 
         if not candidates:
             raise KeboolaError(f"No file found after export in {output_dir}")
 
-        logger.info(f"Downloaded {table_id} → {candidates[0]}")
-        return str(candidates[0])
+        # If the file has no .csv suffix, rename it — downstream tools
+        # (file manager, Excel, pandas) expect the extension.
+        chosen = candidates[0]
+        if chosen.suffix.lower() != ".csv":
+            renamed = chosen.with_suffix(".csv")
+            chosen.rename(renamed)
+            chosen = renamed
+            logger.info(f"Renamed download to add .csv suffix: {chosen.name}")
+
+        logger.info(f"Downloaded {table_id} → {chosen}")
+        return str(chosen)
 
     # ==================================================================
     # Configuration API — transformations
