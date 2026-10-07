@@ -1,4 +1,5 @@
 # ----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 # SQL Schema Studio 0.9.5 - Terminal Color Themes (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
@@ -6,12 +7,17 @@
 # Feel free to distribute and modify.
 # ----------------------------------------------------------------------
 
-"""Terminal color theme definitions for VTE."""
+"""Terminal color theme definitions for VTE.
+
+Each theme declares a `variant` ("light" or "dark") so the Preferences
+dialog can filter themes by the user's selected theme mode.
+"""
 
 # fmt: off
 TERMINAL_THEMES = {
     "dark": {
         "name": "Dark",
+        "variant": "dark",
         "fg": "#D3D7CF",
         "bg": "#1E1E1E",
         "palette": [
@@ -23,6 +29,7 @@ TERMINAL_THEMES = {
     },
     "light": {
         "name": "Light",
+        "variant": "light",
         "fg": "#000000",
         "bg": "#FFFFFF",
         "palette": [
@@ -34,6 +41,7 @@ TERMINAL_THEMES = {
     },
     "tango-dark": {
         "name": "Tango Dark",
+        "variant": "dark",
         "fg": "#EEEEEC",
         "bg": "#2E3436",
         "palette": [
@@ -45,6 +53,7 @@ TERMINAL_THEMES = {
     },
     "tango-light": {
         "name": "Tango Light",
+        "variant": "light",
         "fg": "#2E3436",
         "bg": "#EEEEEC",
         "palette": [
@@ -56,6 +65,7 @@ TERMINAL_THEMES = {
     },
     "solarized-dark": {
         "name": "Solarized Dark",
+        "variant": "dark",
         "fg": "#839496",
         "bg": "#002B36",
         "palette": [
@@ -67,6 +77,7 @@ TERMINAL_THEMES = {
     },
     "solarized-light": {
         "name": "Solarized Light",
+        "variant": "light",
         "fg": "#657B83",
         "bg": "#FDF6E3",
         "palette": [
@@ -78,6 +89,7 @@ TERMINAL_THEMES = {
     },
     "monokai": {
         "name": "Monokai",
+        "variant": "dark",
         "fg": "#F8F8F2",
         "bg": "#272822",
         "palette": [
@@ -89,6 +101,7 @@ TERMINAL_THEMES = {
     },
     "nord": {
         "name": "Nord",
+        "variant": "dark",
         "fg": "#D8DEE9",
         "bg": "#2E3440",
         "palette": [
@@ -105,3 +118,35 @@ TERMINAL_THEMES = {
 def get_terminal_theme_names():
     """Return list of (theme_id, display_name) tuples for all themes."""
     return [(theme_id, theme["name"]) for theme_id, theme in TERMINAL_THEMES.items()]
+
+
+def get_terminal_theme_names_by_variant(variant: str):
+    """Return (theme_id, display_name) tuples filtered by variant.
+
+    Args:
+        variant: "light" or "dark".
+
+    Returns:
+        List of (theme_id, display_name), preserving the dict order
+        of TERMINAL_THEMES. Empty if no themes match.
+    """
+    return [
+        (theme_id, theme["name"])
+        for theme_id, theme in TERMINAL_THEMES.items()
+        if theme.get("variant") == variant
+    ]
+
+
+def get_default_terminal_theme(variant: str) -> str:
+    """Return a sensible default terminal theme id for a variant.
+
+    Prefers the short-named themes ("dark", "light") when available,
+    falls back to the first matching theme otherwise.
+    """
+    if variant in TERMINAL_THEMES and TERMINAL_THEMES[variant].get("variant") == variant:
+        return variant
+    for theme_id, theme in TERMINAL_THEMES.items():
+        if theme.get("variant") == variant:
+            return theme_id
+    # Ultimate fallback — should never be hit since we always have dark and light.
+    return "dark"

@@ -17,6 +17,10 @@ DEFAULTS = {
         "show_line_numbers": True,
         "highlight_current_line": True,
         "color_scheme": "classic",
+        "terminal_font": "Monospace 10",
+        "terminal_scheme": "dark",
+        "autocomplete_enabled": True,
+        "theme_mode": "auto",
     },
     "general": {
         "confirm_close": True,
