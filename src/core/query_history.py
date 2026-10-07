@@ -83,48 +83,56 @@ class QueryHistory:
             logger.error(f"Failed to save query history: {e}")
 
     def get_recent(self, limit: int = 50) -> list[dict]:
-        """Get recent queries."""
+        """Get recent queries (newest first)."""
         cursor = self._conn.execute(
             "SELECT id, query, category, database, executed_at, execution_time, row_count, success "
             "FROM history ORDER BY id DESC LIMIT ?",
             (limit,),
         )
-        rows = cursor.fetchall()
-        return [
-            {
-                "id": r[0],
-                "query": r[1],
-                "category": r[2],
-                "database": r[3],
-                "executed_at": r[4],
-                "execution_time": r[5],
-                "row_count": r[6],
-                "success": bool(r[7]),
-            }
-            for r in rows
-        ]
+        return [self._row_to_dict(r) for r in cursor.fetchall()]
 
     def search(self, term: str, limit: int = 50) -> list[dict]:
-        """Search queries containing a term."""
+        """Search queries containing a term (newest first)."""
         cursor = self._conn.execute(
             "SELECT id, query, category, database, executed_at, execution_time, row_count, success "
             "FROM history WHERE query LIKE ? ORDER BY id DESC LIMIT ?",
             (f"%{term}%", limit),
         )
-        rows = cursor.fetchall()
-        return [
-            {
-                "id": r[0],
-                "query": r[1],
-                "category": r[2],
-                "database": r[3],
-                "executed_at": r[4],
-                "execution_time": r[5],
-                "row_count": r[6],
-                "success": bool(r[7]),
-            }
-            for r in rows
-        ]
+        return [self._row_to_dict(r) for r in cursor.fetchall()]
+
+    def get_by_category(self, category: str, limit: int = 1000) -> list[dict]:
+        """Return queries filtered by category (newest first)."""
+        if category == "all":
+            return self.get_recent(limit=limit)
+        cursor = self._conn.execute(
+            "SELECT id, query, category, database, executed_at, execution_time, row_count, success "
+            "FROM history WHERE category = ? ORDER BY id DESC LIMIT ?",
+            (category, limit),
+        )
+        return [self._row_to_dict(r) for r in cursor.fetchall()]
+
+    def get_by_id(self, history_id: int) -> dict | None:
+        """Return a single history entry by its id, or None if not found."""
+        cursor = self._conn.execute(
+            "SELECT id, query, category, database, executed_at, execution_time, row_count, success "
+            "FROM history WHERE id = ?",
+            (history_id,),
+        )
+        row = cursor.fetchone()
+        return self._row_to_dict(row) if row else None
+
+    @staticmethod
+    def _row_to_dict(r) -> dict:
+        return {
+            "id": r[0],
+            "query": r[1],
+            "category": r[2],
+            "database": r[3],
+            "executed_at": r[4],
+            "execution_time": r[5],
+            "row_count": r[6],
+            "success": bool(r[7]),
+        }
 
     def clear(self):
         """Clear all history."""
