@@ -446,6 +446,34 @@ class KeboolaClient:
         logger.warning(f"Job {job_id} timed out after {timeout}s")
         return {"id": job_id, "status": "timeout", "isFinished": False}
 
+    def cancel_job(self, job_id: str) -> bool:
+        """Request cancellation of a running queue job.
+
+        Sends POST to the Queue API's /kill endpoint. Returns True on
+        success (HTTP 200), False if the job couldn't be cancelled
+        (already finished, not found, or API error).
+
+        Note: This is best-effort. Even if the API call succeeds, the
+        job may already be in a terminal state — the caller should not
+        rely on cancellation having taken effect without re-checking.
+        """
+        queue_host = self.api_url.replace("connection.", "queue.")
+        url = f"{queue_host}/jobs/{job_id}/kill"
+
+        try:
+            r = self.session.post(url, timeout=15)
+            if r.status_code == 200:
+                logger.info(f"Cancelled job {job_id}")
+                return True
+            logger.warning(
+                f"Cancel job {job_id} returned HTTP {r.status_code}: "
+                f"{r.text[:200]}"
+            )
+            return False
+        except requests.RequestException as e:
+            logger.error(f"Cancel job {job_id} failed: {e}")
+            return False
+
     # ==================================================================
     # Helpers — open file in system file manager
     # ==================================================================

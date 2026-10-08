@@ -10,7 +10,9 @@
 
 from __future__ import annotations
 
+import json as _json
 import os
+import threading
 
 import gi
 
@@ -38,6 +40,11 @@ class KeboolaRunnerDialog(Gtk.Window):
         self._profile_name = profile_name
         self._on_report = None  # callback set by caller
 
+        # Cancel signal — pipeline polls this between steps
+        self._cancel_event = threading.Event()
+
+        self._last_downloaded = ""
+
         self.set_default_size(560, 420)
         self._build_ui()
 
@@ -48,6 +55,8 @@ class KeboolaRunnerDialog(Gtk.Window):
         """Register a callback(report_dict) fired when the run finishes."""
         self._on_report = cb
 
+    # ==================================================================
+    # UI construction
     # ==================================================================
 
     def _build_ui(self):
@@ -85,6 +94,12 @@ class KeboolaRunnerDialog(Gtk.Window):
         btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         btn_box.set_halign(Gtk.Align.END)
 
+        self._btn_cancel = Gtk.Button(label="Cancel")
+        self._btn_cancel.add_css_class("destructive-action")
+        self._btn_cancel.set_tooltip_text("Stop the running pipeline")
+        self._btn_cancel.connect("clicked", self._on_cancel_clicked)
+        btn_box.append(self._btn_cancel)
+
         self._btn_show = Gtk.Button(label="Show File")
         self._btn_show.set_sensitive(False)
         self._btn_show.connect("clicked", self._on_show_file)
@@ -97,8 +112,8 @@ class KeboolaRunnerDialog(Gtk.Window):
         box.append(btn_box)
         self.set_child(box)
 
-        self._last_downloaded = ""
-
+    # ==================================================================
+    # Log / progress
     # ==================================================================
 
     def _log(self, msg: str):
@@ -126,12 +141,30 @@ class KeboolaRunnerDialog(Gtk.Window):
             "wait": 0.75,
             "download": 0.95,
             "done": 1.0,
+            "cancelled": 1.0,
             "error": 1.0,
         }
         frac = fractions.get(step, 0.05)
         self._progress.set_fraction(frac)
         return False
 
+    # ==================================================================
+    # Cancel
+    # ==================================================================
+
+    def _on_cancel_clicked(self, button):
+        """Signal the running pipeline to stop."""
+        if self._cancel_event.is_set():
+            return
+        logger.info("User requested cancellation")
+        self._cancel_event.set()
+        self._btn_cancel.set_sensitive(False)
+        self._btn_cancel.set_label("Cancelling…")
+        self._log("")
+        self._log("--- Cancel requested ---")
+
+    # ==================================================================
+    # Run
     # ==================================================================
 
     def _start_run(self):
@@ -141,7 +174,10 @@ class KeboolaRunnerDialog(Gtk.Window):
         csv_path = self._csv_path
 
         def run():
-            from src.hooks.python_hooks.keboola.pipeline import TransformationPipeline
+            from src.hooks.python_hooks.keboola.pipeline import (
+                TransformationPipeline,
+                PipelineCancelled,
+            )
 
             manager = ProfileManager()
             profile = manager.get(profile_name) if profile_name else manager.active
@@ -160,29 +196,44 @@ class KeboolaRunnerDialog(Gtk.Window):
                 }
 
             try:
-                pipeline = TransformationPipeline(profile, on_progress=self._on_progress)
+                pipeline = TransformationPipeline(
+                    profile,
+                    on_progress=self._on_progress,
+                    cancel_event=self._cancel_event,
+                )
                 report = pipeline.run(csv_path, timeout=300)
                 manager.add(profile)  # persist transformation_id if newly created
                 return report.to_dict()
+            except PipelineCancelled:
+                return {"status": "cancelled", "error": "Cancelled by user"}
             except Exception as e:
                 logger.exception("Pipeline run failed")
                 return {"status": "error", "error": str(e)}
 
         def on_done(report: dict):
             status = report.get("status", "error")
+
             if status == "ok":
                 self._progress.set_fraction(1.0)
-                self._step_label.set_markup('<span foreground="green">✓ Pipeline finished</span>')
+                self._step_label.set_markup(
+                    '<span foreground="green">✓ Pipeline finished</span>'
+                )
+            elif status == "cancelled":
+                self._progress.set_fraction(1.0)
+                self._step_label.set_markup(
+                    '<span foreground="orange">⚠ Cancelled by user</span>'
+                )
             else:
                 self._progress.set_fraction(1.0)
                 self._step_label.set_markup(
                     f'<span foreground="red">✗ {report.get("error", "failed")}</span>'
                 )
 
-            self._log("")
-            self._log(f"--- Final report ---")
-            import json as _json
+            # Cancel button is no longer useful once the pipeline is done
+            self._btn_cancel.set_sensitive(False)
 
+            self._log("")
+            self._log("--- Final report ---")
             self._log(_json.dumps(report, indent=2, default=str))
 
             path = report.get("downloaded_csv") or ""
@@ -198,6 +249,8 @@ class KeboolaRunnerDialog(Gtk.Window):
         run_async(run, on_done)
         return False
 
+    # ==================================================================
+    # Show file
     # ==================================================================
 
     def _on_show_file(self, _button):

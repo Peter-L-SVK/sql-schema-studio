@@ -204,6 +204,7 @@ class KeboolaNormalizerHook(BaseHook):
         profile_name: str | None = None,
         on_progress=None,
         timeout: int = 300,
+        cancel_event=None,
     ) -> dict:
         """Run the full Keboola transformation pipeline.
 
@@ -246,7 +247,11 @@ class KeboolaNormalizerHook(BaseHook):
             }
 
         try:
-            pipeline = TransformationPipeline(profile, on_progress=on_progress)
+            pipeline = TransformationPipeline(
+                profile,
+                on_progress=on_progress,
+                cancel_event=cancel_event,
+            )
             report = pipeline.run(csv_path, timeout=timeout)
 
             # Persist any changes to the profile (e.g. new transformation_id)

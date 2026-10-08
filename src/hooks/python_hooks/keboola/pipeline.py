@@ -18,10 +18,16 @@ Orchestrates the full flow:
 
 The pipeline is synchronous (uses requests + kbcstorage under the hood).
 Callers on the GTK thread should wrap it in asyncio.to_thread().
+
+Cancellation: pass a threading.Event via cancel_event. The pipeline
+checks it between steps and during the wait step's poll loop. If set,
+it raises PipelineCancelled (between steps) or returns a 'cancelled'
+step result (during wait) and attempts a server-side job kill.
 """
 
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -39,12 +45,18 @@ logger = get_logger(__name__)
 ProgressCallback = Callable[[str, str], None]
 
 
+class PipelineCancelled(Exception):
+    """Raised when the user cancels a running pipeline."""
+
+    pass
+
+
 @dataclass
 class PipelineStep:
     """Result of a single pipeline step."""
 
     name: str
-    status: str  # "ok" | "error" | "skipped"
+    status: str  # "ok" | "error" | "skipped" | "cancelled"
     duration: float = 0.0
     detail: dict = field(default_factory=dict)
     error: Optional[str] = None
@@ -63,13 +75,14 @@ class PipelineStep:
 class PipelineReport:
     """Full report of a pipeline run."""
 
-    status: str = "ok"  # "ok" | "error"
+    status: str = "ok"  # "ok" | "error" | "cancelled"
     started_at: str = ""
     finished_at: str = ""
     duration_seconds: float = 0.0
     steps: list[PipelineStep] = field(default_factory=list)
     output_table: str = ""
     downloaded_csv: str = ""
+    job_id: str = ""  # populated after the trigger step; used for cancel
     error: Optional[str] = None
 
     def to_dict(self) -> dict:
@@ -81,6 +94,7 @@ class PipelineReport:
             "steps": [s.to_dict() for s in self.steps],
             "output_table": self.output_table,
             "downloaded_csv": self.downloaded_csv,
+            "job_id": self.job_id,
             "error": self.error,
         }
 
@@ -92,9 +106,11 @@ class TransformationPipeline:
         self,
         profile: KeboolaProfile,
         on_progress: Optional[ProgressCallback] = None,
+        cancel_event: Optional[threading.Event] = None,
     ):
         self.profile = profile
         self.on_progress = on_progress
+        self._cancel_event = cancel_event or threading.Event()
 
         token = profile.get_token()
         if not token:
@@ -118,6 +134,16 @@ class TransformationPipeline:
                 self.on_progress(step, message)
             except Exception as e:
                 logger.warning(f"Progress callback failed: {e}")
+
+    def _check_cancelled(self) -> None:
+        """Raise PipelineCancelled if the user requested a stop.
+
+        Called between pipeline steps so we don't start a new step
+        (e.g. trigger a job) after the user clicked Cancel.
+        """
+        if self._cancel_event.is_set():
+            logger.info("[pipeline] Cancellation requested by user")
+            raise PipelineCancelled("Cancelled by user")
 
     def _output_table_id(self) -> str:
         """Build the fully-qualified output table id (bucket.table)."""
@@ -219,29 +245,70 @@ class TransformationPipeline:
         return step
 
     def _step_wait(self, job_id: str, timeout: int = 300) -> PipelineStep:
-        """Poll the job until it finishes or times out."""
+        """Poll the job, checking for cancel requests between polls.
+
+        Unlike client.wait_for_job (which blocks), this loop wakes up
+        every 2 seconds and checks self._cancel_event. When cancelled,
+        it also attempts a server-side kill so the Keboola job doesn't
+        keep running after the user clicked Cancel.
+        """
         step = PipelineStep(name="wait", status="ok")
         start = datetime.now()
 
         self._progress("wait", f"Waiting for job {job_id} (timeout {timeout}s)")
-        try:
-            final = self.client.wait_for_job(job_id, timeout=timeout)
-            status = final.get("status")
-            step.detail = {
-                "job_id": job_id,
-                "final_status": status,
-                "finished": final.get("isFinished", False),
-            }
 
-            if status == "timeout":
-                step.status = "error"
-                step.error = f"Job did not finish within {timeout}s"
-            elif status != "success":
-                # Extract the actual error message from the job payload
-                result = final.get("result", {}) or {}
-                message = result.get("message") or result.get("error") or status
-                step.status = "error"
-                step.error = f"Job failed: {message}"
+        queue_host = self.client.api_url.replace("connection.", "queue.")
+        url = f"{queue_host}/jobs/{job_id}"
+
+        import time as _time
+
+        poll_start = _time.time()
+        try:
+            while _time.time() - poll_start < timeout:
+                # --- Check cancel before each poll ---
+                if self._cancel_event.is_set():
+                    logger.info(f"[pipeline] Cancel requested — killing job {job_id}")
+                    self.client.cancel_job(job_id)
+                    step.status = "cancelled"
+                    step.error = "Cancelled by user"
+                    step.detail = {"job_id": job_id, "final_status": "cancelled"}
+                    step.duration = (datetime.now() - start).total_seconds()
+                    return step
+
+                # --- Poll job status ---
+                try:
+                    r = self.client.session.get(url, timeout=15)
+                    r.raise_for_status()
+                    data = r.json()
+                except Exception as e:
+                    logger.warning(f"Job poll error: {e}")
+                    _time.sleep(2)
+                    continue
+
+                status = data.get("status")
+                if data.get("isFinished") or status in ("success", "error", "terminated"):
+                    step.detail = {
+                        "job_id": job_id,
+                        "final_status": status,
+                        "finished": True,
+                    }
+                    if status == "success":
+                        step.status = "ok"
+                    else:
+                        result = data.get("result", {}) or {}
+                        message = result.get("message") or result.get("error") or status
+                        step.status = "error"
+                        step.error = f"Job failed: {message}"
+                    step.duration = (datetime.now() - start).total_seconds()
+                    return step
+
+                _time.sleep(2)
+
+            # --- Timeout ---
+            step.status = "error"
+            step.error = f"Job did not finish within {timeout}s"
+            step.detail = {"job_id": job_id, "final_status": "timeout", "finished": False}
+
         except Exception as e:
             step.status = "error"
             step.error = str(e)
@@ -282,6 +349,7 @@ class TransformationPipeline:
 
         Returns:
             PipelineReport with per-step details and final status.
+            status can be "ok", "error", or "cancelled".
         """
         report = PipelineReport()
         report.started_at = datetime.now().isoformat()
@@ -293,6 +361,9 @@ class TransformationPipeline:
         )
 
         try:
+            # --- Cancel check before we start any work ---
+            self._check_cancelled()
+
             # 1. Upload
             upload = self._step_upload(csv_path)
             report.steps.append(upload)
@@ -301,6 +372,9 @@ class TransformationPipeline:
                 report.error = upload.error
                 return self._finalize(report, start_time)
 
+            # --- Cancel check before the next step ---
+            self._check_cancelled()
+
             # 2. Create or update transformation
             transform = self._step_transform()
             report.steps.append(transform)
@@ -308,6 +382,9 @@ class TransformationPipeline:
                 report.status = "error"
                 report.error = transform.error
                 return self._finalize(report, start_time)
+
+            # --- Cancel check before the next step ---
+            self._check_cancelled()
 
             # 3. Trigger job
             trigger = self._step_trigger()
@@ -323,13 +400,25 @@ class TransformationPipeline:
                 report.error = "Trigger step returned no job id"
                 return self._finalize(report, start_time)
 
-            # 4. Wait for completion
+            # Remember the job id so callers can cancel if needed.
+            report.job_id = str(job_id)
+
+            # 4. Wait for completion — the wait step handles its own
+            #    cancellation polling and returns status="cancelled"
+            #    instead of raising.
             wait = self._step_wait(str(job_id), timeout=timeout)
             report.steps.append(wait)
+            if wait.status == "cancelled":
+                report.status = "cancelled"
+                report.error = "Cancelled by user"
+                return self._finalize(report, start_time)
             if wait.status == "error":
                 report.status = "error"
                 report.error = wait.error
                 return self._finalize(report, start_time)
+
+            # --- Cancel check before the download ---
+            self._check_cancelled()
 
             # 5. Download cleaned CSV
             report.output_table = self._output_table_id()
@@ -351,6 +440,11 @@ class TransformationPipeline:
                     )
                 )
 
+        except PipelineCancelled:
+            logger.info("Pipeline cancelled by user")
+            report.status = "cancelled"
+            report.error = "Cancelled by user"
+
         except Exception as e:
             # Catch-all for unexpected errors
             logger.exception(f"Pipeline crashed unexpectedly: {e}")
@@ -366,6 +460,8 @@ class TransformationPipeline:
 
         if report.status == "ok":
             self._progress("done", f"Pipeline finished in {report.duration_seconds:.1f}s")
+        elif report.status == "cancelled":
+            self._progress("cancelled", "Pipeline cancelled by user")
         else:
             self._progress("error", report.error or "Pipeline failed")
 
