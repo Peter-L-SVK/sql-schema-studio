@@ -98,15 +98,24 @@ class KeboolaClient:
     # ==================================================================
 
     def upload_csv(self, bucket: str, table_name: str, csv_path: str) -> dict:
-        """Upload CSV as a table. Creates or replaces the table.
+        """Upload CSV as a table, replacing any existing table with that name.
 
-        Note: kbcstorage's Tables.create() does not accept an `incremental`
-        parameter. For a full replace (the default), we simply call create()
-        without it. If the table already exists, Keboola will replace it.
+        The Storage API's tables.create() refuses to create a table whose
+        display name already exists — even if we intend to replace the
+        data. kbcstorage does not expose tables.delete(), so we call the
+        Storage API directly with requests.
+
+        If the delete fails (table didn't exist, or permission issue), we
+        proceed and let create() report the real error.
         """
         path = Path(csv_path)
         if not path.exists():
             raise KeboolaError(f"CSV file not found: {csv_path}")
+
+        table_id = f"{bucket}.{table_name}"
+
+        # --- Try to delete any existing table with this name ---
+        self._delete_table_if_exists(table_id)
 
         try:
             table = self.storage.tables.create(
@@ -114,10 +123,35 @@ class KeboolaClient:
                 bucket_id=bucket,
                 file_path=str(path),
             )
-            logger.info(f"Uploaded {csv_path} → {bucket}.{table_name}")
+            logger.info(f"Uploaded {csv_path} → {table_id}")
             return table
         except Exception as e:
             raise KeboolaError(f"Upload failed: {e}") from e
+
+    def _delete_table_if_exists(self, table_id: str) -> None:
+        """Delete a Storage table via HTTP if it exists.
+
+        Used before upload to work around tables.create() refusing to
+        replace a table with the same display name. The Storage API
+        requires the table to be deleted first.
+
+        This is best-effort: any error is logged but not raised, so the
+        caller can proceed and surface a more relevant error if needed.
+        """
+        url = f"{self.api_url}/v2/storage/tables/{table_id}"
+        try:
+            r = self.session.delete(url, timeout=30)
+            if r.status_code in (200, 202, 204):
+                logger.info(f"Deleted existing table {table_id} before upload")
+            elif r.status_code == 404:
+                logger.debug(f"Table {table_id} does not exist — nothing to delete")
+            else:
+                logger.warning(
+                    f"Delete table {table_id} returned HTTP {r.status_code}: "
+                    f"{r.text[:200]}"
+                )
+        except requests.RequestException as e:
+            logger.debug(f"Delete table {table_id} failed: {e}")
 
     def download_table_csv(self, table_id: str, output_dir: str) -> str:
         """Download a table as CSV into output_dir.
