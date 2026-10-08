@@ -3,6 +3,7 @@
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
+# Feel free to distribute and modify.
 # ----------------------------------------------------------------------
 
 """Tests for the Keboola transformation pipeline (mocked client)."""
@@ -16,6 +17,11 @@ from src.hooks.python_hooks.keboola.pipeline import (
     TransformationPipeline,
     PipelineReport,
 )
+
+
+# =====================================================================
+# Fixtures
+# =====================================================================
 
 
 @pytest.fixture
@@ -34,15 +40,42 @@ def profile():
 
 
 @pytest.fixture
-def pipeline(profile, tmp_path):
+def pipeline(profile):
     """Pipeline with mocked client."""
     with patch.object(KeboolaProfile, "get_token", return_value="fake-token"):
         with patch(
             "src.hooks.python_hooks.keboola.pipeline.KeboolaClient"
-        ) as mock_client:
+        ):
             p = TransformationPipeline(profile)
             p.client = MagicMock()
+            p.client.api_url = "https://connection.test.keboola.com"
             yield p
+
+
+def _mock_job_response(status: str, is_finished: bool = True, result: dict | None = None):
+    """Build a MagicMock that mimics a successful session.get() response.
+
+    The pipeline's _step_wait uses self.client.session.get(url) directly
+    and reads .json() from the response. Tests must therefore mock that
+    call, not the (no longer used) client.wait_for_job().
+    """
+    response = MagicMock()
+    response.status_code = 200
+    response.raise_for_status = MagicMock()
+    payload = {
+        "id": "job-1",
+        "status": status,
+        "isFinished": is_finished,
+    }
+    if result is not None:
+        payload["result"] = result
+    response.json.return_value = payload
+    return response
+
+
+# =====================================================================
+# Step-level tests
+# =====================================================================
 
 
 class TestPipelineSteps:
@@ -73,7 +106,7 @@ class TestPipelineSteps:
         assert step.status == "ok"
         assert step.detail["action"] == "create"
         assert step.detail["config_id"] == "99999"
-        assert profile.transformation_id == "99999"  # persisted
+        assert profile.transformation_id == "99999"
 
     def test_transform_step_updates_existing(self, pipeline, profile):
         profile.transformation_id = "12345"
@@ -90,34 +123,39 @@ class TestPipelineSteps:
         assert step.detail["job_id"] == "job-1"
 
     def test_wait_step_success(self, pipeline):
-        pipeline.client.wait_for_job.return_value = {
-            "id": "job-1",
-            "status": "success",
-            "isFinished": True,
-        }
+        """_step_wait now polls session.get() — mock that, not wait_for_job."""
+        pipeline.client.session.get.return_value = _mock_job_response("success")
+
         step = pipeline._step_wait("job-1")
         assert step.status == "ok"
+        assert step.detail["final_status"] == "success"
 
     def test_wait_step_job_failed(self, pipeline):
-        pipeline.client.wait_for_job.return_value = {
-            "id": "job-1",
-            "status": "error",
-            "isFinished": True,
-            "result": {"message": "SQL syntax error"},
-        }
+        pipeline.client.session.get.return_value = _mock_job_response(
+            "error",
+            result={"message": "SQL syntax error"},
+        )
+
         step = pipeline._step_wait("job-1")
         assert step.status == "error"
         assert "SQL syntax error" in step.error
 
     def test_wait_step_timeout(self, pipeline):
-        pipeline.client.wait_for_job.return_value = {
-            "id": "job-1",
-            "status": "timeout",
-            "isFinished": False,
-        }
+        """Job never finishes — _step_wait returns an error after timeout."""
+        # Always return 'running' — the loop will hit the timeout
+        pipeline.client.session.get.return_value = _mock_job_response(
+            "running", is_finished=False
+        )
+
+        # Use a 1-second timeout so the test doesn't take long
         step = pipeline._step_wait("job-1", timeout=1)
         assert step.status == "error"
         assert "did not finish" in step.error
+
+
+# =====================================================================
+# Full-run tests
+# =====================================================================
 
 
 class TestPipelineRun:
@@ -129,11 +167,7 @@ class TestPipelineRun:
         pipeline.client.upload_csv.return_value = {"rowsCount": 1}
         pipeline.client.create_transformation.return_value = {"id": "99999"}
         pipeline.client.trigger_job.return_value = {"id": "job-1"}
-        pipeline.client.wait_for_job.return_value = {
-            "id": "job-1",
-            "status": "success",
-            "isFinished": True,
-        }
+        pipeline.client.session.get.return_value = _mock_job_response("success")
         pipeline.client.download_table_csv.return_value = "/tmp/out_cleaned.csv"
 
         report = pipeline.run(str(csv))
@@ -153,7 +187,6 @@ class TestPipelineRun:
         report = pipeline.run(str(csv))
         assert report.status == "error"
         assert "upload failed" in report.error
-        # Only the upload step should have run
         assert len(report.steps) == 1
         assert report.steps[0].name == "upload"
 
@@ -164,12 +197,10 @@ class TestPipelineRun:
         pipeline.client.upload_csv.return_value = {"rowsCount": 1}
         pipeline.client.create_transformation.return_value = {"id": "99999"}
         pipeline.client.trigger_job.return_value = {"id": "job-1"}
-        pipeline.client.wait_for_job.return_value = {
-            "id": "job-1",
-            "status": "error",
-            "isFinished": True,
-            "result": {"message": "syntax error"},
-        }
+        pipeline.client.session.get.return_value = _mock_job_response(
+            "error",
+            result={"message": "syntax error"},
+        )
 
         report = pipeline.run(str(csv))
         assert report.status == "error"
@@ -185,15 +216,10 @@ class TestPipelineRun:
         pipeline.client.upload_csv.return_value = {"rowsCount": 1}
         pipeline.client.create_transformation.return_value = {"id": "99999"}
         pipeline.client.trigger_job.return_value = {"id": "job-1"}
-        pipeline.client.wait_for_job.return_value = {
-            "id": "job-1",
-            "status": "success",
-            "isFinished": True,
-        }
+        pipeline.client.session.get.return_value = _mock_job_response("success")
         pipeline.client.download_table_csv.side_effect = KeboolaError("download failed")
 
         report = pipeline.run(str(csv))
-        # Transformation succeeded — status stays ok, download warning logged
         assert report.status == "ok"
         assert "download warning" in (report.error or "").lower()
 
@@ -209,17 +235,14 @@ class TestPipelineRun:
         with patch.object(KeboolaProfile, "get_token", return_value="fake-token"):
             with patch(
                 "src.hooks.python_hooks.keboola.pipeline.KeboolaClient"
-            ) as mock_client:
+            ):
                 p = TransformationPipeline(profile, on_progress=on_progress)
                 p.client = MagicMock()
+                p.client.api_url = "https://connection.test.keboola.com"
                 p.client.upload_csv.return_value = {"rowsCount": 1}
                 p.client.create_transformation.return_value = {"id": "99999"}
                 p.client.trigger_job.return_value = {"id": "job-1"}
-                p.client.wait_for_job.return_value = {
-                    "id": "job-1",
-                    "status": "success",
-                    "isFinished": True,
-                }
+                p.client.session.get.return_value = _mock_job_response("success")
                 p.run(str(csv))
 
         step_names = [e[0] for e in events]
@@ -235,3 +258,5 @@ class TestPipelineRun:
         assert d["status"] == "ok"
         assert d["output_table"] == "out.c.x"
         assert isinstance(d["steps"], list)
+        # job_id is the new field added for cancellation support
+        assert "job_id" in d
