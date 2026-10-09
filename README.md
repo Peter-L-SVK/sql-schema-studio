@@ -122,6 +122,7 @@ git clone https://github.com/Peter-L-SVK/sql-schema-studio.git
 cd sql-schema-studio
 pip install --user -e . or pipx variant
 python3 -m src.main
+```
 
 ## Installation from Packages
 
