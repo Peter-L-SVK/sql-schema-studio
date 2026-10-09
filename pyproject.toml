@@ -127,7 +127,6 @@ no_implicit_optional = true
 module = [
     "kbcstorage.*",
     "paramiko.*",
-    "faker.*",
     "keyring.*",
 ]
 ignore_missing_imports = true
@@ -142,6 +141,7 @@ module = [
     "src.core.schema_parser",
     "src.core.ssh_tunnel",
     "src.analytics.engine",
+    "src.hooks.python_hooks.keboola.client",
     "src.hooks.python_hooks.keboola_normalizer",
     "src.hooks.python_hooks.data_generator",
 ]
