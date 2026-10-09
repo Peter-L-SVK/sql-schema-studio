@@ -107,6 +107,22 @@ More detailed plans in [ROADMAP](https://github.com/Peter-L-SVK/sql-schema-studi
 - VTE/terminal 
 - Developed on Fedora 43 Cinnamon and tested on Fedora 43 KDE Plasma 6
 
+## ⚠️ Alpha Version — Run from Source
+
+**SQL Schema Studio 0.9.x is alpha software.** The RPM/DEB packages and PyPI
+release **are not ready yet** — they will ship with v1.0.0.
+
+Until then, you must **run the application directly from the source code**.
+
+The source-code workflow is documented in [Run from source](#run-from-source)
+below. In short:
+
+```bash
+git clone https://github.com/Peter-L-SVK/sql-schema-studio.git
+cd sql-schema-studio
+pip install --user -e . or pipx variant
+python3 -m src.main
+
 ## Installation from Packages
 
 ### Fedora / RHEL (RPM)
