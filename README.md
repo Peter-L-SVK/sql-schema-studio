@@ -405,7 +405,7 @@ See [CONTRIBUTING](https://github.com/Peter-L-SVK/sql-schema-studio/blob/main/CO
 Please open an issue or pull request for bug fixes, feature suggestions, or documentation improvements.
 Also discussion on repo is allowed.
 
-See [HOOKS]((https://github.com/Peter-L-SVK/sql-schema-studio/blob/main/docs/HOOKS.md) for the hook development guide.
+See [HOOKS](https://github.com/Peter-L-SVK/sql-schema-studio/blob/main/docs/HOOKS.md) for the hook development guide.
 
 ## License
 
