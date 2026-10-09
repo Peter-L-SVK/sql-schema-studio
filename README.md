@@ -22,6 +22,8 @@ Connect to PostgreSQL, browse schemas and tables, write and execute queries
 with syntax highlighting, design schemas visually, and get AI-powered index
 recommendations. Extend with Python and Perl hooks for custom automation.
 
+See [HOOKS]((https://github.com/Peter-L-SVK/sql-schema-studio/blob/main/docs/HOOKS.md) for the hook development guide.
+
 ## Current Features
 
 ### Editor
@@ -402,6 +404,8 @@ src/
 See [CONTRIBUTING](https://github.com/Peter-L-SVK/sql-schema-studio/blob/main/CONTRIBUTING.md) for details.  
 Please open an issue or pull request for bug fixes, feature suggestions, or documentation improvements.
 Also discussion on repo is allowed.
+
+See [HOOKS]((https://github.com/Peter-L-SVK/sql-schema-studio/blob/main/docs/HOOKS.md) for the hook development guide.
 
 ## License
 
