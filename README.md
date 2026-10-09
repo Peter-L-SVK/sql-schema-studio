@@ -111,9 +111,10 @@ More detailed plans in [ROADMAP](https://github.com/Peter-L-SVK/sql-schema-studi
 
 ## ⚠️ Alpha Version — Run from Source
 
-**SQL Schema Studio 0.9.x is alpha software.** The RPM/DEB packages and PyPI
-release **are not ready yet** — they will ship with v1.0.0.
-
+**SQL Schema Studio 0.9.x is alpha software.**  
+The packaged builds still need their code paths rewritten for the directory structure the RPM/DEB installers drop the app into.  
+Until that's done you won't get the full feature set out of a packaged install.  
+This will be done in **v1.0.0**  
 Until then, you must **run the application directly from the source code**.
 
 The source-code workflow is documented in [Run from source](#run-from-source)
