@@ -268,8 +268,23 @@ class ConnectionDialog(Gtk.Dialog):
                         get_postgres_conn_string_with_ssh,
                     )
 
-                    ssh_config = SSHTunnelConfig(...)
-                    db_config = {...}
+                    ssh_config = SSHTunnelConfig(
+                        enabled=True,
+                        ssh_host=profile.ssh_host,
+                        ssh_port=profile.ssh_port,
+                        ssh_user=profile.ssh_user,
+                        ssh_password=profile.ssh_password,
+                        ssh_key_path=profile.ssh_key_path,
+                        remote_host=profile.ssh_remote_host,
+                        remote_port=profile.ssh_remote_port,
+                    )
+                    db_config = {
+                        "host": profile.host,
+                        "port": profile.port,
+                        "database": profile.database,
+                        "username": profile.username,
+                        "password": profile.password,
+                    }
                     conn_string, tunnel, error = get_postgres_conn_string_with_ssh(
                         ssh_config, db_config
                     )

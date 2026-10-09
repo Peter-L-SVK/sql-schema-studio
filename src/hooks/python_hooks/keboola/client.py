@@ -28,7 +28,7 @@ from __future__ import annotations
 import subprocess
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import requests
 
@@ -83,7 +83,7 @@ class KeboolaClient:
         try:
             r = self.session.get(url, timeout=15)
             r.raise_for_status()
-            return r.json()
+            return cast(dict[str, Any], r.json())
         except requests.HTTPError as e:
             raise KeboolaError(f"Token verification failed: {e.response.status_code}") from e
         except requests.RequestException as e:
@@ -120,7 +120,7 @@ class KeboolaClient:
                 file_path=str(path),
             )
             logger.info(f"Uploaded {csv_path} → {table_id}")
-            return table
+            return cast(dict[str, Any], table)
         except Exception as e:
             raise KeboolaError(f"Upload failed: {e}") from e
 
@@ -313,7 +313,7 @@ class KeboolaClient:
                 f"Created transformation '{name}' (id={config.get('id')}) "
                 f"on {eng['display_name']}"
             )
-            return config
+            return cast(dict[str, Any], config)
         except requests.HTTPError as e:
             body = e.response.text[:500]
             raise KeboolaError(
@@ -383,7 +383,7 @@ class KeboolaClient:
             r = self.session.put(url, json=current, timeout=30)
             r.raise_for_status()
             logger.info(f"Updated transformation id={config_id}")
-            return r.json()
+            return cast(dict[str, Any], r.json())
         except requests.HTTPError as e:
             body = e.response.text[:500]
             raise KeboolaError(
@@ -396,7 +396,7 @@ class KeboolaClient:
         try:
             r = self.session.get(url, timeout=15)
             r.raise_for_status()
-            return r.json()
+            return cast(dict[str, Any], r.json())
         except requests.HTTPError as e:
             raise KeboolaError(
                 f"Get transformation failed ({e.response.status_code}): " f"{e.response.text[:300]}"
@@ -432,7 +432,7 @@ class KeboolaClient:
             r.raise_for_status()
             job = r.json()
             logger.info(f"Triggered job id={job.get('id')} for config={config_id}")
-            return job
+            return cast(dict[str, Any], job)
         except requests.HTTPError as e:
             body = e.response.text[:500]
             raise KeboolaError(f"Trigger job failed ({e.response.status_code}): {body}") from e
@@ -461,7 +461,7 @@ class KeboolaClient:
             status = data.get("status")
             if data.get("isFinished") or status in ("success", "error", "terminated"):
                 logger.info(f"Job {job_id} finished with status={status}")
-                return data
+                return cast(dict[str, Any], data)
             time.sleep(poll)
 
         logger.warning(f"Job {job_id} timed out after {timeout}s")

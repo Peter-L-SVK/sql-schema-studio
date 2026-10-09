@@ -30,7 +30,9 @@ def make_keboola_uri(profile_name: str) -> str:
 
 def is_keboola_uri(path: str | None) -> bool:
     """Check whether a tab's file_path points to a Keboola profile."""
-    return bool(path) and path.startswith(KEBOOLA_URI_PREFIX)
+    if path is None:
+        return False
+    return path.startswith(KEBOOLA_URI_PREFIX)
 
 
 def profile_name_from_uri(uri: str) -> str | None:

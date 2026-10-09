@@ -207,7 +207,10 @@ class QueryHistoryDialog(Gtk.Window):
         if tree_iter is None:
             return None
         path = model.get_path(tree_iter)
-        return path.get_indices()[0]
+        indices = path.get_indices()
+        if not indices:
+            return None
+        return int(indices[0])
 
     def _on_load(self, button):
         """Load the selected query into the editor."""

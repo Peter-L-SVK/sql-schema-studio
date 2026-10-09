@@ -123,53 +123,27 @@ namespace_packages = true
 check_untyped_defs = true
 no_implicit_optional = true
 
-# Ignore schema_designer modules (mixin problems)
+# Third-party libs without stubs — don't report missing imports
 [[tool.mypy.overrides]]
-module = "src.ui.schema_designer.*"
-ignore_errors = true
+module = [
+    "kbcstorage.*",
+    "paramiko.*",
+    "faker.*",
+    "keyring.*",
+]
+ignore_missing_imports = true
 
+# Modules where GTK/`Any` returns make strict typing impractical.
+# Each of these is either mostly GUI glue or wraps a third-party
+# client that returns Any (kbcstorage, psycopg rows, etc.).
 [[tool.mypy.overrides]]
-module = "src.hooks.python_hooks.keboola_normalizer"
+module = [
+    "src.ui.schema_designer.*",
+    "src.ui.editor_tabs",
+    "src.core.schema_parser",
+    "src.core.ssh_tunnel",
+    "src.analytics.engine",
+    "src.hooks.python_hooks.keboola_normalizer",
+    "src.hooks.python_hooks.data_generator",
+]
 ignore_errors = true
-
-[[tool.mypy.overrides]]
-module = "src.hooks.python_hooks.data_generator"
-ignore_errors = true
-
-[[tool.mypy.overrides]]
-module = "src.analytics.engine"
-ignore_errors = true
-
-[[tool.mypy.overrides]]
-module = "src.core.schema_parser"
-ignore_errors = true
-
-[[tool.mypy.overrides]]
-module = "src.ui.editor_tabs"
-ignore_errors = true
-
-[[tool.mypy.overrides]]
-module = "src.core.ssh_tunnel"
-ignore_errors = true
-
-[[tool.mypy.overrides]]
-module = "src.hooks.python_hooks.keboola_normalizer"
-ignore_errors = true
-
-[[tool.mypy.overrides]]
-module = "src.hooks.python_hooks.data_generator"
-ignore_errors = true
-
-[[tool.mypy.overrides]]
-module = "src.analytics.engine"
-ignore_errors = true
-
-[[tool.mypy.overrides]]
-module = "src.core.schema_parser"
-ignore_errors = true
-
-[tool.pytest.ini_options]
-minversion = "7.0"
-testpaths = ["tests"]
-pythonpath = ["."]
-addopts = "-v --tb=short"

@@ -31,7 +31,7 @@ class PythonHookExecutor:
         module = importlib.util.module_from_spec(spec)  # type: ignore[attr-defined]
         spec.loader.exec_module(module)
 
-        hook_instance = module.Plugin()
+        hook_instance: BaseHook = module.Plugin()
 
         if hook_instance.validate():
             metadata = hook_instance.get_metadata()
