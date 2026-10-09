@@ -80,6 +80,15 @@ class EditorTab(Gtk.Box):
         buffer.connect("modified-changed", self._on_modified_changed)
 
     def _setup_sql_language(self):
+        """Set SQL language and apply the user's preferred color scheme.
+
+        Reads the scheme from Settings so a newly created tab does not
+        briefly show 'classic' before EditorTabs._apply_settings_to_tab()
+        runs — that two-step caused a visible flicker on every Ctrl+T.
+
+        Falls back to a small hardcoded list if the user's saved scheme
+        is not available (e.g. removed GtkSourceView style).
+        """
         manager = GtkSource.LanguageManager.get_default()
         lang = manager.get_language("sql")
         if not lang:
@@ -87,15 +96,34 @@ class EditorTab(Gtk.Box):
                 if "sql" in lang_id.lower():
                     lang = manager.get_language(lang_id)
                     break
-        if lang:
-            buffer = self._view.get_buffer()
-            buffer.set_language(lang)
-            scheme_manager = GtkSource.StyleSchemeManager.get_default()
-            for scheme_id in ["classic", "tango", "oblivion", "cobalt"]:
-                scheme = scheme_manager.get_scheme(scheme_id)
-                if scheme:
-                    buffer.set_style_scheme(scheme)
-                    break
+        if not lang:
+            return
+
+        buffer = self._view.get_buffer()
+        buffer.set_language(lang)
+
+        # Read user's preferred scheme from Settings — the same source
+        # EditorTabs._apply_settings_to_tab() uses, so the first
+        # set_style_scheme() call already applies the right one.
+        from src.utils.settings import Settings
+
+        settings = Settings()
+        editor = settings.get_section("editor")
+        scheme_id = editor.get("color_scheme", "classic")
+
+        scheme_manager = GtkSource.StyleSchemeManager.get_default()
+        scheme = scheme_manager.get_scheme(scheme_id)
+        if scheme:
+            buffer.set_style_scheme(scheme)
+            return
+
+        # Fallback: user's saved scheme is gone (removed style, renamed
+        # scheme id, etc.). Pick the first available from a small list.
+        for fallback in ("classic", "tango", "oblivion", "cobalt"):
+            scheme = scheme_manager.get_scheme(fallback)
+            if scheme:
+                buffer.set_style_scheme(scheme)
+                return
 
     def _setup_autocomplete(self):
         self._build_completion_popover()
