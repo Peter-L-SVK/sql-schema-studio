@@ -12,7 +12,6 @@ import time
 from gi.repository import Gtk
 from typing import Any
 
-from src.config import REFRESH_TRIGGER_COMMANDS
 from src.utils.gtk_helpers import run_async
 from src.utils.logging import get_logger
 
