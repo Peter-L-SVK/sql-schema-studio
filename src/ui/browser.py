@@ -837,9 +837,7 @@ class DatabaseBrowser(Gtk.Box):
     def _display_structure(self, schema, table, columns):
         """Render column metadata in the results panel."""
         if not columns:
-            self._window.results.show_text(
-                f"Table: {schema}.{table}\n{'─' * 50}\n(no columns)"
-            )
+            self._window.results.show_text(f"Table: {schema}.{table}\n{'─' * 50}\n(no columns)")
             return
 
         # Find the widest column name for alignment

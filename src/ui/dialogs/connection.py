@@ -267,6 +267,7 @@ class ConnectionDialog(Gtk.Dialog):
                         SSHTunnelConfig,
                         get_postgres_conn_string_with_ssh,
                     )
+
                     ssh_config = SSHTunnelConfig(...)
                     db_config = {...}
                     conn_string, tunnel, error = get_postgres_conn_string_with_ssh(
@@ -280,7 +281,7 @@ class ConnectionDialog(Gtk.Dialog):
                         f"dbname={profile.database} user={profile.username} "
                         f"password={profile.password}"
                     )
-                    
+
                 with psycopg.connect(conn_string) as conn:
                     conn.execute("SELECT 1")
                 return True, "Connection successful!"

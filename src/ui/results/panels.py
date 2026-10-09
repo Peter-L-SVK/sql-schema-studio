@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import logging
+import sys
 
 import gi
 
@@ -42,7 +43,9 @@ class LogHandler(logging.Handler):
         except Exception as e:
             # Write to stderr so we don't lose the failure silently
             import sys
+
             print(f"LogHandler.emit failed: {e}", file=sys.stderr)
+
 
 class ResultsPanel(Gtk.Box):
     """Query results display panel with Results, Log, and Terminal tabs."""

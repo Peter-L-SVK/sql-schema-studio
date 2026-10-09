@@ -66,9 +66,7 @@ class SchemaCache:
     def put(self, schema: str, table: str, data: Any) -> None:
         """Store data for a table."""
         with self._lock:
-            self._cache[(schema, table)] = _CacheEntry(
-                data=data, timestamp=time.time()
-            )
+            self._cache[(schema, table)] = _CacheEntry(data=data, timestamp=time.time())
 
     # ==================================================================
     # Invalidation

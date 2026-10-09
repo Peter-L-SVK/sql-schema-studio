@@ -184,7 +184,7 @@ class KeboolaRunnerDialog(Gtk.Window):
             if profile is None:
                 return {
                     "status": "error",
-                    "error": f"No profile found"
+                    "error": "No profile found"
                     + (f" named '{profile_name}'" if profile_name else ""),
                 }
 
@@ -215,14 +215,10 @@ class KeboolaRunnerDialog(Gtk.Window):
 
             if status == "ok":
                 self._progress.set_fraction(1.0)
-                self._step_label.set_markup(
-                    '<span foreground="green">✓ Pipeline finished</span>'
-                )
+                self._step_label.set_markup('<span foreground="green">✓ Pipeline finished</span>')
             elif status == "cancelled":
                 self._progress.set_fraction(1.0)
-                self._step_label.set_markup(
-                    '<span foreground="orange">⚠ Cancelled by user</span>'
-                )
+                self._step_label.set_markup('<span foreground="orange">⚠ Cancelled by user</span>')
             else:
                 self._progress.set_fraction(1.0)
                 self._step_label.set_markup(

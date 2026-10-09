@@ -18,7 +18,6 @@ from src.hooks.python_hooks.keboola.pipeline import (
     PipelineReport,
 )
 
-
 # =====================================================================
 # Fixtures
 # =====================================================================
@@ -43,9 +42,7 @@ def profile():
 def pipeline(profile):
     """Pipeline with mocked client."""
     with patch.object(KeboolaProfile, "get_token", return_value="fake-token"):
-        with patch(
-            "src.hooks.python_hooks.keboola.pipeline.KeboolaClient"
-        ):
+        with patch("src.hooks.python_hooks.keboola.pipeline.KeboolaClient"):
             p = TransformationPipeline(profile)
             p.client = MagicMock()
             p.client.api_url = "https://connection.test.keboola.com"
@@ -143,9 +140,7 @@ class TestPipelineSteps:
     def test_wait_step_timeout(self, pipeline):
         """Job never finishes — _step_wait returns an error after timeout."""
         # Always return 'running' — the loop will hit the timeout
-        pipeline.client.session.get.return_value = _mock_job_response(
-            "running", is_finished=False
-        )
+        pipeline.client.session.get.return_value = _mock_job_response("running", is_finished=False)
 
         # Use a 1-second timeout so the test doesn't take long
         step = pipeline._step_wait("job-1", timeout=1)
@@ -233,9 +228,7 @@ class TestPipelineRun:
             events.append((step, message))
 
         with patch.object(KeboolaProfile, "get_token", return_value="fake-token"):
-            with patch(
-                "src.hooks.python_hooks.keboola.pipeline.KeboolaClient"
-            ):
+            with patch("src.hooks.python_hooks.keboola.pipeline.KeboolaClient"):
                 p = TransformationPipeline(profile, on_progress=on_progress)
                 p.client = MagicMock()
                 p.client.api_url = "https://connection.test.keboola.com"

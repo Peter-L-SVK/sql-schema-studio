@@ -16,7 +16,7 @@ under service name "sql-schema-studio-keboola" with key "<profile>/token".
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Optional
 
@@ -134,9 +134,7 @@ class ProfileManager:
         try:
             data = {
                 "active_profile": self._active,
-                "profiles": {
-                    name: prof.to_dict() for name, prof in self._profiles.items()
-                },
+                "profiles": {name: prof.to_dict() for name, prof in self._profiles.items()},
             }
             with open(PROFILES_FILE, "w") as f:
                 json.dump(data, f, indent=2)

@@ -9,11 +9,10 @@
 """Tests for Settings — JSON persistence and deep merge."""
 
 import json
-from pathlib import Path
 
 import pytest
 
-from src.utils.settings import Settings, DEFAULTS
+from src.utils.settings import Settings
 
 
 @pytest.fixture

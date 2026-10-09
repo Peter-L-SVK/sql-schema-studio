@@ -8,8 +8,6 @@
 
 """Tests for QueryHistory — SQLite persistence, categorization, filters."""
 
-import sqlite3
-from pathlib import Path
 
 import pytest
 

@@ -1,4 +1,3 @@
-
 # ----------------------------------------------------------------------
 # SQL Schema Studio 0.9.5 - Results Panel Tests (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
@@ -13,7 +12,6 @@ The GUI parts of ResultsPanel need a display and are covered by manual
 testing. This file tests only the static helper that has no GTK deps.
 """
 
-import pytest
 
 from src.ui.results.panels import ResultsPanel
 

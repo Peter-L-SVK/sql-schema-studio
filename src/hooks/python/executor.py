@@ -32,7 +32,7 @@ class PythonHookExecutor:
         spec.loader.exec_module(module)
 
         hook_instance = module.Plugin()
-        
+
         if hook_instance.validate():
             metadata = hook_instance.get_metadata()
             self._loaded_hooks[metadata["name"]] = hook_instance

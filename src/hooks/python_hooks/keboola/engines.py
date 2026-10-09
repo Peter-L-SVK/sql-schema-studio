@@ -53,9 +53,7 @@ def get_engine(engine_id: str) -> EngineConfig:
     """Return engine config or raise ValueError with a helpful message."""
     if engine_id not in ENGINES:
         available = ", ".join(ENGINES.keys())
-        raise ValueError(
-            f"Unknown engine '{engine_id}'. Available engines: {available}"
-        )
+        raise ValueError(f"Unknown engine '{engine_id}'. Available engines: {available}")
     return ENGINES[engine_id]
 
 

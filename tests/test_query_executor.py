@@ -8,7 +8,6 @@
 
 import pytest
 from src.core.query_executor import QueryExecutor
-from src.core.db_connector import DatabaseConnector, ConnectionProfile
 
 
 @pytest.mark.asyncio
@@ -16,7 +15,7 @@ async def test_execute_simple_query(db_with_table):
     """Test async query execution."""
     executor = QueryExecutor(db_with_table, timeout=10)
     result = await executor.execute("SELECT * FROM users ORDER BY id")
-    
+
     assert result.success is True
     assert result.row_count == 3
     assert "name" in result.columns
@@ -27,7 +26,6 @@ async def test_execute_simple_query(db_with_table):
 async def test_execute_timeout():
     """Test that timeout works."""
     # ... mock connector ktorý zaspí
-    pass
 
 
 @pytest.mark.asyncio
@@ -35,7 +33,7 @@ async def test_execute_invalid_query(db_with_table):
     """Test that error is captured, not raised."""
     executor = QueryExecutor(db_with_table, timeout=10)
     result = await executor.execute("SELECT * FROM nonexistent_table_xyz")
-    
+
     assert result.success is False
     assert result.error is not None
     assert "nonexistent_table_xyz" in result.error

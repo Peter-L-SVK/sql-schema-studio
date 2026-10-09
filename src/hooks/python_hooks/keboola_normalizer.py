@@ -233,7 +233,7 @@ class KeboolaNormalizerHook(BaseHook):
             return {
                 "status": "error",
                 "error": (
-                    f"No Keboola profile found"
+                    "No Keboola profile found"
                     + (f" named '{profile_name}'" if profile_name else "")
                     + ". Open the configuration dialog and add one."
                 ),
@@ -531,4 +531,5 @@ class KeboolaNormalizerHook(BaseHook):
 # Plugin class for discovery
 class Plugin(KeboolaNormalizerHook):
     """Plugin entry point for hook discovery."""
+
     pass

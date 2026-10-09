@@ -8,11 +8,9 @@
 
 """Tests for DataBridge — Python ↔ JSON marshaling for Perl hooks."""
 
-import json
 from datetime import datetime, date
 from decimal import Decimal
 
-import pytest
 
 from src.hooks.bridge import DataBridge
 

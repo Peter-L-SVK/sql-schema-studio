@@ -635,7 +635,6 @@ class HookManagerDialog(Gtk.Window):
 
         dialog.open(self, None, on_open)
 
-
     def _start_keboola_run(self, csv_path: str):
         """Open the runner dialog and connect it to the config dialog."""
         from src.ui.dialogs.keboola_runner import KeboolaRunnerDialog

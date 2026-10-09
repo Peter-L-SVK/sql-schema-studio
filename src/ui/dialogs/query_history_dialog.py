@@ -179,9 +179,7 @@ class QueryHistoryDialog(Gtk.Window):
         for r in rows:
             date_str = r["executed_at"][:10] if r["executed_at"] else ""
             time_str = (
-                r["executed_at"][11:19]
-                if r["executed_at"] and len(r["executed_at"]) > 11
-                else ""
+                r["executed_at"][11:19] if r["executed_at"] and len(r["executed_at"]) > 11 else ""
             )
             query_display = r["query"][:100] + "..." if len(r["query"]) > 100 else r["query"]
             row_count = str(r["row_count"])
@@ -260,7 +258,7 @@ class QueryHistoryDialog(Gtk.Window):
 
         logger.info(f"Refreshed history entry (index {idx}): {query[:80]}...")
         self._load_history()
-        self._status_label.set_text(f"✓ Refreshed entry")
+        self._status_label.set_text("✓ Refreshed entry")
 
     def _on_clear(self, button):
         """Clear all history with a confirmation dialog."""

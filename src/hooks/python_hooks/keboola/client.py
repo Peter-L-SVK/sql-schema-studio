@@ -54,9 +54,7 @@ class KeboolaClient:
 
     def __init__(self, api_url: str, token: str):
         if KbcStorageClient is None:
-            raise KeboolaError(
-                "kbcstorage client not installed. Run: pip install kbcstorage"
-            )
+            raise KeboolaError("kbcstorage client not installed. Run: pip install kbcstorage")
         if not token:
             raise KeboolaError("API token is empty")
 
@@ -87,9 +85,7 @@ class KeboolaClient:
             r.raise_for_status()
             return r.json()
         except requests.HTTPError as e:
-            raise KeboolaError(
-                f"Token verification failed: {e.response.status_code}"
-            ) from e
+            raise KeboolaError(f"Token verification failed: {e.response.status_code}") from e
         except requests.RequestException as e:
             raise KeboolaError(f"Network error: {e}") from e
 
@@ -147,8 +143,7 @@ class KeboolaClient:
                 logger.debug(f"Table {table_id} does not exist — nothing to delete")
             else:
                 logger.warning(
-                    f"Delete table {table_id} returned HTTP {r.status_code}: "
-                    f"{r.text[:200]}"
+                    f"Delete table {table_id} returned HTTP {r.status_code}: " f"{r.text[:200]}"
                 )
         except requests.RequestException as e:
             logger.debug(f"Delete table {table_id} failed: {e}")
@@ -210,10 +205,7 @@ class KeboolaClient:
     # ==================================================================
 
     def _component_url(self, component_id: str, config_id: str | None = None) -> str:
-        base = (
-            f"{self.api_url}/v2/storage/branch/default/components/"
-            f"{component_id}/configs"
-        )
+        base = f"{self.api_url}/v2/storage/branch/default/components/" f"{component_id}/configs"
         return f"{base}/{config_id}" if config_id else base
 
     @staticmethod
@@ -377,9 +369,7 @@ class KeboolaClient:
         for key in ("input", "output"):
             legacy = cfg.pop(key, None)
             if legacy is not None and key not in storage:
-                storage[key] = (
-                    legacy if isinstance(legacy, dict) else {"tables": legacy}
-                )
+                storage[key] = legacy if isinstance(legacy, dict) else {"tables": legacy}
                 logger.info(f"Migrated legacy configuration.{key} → storage.{key}")
 
         if input_table is not None:
@@ -409,8 +399,7 @@ class KeboolaClient:
             return r.json()
         except requests.HTTPError as e:
             raise KeboolaError(
-                f"Get transformation failed ({e.response.status_code}): "
-                f"{e.response.text[:300]}"
+                f"Get transformation failed ({e.response.status_code}): " f"{e.response.text[:300]}"
             ) from e
 
     # ==================================================================
@@ -446,9 +435,7 @@ class KeboolaClient:
             return job
         except requests.HTTPError as e:
             body = e.response.text[:500]
-            raise KeboolaError(
-                f"Trigger job failed ({e.response.status_code}): {body}"
-            ) from e
+            raise KeboolaError(f"Trigger job failed ({e.response.status_code}): {body}") from e
 
     def wait_for_job(self, job_id: str, timeout: int = 300, poll: int = 2) -> dict:
         """Poll job status until finished or timeout.
@@ -499,10 +486,7 @@ class KeboolaClient:
             if r.status_code == 200:
                 logger.info(f"Cancelled job {job_id}")
                 return True
-            logger.warning(
-                f"Cancel job {job_id} returned HTTP {r.status_code}: "
-                f"{r.text[:200]}"
-            )
+            logger.warning(f"Cancel job {job_id} returned HTTP {r.status_code}: " f"{r.text[:200]}")
             return False
         except requests.RequestException as e:
             logger.error(f"Cancel job {job_id} failed: {e}")

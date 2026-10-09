@@ -8,18 +8,16 @@
 """Tests for Keboola client, profiles, and engines (mocked)."""
 
 import json
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.hooks.python_hooks.keboola.engines import ENGINES, get_engine, list_engines
+from src.hooks.python_hooks.keboola.engines import get_engine, list_engines
 from src.hooks.python_hooks.keboola.profiles import (
     KeboolaProfile,
     ProfileManager,
     KEYRING_SERVICE,
 )
-
 
 # =====================================================================
 # Engines
@@ -89,9 +87,7 @@ class TestKeboolaProfile:
         p = KeboolaProfile(name="keyring-test")
         with patch("keyring.set_password") as mock_set:
             p.save_token("secret")
-        mock_set.assert_called_once_with(
-            KEYRING_SERVICE, "keyring-test/token", "secret"
-        )
+        mock_set.assert_called_once_with(KEYRING_SERVICE, "keyring-test/token", "secret")
 
 
 class TestProfileManager:
@@ -101,12 +97,8 @@ class TestProfileManager:
         fake_dir = tmp_path / "config"
         fake_dir.mkdir()
         fake_file = fake_dir / "keboola_profiles.json"
-        monkeypatch.setattr(
-            "src.hooks.python_hooks.keboola.profiles.CONFIG_DIR", fake_dir
-        )
-        monkeypatch.setattr(
-            "src.hooks.python_hooks.keboola.profiles.PROFILES_FILE", fake_file
-        )
+        monkeypatch.setattr("src.hooks.python_hooks.keboola.profiles.CONFIG_DIR", fake_dir)
+        monkeypatch.setattr("src.hooks.python_hooks.keboola.profiles.PROFILES_FILE", fake_file)
         return fake_file
 
     def test_empty_manager(self, temp_config):

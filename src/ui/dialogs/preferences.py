@@ -8,7 +8,6 @@
 
 """Preferences dialog with persistent settings."""
 
-import os
 import gi
 
 gi.require_version("Gtk", "4.0")
@@ -18,7 +17,6 @@ from gi.repository import Gtk, GtkSource, Pango
 from src.utils.gtk_helpers import set_margin
 from src.utils.settings import Settings
 from src.utils.logging import get_logger
-from src.ui.results import ResultsPanel
 from src.ui.results.terminal_themes import get_terminal_theme_names_by_variant
 
 logger = get_logger(__name__)
@@ -457,7 +455,8 @@ class PreferencesDialog(Gtk.Window):
             changed_editor = {
                 k: v
                 for k, v in changed.items()
-                if k not in (
+                if k
+                not in (
                     "confirm_close",
                     "restore_session",
                     "terminal_font",

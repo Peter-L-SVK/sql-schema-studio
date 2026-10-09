@@ -62,16 +62,10 @@ def open_profile_in_editor(window, profile_name: str) -> bool:
         seen.add(id(target))
         if hasattr(target, "editor"):
             break
-        target = (
-            target.get_transient_for()
-            if hasattr(target, "get_transient_for")
-            else None
-        )
+        target = target.get_transient_for() if hasattr(target, "get_transient_for") else None
 
     if target is None or not hasattr(target, "editor"):
-        logger.warning(
-            "Cannot open editor: no MainWindow with .editor found in parent chain"
-        )
+        logger.warning("Cannot open editor: no MainWindow with .editor found in parent chain")
         return False
 
     manager = ProfileManager()

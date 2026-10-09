@@ -50,7 +50,7 @@ class KeboolaConfigDialog(Gtk.Window):
         super().__init__(
             title="Keboola Normalizer Configuration",
             transient_for=parent,
-            modal=False,   # non-modal so the user can work in the editor
+            modal=False,  # non-modal so the user can work in the editor
         )
         self._window = parent
         self._hook = hook
@@ -189,8 +189,11 @@ class KeboolaConfigDialog(Gtk.Window):
             if col_idx == 3:
                 renderer = Gtk.CellRendererToggle()
                 renderer.set_property("activatable", False)
-            col = Gtk.TreeViewColumn(title, renderer, text=col_idx) if col_idx != 3 else \
-                  Gtk.TreeViewColumn(title, renderer, active=col_idx)
+            col = (
+                Gtk.TreeViewColumn(title, renderer, text=col_idx)
+                if col_idx != 3
+                else Gtk.TreeViewColumn(title, renderer, active=col_idx)
+            )
             col.set_expand(expand)
             tree.append_column(col)
 
@@ -263,7 +266,9 @@ class KeboolaConfigDialog(Gtk.Window):
         box.append(make_labeled_field("Output Table:", self._ed_output))
 
         # Transformation ID (with a "Create new" checkbox)
-        self._ed_new_transform = Gtk.CheckButton(label="Create new transformation (ignore ID below)")
+        self._ed_new_transform = Gtk.CheckButton(
+            label="Create new transformation (ignore ID below)"
+        )
         self._ed_new_transform.connect("toggled", self._on_new_transform_toggled)
         box.append(self._ed_new_transform)
 
@@ -562,9 +567,9 @@ class KeboolaConfigDialog(Gtk.Window):
         def on_done(result):
             ok, payload = result
             if ok:
-                project = payload.get("owner", {}).get("name") or payload.get(
-                    "project", {}
-                ).get("name", "unknown")
+                project = payload.get("owner", {}).get("name") or payload.get("project", {}).get(
+                    "name", "unknown"
+                )
                 self._conn_status.set_markup(
                     f'<span foreground="green">✓ Connected to project: {project}</span>'
                 )
