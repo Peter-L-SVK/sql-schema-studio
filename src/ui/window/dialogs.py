@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.9 - Window Dialogs (GPLv3)
+# SQL Schema Studio 0.9.5 - Window Dialogs (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -95,10 +95,36 @@ class WindowDialogsMixin:
             logger.error(f"Failed to save file: {e}")
 
     def _save_to_file(self, path):
+        """Save the active tab. Routes Keboola URIs back to the profile."""
+        from src.hooks.python_hooks.keboola.editor_bridge import (
+            is_keboola_uri,
+            profile_name_from_uri,
+            save_sql_to_profile,
+        )
+
+        tab = self.editor.get_active_tab()
+        if tab is None:
+            return
+
         content = self.editor.get_text()
+
+        # --- Keboola profile-backed tab ---
+        if is_keboola_uri(path):
+            profile_name = profile_name_from_uri(path)
+            if not profile_name:
+                logger.error(f"Malformed Keboola URI: {path}")
+                return
+            if save_sql_to_profile(profile_name, content):
+                tab._view.get_buffer().set_modified(False)
+                self.statusbar.set_connection(f"Saved SQL to Keboola profile: {profile_name}")
+                logger.info(f"Saved SQL to Keboola profile '{profile_name}'")
+            else:
+                self.statusbar.set_connection(f"✗ Profile '{profile_name}' not found")
+            return
+
+        # --- Regular file on disk ---
         with open(path, "w") as f:
             f.write(content)
-        tab = self.editor.get_active_tab()
         if tab:
             tab._view.get_buffer().set_modified(False)
             tab.file_path = path

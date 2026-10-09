@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.9 - Database Connector (GPLv3)
+# SQL Schema Studio 0.9.5 - Database Connector (GPLv3)
 # Copyright (C) 2025-2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -247,6 +247,17 @@ class DatabaseConnector:
                     return [dict(zip(columns, row)) for row in rows]
                 return []
 
+    async def execute(self, query: str, params: tuple | None = None) -> list[dict[str, Any]]:
+        """Async wrapper around execute_sync for use with asyncio.
+
+        Runs the blocking execute_sync in a thread pool executor so it doesn't
+        block the asyncio event loop.
+        """
+        import asyncio
+
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, lambda: self.execute_sync(query, params))
+
     def get_schemas(self) -> List[str]:
         results = self.execute_sync(
             "SELECT schema_name FROM information_schema.schemata "
@@ -255,6 +266,23 @@ class DatabaseConnector:
             (list(EXCLUDED_SCHEMAS),),
         )
         return [r["schema_name"] for r in results]
+
+    def get_table_columns(self, schema: str, table: str) -> list[dict[str, Any]]:
+        """Fetch column metadata for a table.
+
+        Uses information_schema.columns, ordered by ordinal_position.
+        Returns an empty list if the table has no columns (shouldn't happen).
+        """
+        return self.execute_sync(
+            """
+            SELECT column_name, data_type, is_nullable,
+            character_maximum_length, numeric_precision, numeric_scale
+            FROM information_schema.columns
+            WHERE table_schema = %s AND table_name = %s
+            ORDER BY ordinal_position
+            """,
+            (schema, table),
+        )
 
     def get_tables(self, schema: str = "public") -> List[Dict]:
         return self.execute_sync(

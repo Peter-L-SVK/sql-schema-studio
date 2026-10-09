@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.9 - Connection Dialog (GPLv3)
+# SQL Schema Studio 0.9.5 - Connection Dialog (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -260,9 +260,8 @@ class ConnectionDialog(Gtk.Dialog):
         self._set_busy(True)
 
         def test():
+            tunnel = None
             try:
-                tunnel = None
-
                 if profile.use_ssh:
                     from src.core.ssh_tunnel import (
                         SSHTunnelConfig,
@@ -290,8 +289,6 @@ class ConnectionDialog(Gtk.Dialog):
                         ssh_config, db_config
                     )
                     if error:
-                        if tunnel:
-                            tunnel.stop()
                         return False, f"SSH: {error}"
                 else:
                     conn_string = (
@@ -300,16 +297,14 @@ class ConnectionDialog(Gtk.Dialog):
                         f"password={profile.password}"
                     )
 
-                conn = psycopg.connect(conn_string)
-                conn.execute("SELECT 1")
-                conn.close()
-                if tunnel:
-                    tunnel.stop()
+                with psycopg.connect(conn_string) as conn:
+                    conn.execute("SELECT 1")
                 return True, "Connection successful!"
             except Exception as e:
+                return False, str(e)
+            finally:
                 if tunnel:
                     tunnel.stop()
-                return False, str(e)
 
         def on_done(result):
             self._set_busy(False)

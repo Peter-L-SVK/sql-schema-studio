@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.9 - Keboola Normalizer Hook (GPLv3)
+# SQL Schema Studio 0.9.5 - Keboola Normalizer Hook (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -10,15 +10,6 @@
 
 This hook validates CSV files locally and optionally uploads them to
 Keboola Storage for advanced ETL/ELT processing.
-
-The hook detects data quality issues such as:
-- Missing values
-- Invalid email formats
-- Invalid date formats
-- Invalid payment methods
-- Invalid order statuses
-- Invalid categories
-- Invalid price/quantity values
 """
 
 import json
@@ -56,18 +47,12 @@ class CSVValidationResult(TypedDict, total=False):
 
 
 class KeboolaNormalizerHook(BaseHook):
-    """Data normalization hook using Keboola platform.
-
-    Performs local CSV validation and can optionally upload to Keboola
-    for advanced ETL/ELT processing.
-
-    Configuration is stored in ~/.config/sql-schema-studio/keboola_config.json
-    """
+    """Data normalization hook using Keboola platform."""
 
     def __init__(self):
         """Initialize the hook and load configuration."""
         super().__init__()
-        self._client: Optional[Any] = None  # kbcstorage.client.Client
+        self._client: Optional[Any] = None
         self._config: Dict[str, Any] = self._load_config()
 
     # ======================================================================
@@ -175,15 +160,7 @@ class KeboolaNormalizerHook(BaseHook):
             return False
 
     async def execute(self, context: HookContext) -> Dict[str, Any]:
-        """Execute Keboola normalization.
-
-        Expected context.data:
-            - file_path: str - path to CSV file
-            - local_only: bool - if True, only local validation
-
-        Returns:
-            Dict with status, message, recommendations, error_samples, etc.
-        """
+        """Execute Keboola normalization (legacy entry point)."""
         result: Dict[str, Any] = {
             "status": "ok",
             "message": "",
@@ -198,7 +175,6 @@ class KeboolaNormalizerHook(BaseHook):
             result["message"] = "No valid CSV file provided"
             return result
 
-        # 1. Local validation
         validation_result = self._validate_csv(file_path)
         result["tables_analyzed"] = validation_result["total_rows"]
 
@@ -212,12 +188,80 @@ class KeboolaNormalizerHook(BaseHook):
         else:
             result["message"] = "All data looks clean!"
 
-        # 2. Upload to Keboola if requested
         if not context.data.get("local_only", False) and self._config.get("token"):
             upload_result = await self._upload_to_keboola(file_path)
             result["keboola"] = upload_result
 
         return result
+
+    # ======================================================================
+    # Full pipeline (phase 2) — new main entry point
+    # ======================================================================
+
+    def run_pipeline(
+        self,
+        csv_path: str,
+        profile_name: str | None = None,
+        on_progress=None,
+        timeout: int = 300,
+        cancel_event=None,
+    ) -> dict:
+        """Run the full Keboola transformation pipeline.
+
+        This is the new main entry point. It uses the ProfileManager to
+        find the active (or named) profile, uploads the CSV, triggers
+        the transformation, and downloads the cleaned output.
+
+        Args:
+            csv_path: Path to the raw CSV file.
+            profile_name: Optional profile name. If None, uses the active profile.
+            on_progress: Optional callback(step: str, message: str).
+            timeout: Max seconds to wait for the transformation job.
+
+        Returns:
+            Dict with the pipeline report, ready for JSON serialization.
+        """
+        from src.hooks.python_hooks.keboola.pipeline import (
+            TransformationPipeline,
+        )
+        from src.hooks.python_hooks.keboola.profiles import ProfileManager
+
+        manager = ProfileManager()
+        profile = manager.get(profile_name) if profile_name else manager.active
+
+        if profile is None:
+            return {
+                "status": "error",
+                "error": (
+                    "No Keboola profile found"
+                    + (f" named '{profile_name}'" if profile_name else "")
+                    + ". Open the configuration dialog and add one."
+                ),
+            }
+
+        errors = profile.validate()
+        if errors:
+            return {
+                "status": "error",
+                "error": "Profile is not valid: " + "; ".join(errors),
+            }
+
+        try:
+            pipeline = TransformationPipeline(
+                profile,
+                on_progress=on_progress,
+                cancel_event=cancel_event,
+            )
+            report = pipeline.run(csv_path, timeout=timeout)
+
+            # Persist any changes to the profile (e.g. new transformation_id)
+            manager.add(profile)
+
+            return report.to_dict()
+
+        except Exception as e:
+            logger.exception(f"Pipeline failed: {e}")
+            return {"status": "error", "error": str(e)}
 
     # ======================================================================
     # Local CSV validation
@@ -289,7 +333,6 @@ class KeboolaNormalizerHook(BaseHook):
         return []
 
     def _validate_email(self, value: str, row_num: int, col: str) -> Optional[Dict[str, Any]]:
-        """Validate email format."""
         if value.lower() in ("invalid_email", "not_an_email"):
             return {
                 "row": row_num,
@@ -308,7 +351,6 @@ class KeboolaNormalizerHook(BaseHook):
         return None
 
     def _validate_date(self, value: str, row_num: int, col: str) -> Optional[Dict[str, Any]]:
-        """Validate date format."""
         formats = ["%Y-%m-%d", "%d-%m-%Y", "%d.%m.%Y", "%m/%d/%Y"]
         for fmt in formats:
             try:
@@ -326,7 +368,6 @@ class KeboolaNormalizerHook(BaseHook):
     def _validate_payment_method(
         self, value: str, row_num: int, col: str
     ) -> Optional[Dict[str, Any]]:
-        """Validate payment method."""
         valid = {"Credit Card", "PayPal", "Bank Transfer"}
         if value not in valid:
             return {
@@ -340,7 +381,6 @@ class KeboolaNormalizerHook(BaseHook):
     def _validate_order_status(
         self, value: str, row_num: int, col: str
     ) -> Optional[Dict[str, Any]]:
-        """Validate order status."""
         valid = {"Pending", "Completed", "Refunded", "Shipped", "Delivered"}
         if value not in valid:
             return {
@@ -352,7 +392,6 @@ class KeboolaNormalizerHook(BaseHook):
         return None
 
     def _validate_category(self, value: str, row_num: int, col: str) -> Optional[Dict[str, Any]]:
-        """Validate product category."""
         valid = {
             "Electronics",
             "Sports",
@@ -373,7 +412,6 @@ class KeboolaNormalizerHook(BaseHook):
         return None
 
     def _validate_price(self, value: str, row_num: int, col: str) -> Optional[Dict[str, Any]]:
-        """Validate price value."""
         try:
             float(value)
             return None
@@ -386,7 +424,6 @@ class KeboolaNormalizerHook(BaseHook):
             }
 
     def _validate_quantity(self, value: str, row_num: int, col: str) -> Optional[Dict[str, Any]]:
-        """Validate quantity value."""
         try:
             qty = int(value)
             if qty <= 0:
@@ -412,7 +449,6 @@ class KeboolaNormalizerHook(BaseHook):
     def _generate_recommendations(
         self, validation_result: CSVValidationResult
     ) -> List[Dict[str, Any]]:
-        """Generate recommendations based on validation results."""
         recommendations: List[Dict[str, Any]] = []
         issue_counts: Dict[str, int] = {}
 
@@ -455,7 +491,7 @@ class KeboolaNormalizerHook(BaseHook):
         return recommendations
 
     # ======================================================================
-    # Keboola upload
+    # Keboola upload (legacy)
     # ======================================================================
 
     async def _upload_to_keboola(self, file_path: str) -> Dict[str, Any]:

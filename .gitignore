@@ -35,3 +35,6 @@ Thumbs.db
 *.log
 *.db
 *.sqlite
+
+# Backups
+*.bak

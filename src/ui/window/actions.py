@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.9 - Window Actions (GPLv3)
+# SQL Schema Studio 0.9.5 - Window Actions (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -12,7 +12,6 @@ import time
 from gi.repository import Gtk
 from typing import Any
 
-from src.config import REFRESH_TRIGGER_COMMANDS
 from src.utils.gtk_helpers import run_async
 from src.utils.logging import get_logger
 
@@ -108,9 +107,25 @@ class WindowActionsMixin:
         run_async(run, display)
 
     def _refresh_browser_if_ddl(self, query_upper):
-        if any(query_upper.startswith(c) for c in REFRESH_TRIGGER_COMMANDS):
-            logger.info(f"Refreshing browser after: {query_upper[:60]}")
-            self.browser.refresh()
+        """Refresh browser and invalidate schema cache after DDL.
+
+        Only DDL statements (CREATE/ALTER/DROP/TRUNCATE/RENAME) affect the
+        cached structure. DML (INSERT/UPDATE/DELETE) does not — the columns
+        are unchanged, so we keep the cache warm.
+        """
+        from src.config import DDL_COMMANDS
+
+        if not any(query_upper.startswith(c) for c in DDL_COMMANDS):
+            return
+
+        logger.info(f"Refreshing browser after: {query_upper[:60]}")
+
+        # Invalidate the cache — the structure of at least one table changed.
+        # We don't parse the query to find *which* table (would be fragile);
+        # the TTL fallback covers any leftovers, and this only fires on DDL.
+        self.browser._schema_cache.invalidate_all()
+
+        self.browser.refresh()
 
     def _on_stop_clicked(self):
         logger.info("Query cancelled by user")

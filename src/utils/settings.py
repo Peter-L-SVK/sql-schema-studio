@@ -1,13 +1,4 @@
-# ----------------------------------------------------------------------
-# SQL Schema Studio 0.9 - Settings Manager (GPLv3)
-# Copyright (C) 2026 Peter Leukanič
-# License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
-# This is free software with NO WARRANTY.
-# Feel free to distribute and modify.
-# ----------------------------------------------------------------------
-
-"""Persistent user settings stored in ~/.config/sql-schema-studio/"""
-
+import copy
 import json
 from pathlib import Path
 
@@ -26,6 +17,12 @@ DEFAULTS = {
         "show_line_numbers": True,
         "highlight_current_line": True,
         "color_scheme": "classic",
+        "theme_mode_editor": "auto",
+        "terminal_font": "Monospace 10",
+        "terminal_scheme": "dark",
+        "theme_mode_terminal": "auto",
+        "autocomplete_enabled": True,
+        "theme_mode": "auto",
     },
     "general": {
         "confirm_close": True,
@@ -47,15 +44,19 @@ class Settings:
         self._data: dict[str, dict] = self._load()
 
     def _load(self) -> dict:
-        """Load settings from disk or return defaults."""
+        """Load settings from disk or return defaults.
+
+        Uses copy.deepcopy so that mutations in _deep_merge (which writes
+        into nested dicts) never touch the shared DEFAULTS constant.
+        """
         if SETTINGS_FILE.exists():
             try:
                 with open(SETTINGS_FILE, "r") as f:
                     data = json.load(f)
-                return self._deep_merge(DEFAULTS.copy(), data)
+                return self._deep_merge(copy.deepcopy(DEFAULTS), data)
             except Exception as e:
                 logger.warning(f"Failed to load settings: {e}")
-        return DEFAULTS.copy()
+        return copy.deepcopy(DEFAULTS)
 
     def _deep_merge(self, base: dict, override: dict) -> dict:
         """Recursively merge override into base, keeping base keys that don't exist in override."""
