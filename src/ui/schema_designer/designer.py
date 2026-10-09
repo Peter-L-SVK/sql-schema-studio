@@ -853,7 +853,10 @@ class SchemaDesigner(WorkerBridgeMixin, RoutingMixin, DrawingMixin, Gtk.Box):
     def _on_undo(self, button):
         if not self._undo_stack:
             return
-        self._redo_stack.append(self._get_current_state())
+        # Push current state to redo stack, preserving the action name
+        # of the state we're about to undo, so the log reads correctly.
+        undone = self._undo_stack[-1]
+        self._redo_stack.append(self._get_current_state(action=undone.get("action", "unknown")))
         state = self._undo_stack.pop()
         self._restore_state(state)
         logger.info(f"Undo: {state.get('action', 'unknown')}")
@@ -861,13 +864,23 @@ class SchemaDesigner(WorkerBridgeMixin, RoutingMixin, DrawingMixin, Gtk.Box):
     def _on_redo(self, button):
         if not self._redo_stack:
             return
-        self._undo_stack.append(self._get_current_state())
+        # Same as _on_undo — carry the action name across the stack swap.
+        redone = self._redo_stack[-1]
+        self._undo_stack.append(self._get_current_state(action=redone.get("action", "unknown")))
         state = self._redo_stack.pop()
         self._restore_state(state)
         logger.info(f"Redo: {state.get('action', 'unknown')}")
 
-    def _get_current_state(self):
+    def _get_current_state(self, action: str = ""):
+        """Snapshot the current designer state.
+
+        The 'action' field is provided for log readability when the
+        snapshot ends up on the opposite stack during undo/redo. For
+        snapshots taken right before an operation, callers pass a
+        descriptive name via _save_state().
+        """
         return {
+            "action": action,
             "tables": copy.deepcopy(self._tables),
             "relationships": copy.deepcopy(self._relationships),
         }
