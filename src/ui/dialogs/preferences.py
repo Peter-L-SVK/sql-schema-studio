@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# SQL Schema Studio 0.9 - Preferences Dialog (GPLv3)
+# SQL Schema Studio 0.9.5 - Preferences Dialog (GPLv3)
 # Copyright (C) 2026 Peter Leukanič
 # License: GNU GPL v3+ <https://www.gnu.org/licenses/gpl-3.0.txt>
 # This is free software with NO WARRANTY.
@@ -8,7 +8,6 @@
 
 """Preferences dialog with persistent settings."""
 
-import os
 import gi
 
 gi.require_version("Gtk", "4.0")
@@ -18,9 +17,54 @@ from gi.repository import Gtk, GtkSource, Pango
 from src.utils.gtk_helpers import set_margin
 from src.utils.settings import Settings
 from src.utils.logging import get_logger
-from src.ui.results import ResultsPanel
+from src.ui.results.terminal_themes import get_terminal_theme_names_by_variant
 
 logger = get_logger(__name__)
+
+
+# Schemes that don't declare their variant explicitly in the GtkSourceView
+# metadata. Kept in sync with the most common installs (GNOME, KDE, Fedora).
+_KNOWN_DARK_SCHEMES = {
+    "oblivion",
+    "cobalt",
+    "solarized-dark",
+    "monokai",
+    "nord",
+    "dracula",
+    "kate-dark",
+    "builder-dark",
+    "Adwaita-dark",
+}
+
+_KNOWN_LIGHT_SCHEMES = {
+    "classic",
+    "tango",
+    "solarized-light",
+    "kate",
+    "builder",
+    "Adwaita",
+    "gnome",
+}
+
+
+def _is_dark_scheme(scheme_id: str) -> bool:
+    """Heuristic: is a GtkSourceView scheme dark?
+
+    Priority:
+    1. Explicit "dark" / "light" in the id.
+    2. Known scheme lists.
+    3. Fallback: assume light (safer for first-time users).
+    """
+    lower = scheme_id.lower()
+    if "dark" in lower:
+        return True
+    if "light" in lower:
+        return False
+    if scheme_id in _KNOWN_DARK_SCHEMES:
+        return True
+    if scheme_id in _KNOWN_LIGHT_SCHEMES:
+        return False
+    return False
 
 
 class PreferencesDialog(Gtk.Window):
@@ -34,10 +78,13 @@ class PreferencesDialog(Gtk.Window):
         )
         self._editor = editor
         self._settings = Settings()
-        self.set_default_size(520, 500)
+        self.set_default_size(520, 600)
 
         # Snapshots for change detection
         self._originals = {}
+
+        # Suppress combo change handlers during programmatic updates
+        self._loading = False
 
         self._build_ui()
         self._load_settings()
@@ -89,6 +136,30 @@ class PreferencesDialog(Gtk.Window):
         self._autocomplete_check = Gtk.CheckButton(label="Enable SQL keyword autocomplete")
         editor_page.append(self._autocomplete_check)
 
+        # ---- Editor Theme Mode ----
+        editor_theme_label = Gtk.Label(label="Theme Mode", halign=Gtk.Align.START)
+        editor_theme_label.add_css_class("heading")
+        editor_theme_label.set_margin_top(8)
+        editor_page.append(editor_theme_label)
+
+        editor_theme_hint = Gtk.Label()
+        editor_theme_hint.set_markup(
+            '<span size="small" foreground="gray">'
+            "Filters the editor color schemes below to match light or dark."
+            "</span>"
+        )
+        editor_theme_hint.set_halign(Gtk.Align.START)
+        editor_theme_hint.set_wrap(True)
+        editor_page.append(editor_theme_hint)
+
+        self._theme_mode_editor_combo = Gtk.ComboBoxText()
+        self._theme_mode_editor_combo.append("auto", "Auto (follow system)")
+        self._theme_mode_editor_combo.append("light", "Light")
+        self._theme_mode_editor_combo.append("dark", "Dark")
+        self._theme_mode_editor_combo.set_active_id("auto")
+        self._theme_mode_editor_combo.connect("changed", self._on_theme_mode_editor_changed)
+        editor_page.append(self._theme_mode_editor_combo)
+
         # Editor color scheme
         scheme_label = Gtk.Label(label="Editor Color Scheme", halign=Gtk.Align.START)
         scheme_label.add_css_class("heading")
@@ -97,21 +168,6 @@ class PreferencesDialog(Gtk.Window):
 
         self._scheme_combo = Gtk.ComboBoxText()
         self._scheme_ids = []  # parallel list — GTK4 StringList workaround
-        manager = GtkSource.StyleSchemeManager.get_default()
-        manager.set_search_path(
-            [
-                "/usr/share/gtksourceview-5/styles",
-                "/usr/share/gtksourceview-4/styles",
-                "/usr/share/gtksourceview-3.0/styles",
-                os.path.expanduser("~/.local/share/gtksourceview-5/styles"),
-                os.path.expanduser("~/.local/share/gtksourceview-3.0/styles"),
-            ]
-        )
-        for scheme_id in manager.get_scheme_ids():
-            scheme = manager.get_scheme(scheme_id)
-            self._scheme_combo.append(scheme_id, scheme.get_name() or scheme_id)
-            self._scheme_ids.append(scheme_id)
-        self._scheme_combo.set_active(0)
         editor_page.append(self._scheme_combo)
 
         notebook.append_page(editor_page, Gtk.Label(label="Editor"))
@@ -120,17 +176,38 @@ class PreferencesDialog(Gtk.Window):
         terminal_page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
         set_margin(terminal_page, 16)
 
+        # ---- Terminal Theme Mode ----
+        terminal_theme_label = Gtk.Label(label="Theme Mode", halign=Gtk.Align.START)
+        terminal_theme_label.add_css_class("heading")
+        terminal_page.append(terminal_theme_label)
+
+        terminal_theme_hint = Gtk.Label()
+        terminal_theme_hint.set_markup(
+            '<span size="small" foreground="gray">'
+            "Independent from the editor — pick a light theme for daylight "
+            "reading or dark for eye comfort."
+            "</span>"
+        )
+        terminal_theme_hint.set_halign(Gtk.Align.START)
+        terminal_theme_hint.set_wrap(True)
+        terminal_page.append(terminal_theme_hint)
+
+        self._theme_mode_terminal_combo = Gtk.ComboBoxText()
+        self._theme_mode_terminal_combo.append("auto", "Auto (follow system)")
+        self._theme_mode_terminal_combo.append("light", "Light")
+        self._theme_mode_terminal_combo.append("dark", "Dark")
+        self._theme_mode_terminal_combo.set_active_id("auto")
+        self._theme_mode_terminal_combo.connect("changed", self._on_theme_mode_terminal_changed)
+        terminal_page.append(self._theme_mode_terminal_combo)
+
+        # Terminal color theme
         terminal_scheme_label = Gtk.Label(label="Terminal Color Theme", halign=Gtk.Align.START)
         terminal_scheme_label.add_css_class("heading")
+        terminal_scheme_label.set_margin_top(8)
         terminal_page.append(terminal_scheme_label)
 
         self._terminal_scheme_combo = Gtk.ComboBoxText()
         self._terminal_theme_ids = []  # parallel list
-
-        for theme_id, theme_name in ResultsPanel.get_theme_names():
-            self._terminal_scheme_combo.append(theme_id, theme_name)
-            self._terminal_theme_ids.append(theme_id)
-
         terminal_page.append(self._terminal_scheme_combo)
 
         # Terminal font
@@ -178,11 +255,83 @@ class PreferencesDialog(Gtk.Window):
         self.set_child(main_box)
 
     # =================================================================
+    # Theme mode helpers
+    # =================================================================
+
+    def _resolve_theme_mode(self, mode: str) -> str:
+        """Map 'auto' to the actual variant using the system setting."""
+        if mode != "auto":
+            return mode
+        try:
+            gtk_settings = Gtk.Settings.get_default()
+            is_dark = gtk_settings.get_property("gtk-application-prefer-dark-theme")
+            return "dark" if is_dark else "light"
+        except Exception:
+            return "light"
+
+    def _on_theme_mode_editor_changed(self, combo):
+        """Rebuild the editor scheme combo for the new editor mode."""
+        if self._loading:
+            return
+        mode = combo.get_active_id() or "auto"
+        variant = self._resolve_theme_mode(mode)
+        self._repopulate_schemes(variant)
+
+    def _on_theme_mode_terminal_changed(self, combo):
+        """Rebuild the terminal theme combo for the new terminal mode."""
+        if self._loading:
+            return
+        mode = combo.get_active_id() or "auto"
+        variant = self._resolve_theme_mode(mode)
+        self._repopulate_terminal_themes(variant)
+
+    def _repopulate_schemes(self, variant: str):
+        """Rebuild the editor scheme combo filtered by variant."""
+        current = self._scheme_combo.get_active_id()
+
+        self._scheme_combo.remove_all()
+        self._scheme_ids.clear()
+
+        manager = GtkSource.StyleSchemeManager.get_default()
+        for scheme_id in manager.get_scheme_ids():
+            is_dark = _is_dark_scheme(scheme_id)
+            if variant == "dark" and not is_dark:
+                continue
+            if variant == "light" and is_dark:
+                continue
+            scheme = manager.get_scheme(scheme_id)
+            self._scheme_combo.append(scheme_id, scheme.get_name() or scheme_id)
+            self._scheme_ids.append(scheme_id)
+
+        if current and current in self._scheme_ids:
+            self._scheme_combo.set_active_id(current)
+        elif self._scheme_ids:
+            self._scheme_combo.set_active(0)
+
+    def _repopulate_terminal_themes(self, variant: str):
+        """Rebuild the terminal theme combo filtered by variant."""
+        current = self._terminal_scheme_combo.get_active_id()
+
+        self._terminal_scheme_combo.remove_all()
+        self._terminal_theme_ids.clear()
+
+        for theme_id, theme_name in get_terminal_theme_names_by_variant(variant):
+            self._terminal_scheme_combo.append(theme_id, theme_name)
+            self._terminal_theme_ids.append(theme_id)
+
+        if current and current in self._terminal_theme_ids:
+            self._terminal_scheme_combo.set_active_id(current)
+        elif self._terminal_theme_ids:
+            self._terminal_scheme_combo.set_active(0)
+
+    # =================================================================
     # Load settings & snapshot originals
     # =================================================================
 
     def _load_settings(self):
         """Load saved settings into widgets and snapshot original values."""
+        self._loading = True
+
         editor = self._settings.get_section("editor")
         general = self._settings.get_section("general")
 
@@ -205,25 +354,32 @@ class PreferencesDialog(Gtk.Window):
         self._highlight_line_check.set_active(editor.get("highlight_current_line", True))
         self._autocomplete_check.set_active(editor.get("autocomplete_enabled", True))
 
-        # Editor color scheme — use parallel ID list (GTK4 StringList fix)
-        scheme_id = editor.get("color_scheme", "classic")
-        try:
-            idx = self._scheme_ids.index(scheme_id)
-            self._scheme_combo.set_active(idx)
-        except ValueError:
-            self._scheme_combo.set_active(0)
+        # ---- Editor theme mode ----
+        editor_mode = editor.get("theme_mode_editor", "auto")
+        self._theme_mode_editor_combo.set_active_id(editor_mode)
+        editor_variant = self._resolve_theme_mode(editor_mode)
+        self._repopulate_schemes(editor_variant)
 
-        # Terminal theme — use parallel ID list (GTK4 StringList fix)
-        terminal_theme = editor.get("terminal_scheme", "dark")
-        try:
-            idx = self._terminal_theme_ids.index(terminal_theme)
-            self._terminal_scheme_combo.set_active(idx)
-        except ValueError:
-            self._terminal_scheme_combo.set_active(0)
+        # ---- Terminal theme mode ----
+        terminal_mode = editor.get("theme_mode_terminal", "auto")
+        self._theme_mode_terminal_combo.set_active_id(terminal_mode)
+        terminal_variant = self._resolve_theme_mode(terminal_mode)
+        self._repopulate_terminal_themes(terminal_variant)
+
+        # Select saved scheme/theme if still present
+        saved_scheme = editor.get("color_scheme", "classic")
+        if saved_scheme in self._scheme_ids:
+            self._scheme_combo.set_active_id(saved_scheme)
+
+        saved_terminal = editor.get("terminal_scheme", "dark")
+        if saved_terminal in self._terminal_theme_ids:
+            self._terminal_scheme_combo.set_active_id(saved_terminal)
 
         # General
         self._confirm_close_check.set_active(general.get("confirm_close", True))
         self._restore_session_check.set_active(general.get("restore_session", False))
+
+        self._loading = False
 
         # Snapshot for change detection
         self._snapshot_originals()
@@ -241,6 +397,8 @@ class PreferencesDialog(Gtk.Window):
             "show_line_numbers": self._line_numbers_check.get_active(),
             "highlight_current_line": self._highlight_line_check.get_active(),
             "autocomplete_enabled": self._autocomplete_check.get_active(),
+            "theme_mode_editor": self._theme_mode_editor_combo.get_active_id(),
+            "theme_mode_terminal": self._theme_mode_terminal_combo.get_active_id(),
             "color_scheme": self._scheme_combo.get_active_id(),
             "terminal_scheme": self._terminal_scheme_combo.get_active_id(),
             "confirm_close": self._confirm_close_check.get_active(),
@@ -255,7 +413,6 @@ class PreferencesDialog(Gtk.Window):
         """Save and apply only settings that actually changed."""
         window = self.get_transient_for()
 
-        # Read current values
         font_desc = self._font_button.get_font_desc()
         terminal_font_desc = self._terminal_font_button.get_font_desc()
 
@@ -267,13 +424,14 @@ class PreferencesDialog(Gtk.Window):
             "show_line_numbers": self._line_numbers_check.get_active(),
             "highlight_current_line": self._highlight_line_check.get_active(),
             "autocomplete_enabled": self._autocomplete_check.get_active(),
+            "theme_mode_editor": self._theme_mode_editor_combo.get_active_id(),
+            "theme_mode_terminal": self._theme_mode_terminal_combo.get_active_id(),
             "color_scheme": self._scheme_combo.get_active_id(),
             "terminal_scheme": self._terminal_scheme_combo.get_active_id(),
             "confirm_close": self._confirm_close_check.get_active(),
             "restore_session": self._restore_session_check.get_active(),
         }
 
-        # Determine what changed
         changed = {key: val for key, val in current.items() if val != self._originals.get(key)}
 
         if not changed:
@@ -283,7 +441,6 @@ class PreferencesDialog(Gtk.Window):
 
         logger.info(f"Preferences changed: {list(changed.keys())}")
 
-        # Persist only changed keys
         for key, val in changed.items():
             if key in ("confirm_close", "restore_session"):
                 self._settings.set("general", key, val)
@@ -292,12 +449,21 @@ class PreferencesDialog(Gtk.Window):
 
         self._settings.save()
 
-        # Apply editor side-effects only for changed editor keys
         if self._editor:
+            # theme_mode_* are not applied to the editor directly — they only
+            # gate the dropdowns. Exclude them from side-effects.
             changed_editor = {
                 k: v
                 for k, v in changed.items()
-                if k not in ("confirm_close", "restore_session", "terminal_font", "terminal_scheme")
+                if k
+                not in (
+                    "confirm_close",
+                    "restore_session",
+                    "terminal_font",
+                    "terminal_scheme",
+                    "theme_mode_editor",
+                    "theme_mode_terminal",
+                )
             }
             changed_terminal = {
                 k: v for k, v in changed.items() if k in ("terminal_font", "terminal_scheme")
@@ -356,6 +522,5 @@ class PreferencesDialog(Gtk.Window):
                     window.results.apply_terminal_scheme(current["terminal_scheme"])
                 logger.info(f"Terminal preferences applied: {list(changed_terminal.keys())}")
 
-        # Update snapshot so next Apply is also delta-only
         self._snapshot_originals()
         self.close()
