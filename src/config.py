@@ -37,8 +37,14 @@ DML_COMMANDS: frozenset[str] = frozenset(
     }
 )
 
-# Combined — any statement that should trigger a browser refresh
-REFRESH_TRIGGER_COMMANDS: frozenset[str] = DDL_COMMANDS | DML_COMMANDS
+# Note: The browser should NOT refresh on every DML statement.
+# INSERT/UPDATE/DELETE don't change table structure — refreshing
+# after each one is wasteful (e.g. a 1000-row bulk import would
+# trigger 1000 refreshes).
+#
+# Only DDL (CREATE/ALTER/DROP/TRUNCATE/RENAME) changes the schema
+# shown in the browser. See _refresh_browser_if_ddl() in
+# src/ui/window/actions.py.
 
 # Default values when openning Connect
 DEFAULT_PORT: int = 5432
