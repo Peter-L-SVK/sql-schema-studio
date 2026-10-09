@@ -39,7 +39,7 @@ def profile_name_from_uri(uri: str) -> str | None:
     """Extract the profile name from a keboola:// URI."""
     if not is_keboola_uri(uri):
         return None
-    body = uri[len(KEBOOLA_URI_PREFIX):]
+    body = uri[len(KEBOOLA_URI_PREFIX) :]
     if body.endswith("/sql"):
         body = body[:-4]
     return body or None

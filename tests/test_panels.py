@@ -12,7 +12,6 @@ The GUI parts of ResultsPanel need a display and are covered by manual
 testing. This file tests only the static helper that has no GTK deps.
 """
 
-
 from src.ui.results.panels import ResultsPanel
 
 

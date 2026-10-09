@@ -8,7 +8,6 @@
 
 """Tests for QueryHistory — SQLite persistence, categorization, filters."""
 
-
 import pytest
 
 from src.core.query_history import QueryHistory
