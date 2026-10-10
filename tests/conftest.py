@@ -26,6 +26,7 @@ TEST_PASSWORD = os.environ.get("TEST_PASSWORD", "admin123")
 TEST_HOST = os.environ.get("TEST_HOST", "localhost")
 TEST_PORT = int(os.environ.get("TEST_PORT", "5432"))
 
+
 @pytest.fixture(scope="session")
 def test_db_setup():
     """Create test database once per session, drop at end"""
