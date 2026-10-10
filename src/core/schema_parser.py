@@ -14,6 +14,9 @@ from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
+# A line that starts with one of these is a table constraint, not a column.
+CONSTRAINT_LINE_RE = re.compile(r"(PRIMARY\s+KEY|FOREIGN\s+KEY|CONSTRAINT|UNIQUE|CHECK|EXCLUDE)\b")
+
 
 class SchemaParser:
     """Parse CREATE TABLE and ALTER TABLE statements from SQL text.
@@ -193,15 +196,9 @@ class SchemaParser:
 
         # Skip pure constraint lines
         upper = line.upper().strip()
-        skip_patterns = (
-            "PRIMARY KEY",
-            "FOREIGN KEY",
-            "CONSTRAINT",
-            "UNIQUE",
-            "CHECK",
-            "EXCLUDE",
-        )
-        if upper.startswith(skip_patterns) and "(" in upper:
+        # Anchored on a word boundary so a column named unique_code or
+        # constraint_name is not mistaken for a constraint declaration.
+        if CONSTRAINT_LINE_RE.match(upper) and "(" in upper:
             return None
 
         # Try to extract column name and type
