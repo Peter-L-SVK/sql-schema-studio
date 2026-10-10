@@ -190,6 +190,40 @@ class TestConstraints:
         assert len(pks) == 2
         assert {c["name"] for c in pks} == {"a", "b"}
 
+    def test_column_named_like_constraint_keyword(self, parser):
+        """A column whose name starts with a constraint keyword is a column.
+
+        unique_code and constraint_name used to be dropped because the
+        constraint check compared raw prefixes. The designer then showed a
+        table with fewer columns than the SQL declares.
+        """
+        sql = """
+        CREATE TABLE t (
+            id SERIAL PRIMARY KEY,
+            unique_code VARCHAR(10),
+            constraint_name VARCHAR(50),
+            check_flag BOOLEAN,
+            excluded_at TIMESTAMP
+        );
+        """
+        tables, _ = parser.parse_sql(sql)
+        names = [c["name"] for c in tables[0]["columns"]]
+        assert names == ["id", "unique_code", "constraint_name", "check_flag", "excluded_at"]
+
+    def test_table_level_unique_constraint_still_skipped(self, parser):
+        """The keyword fix must not start parsing real constraint lines."""
+        sql = """
+        CREATE TABLE t (
+            id SERIAL PRIMARY KEY,
+            email VARCHAR(200),
+            UNIQUE (email),
+            CONSTRAINT chk_len CHECK (length(email) > 3)
+        );
+        """
+        tables, _ = parser.parse_sql(sql)
+        names = [c["name"] for c in tables[0]["columns"]]
+        assert names == ["id", "email"]
+
     def test_not_null(self, parser):
         sql = "CREATE TABLE t (name VARCHAR(100) NOT NULL);"
         tables, _ = parser.parse_sql(sql)
