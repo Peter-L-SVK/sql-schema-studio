@@ -8,6 +8,7 @@
 
 """Shared test fixtures and configuration"""
 
+import os
 import pytest
 import psycopg
 import sys
@@ -19,11 +20,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.core.db_connector import DatabaseConnector, ConnectionProfile
 
 # Test database settings — use a dedicated test database
-TEST_DB = "sql_schema_studio_test"
-TEST_USER = "postgres"
-TEST_PASSWORD = "admin123"
-TEST_HOST = "localhost"
-TEST_PORT = 5432
+TEST_DB = os.environ.get("TEST_DB", "sql_schema_studio_test")
+TEST_USER = os.environ.get("TEST_USER", "postgres")
+TEST_PASSWORD = os.environ.get("TEST_PASSWORD", "admin123")
+TEST_HOST = os.environ.get("TEST_HOST", "localhost")
+TEST_PORT = int(os.environ.get("TEST_PORT", "5432"))
 
 
 @pytest.fixture(scope="session")
