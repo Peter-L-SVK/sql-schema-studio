@@ -37,4 +37,5 @@ Thumbs.db
 *.sqlite
 
 # Backups
-*.bak.env
+*.bak
+.env
